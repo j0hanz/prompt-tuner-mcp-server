@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  prompttuner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: prompttuner-mcp
+    ports:
+      - '${PORT:-3000}:3000'
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=3000
+      - HOST=0.0.0.0
+      - API_KEY=${API_KEY:-dev_api_key_12345}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - RATE_LIMIT=${RATE_LIMIT:-100}
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      # Mount source for development hot reload (optional)
+      - ./src:/app/src:ro
+      - ./dist:/app/dist
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - prompttuner-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: prompttuner-redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - prompttuner-network
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+networks:
+  prompttuner-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local

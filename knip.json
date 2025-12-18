@@ -1,0 +1,3 @@
+{
+  "ignoreBinaries": ["docker-compose", "audit-ci"]
+}
