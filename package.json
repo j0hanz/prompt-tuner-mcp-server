@@ -1,10 +1,10 @@
 {
-  "name": "prompttuner-mcp",
+  "name": "prompt-tuner-mcp-server",
   "version": "1.0.0",
   "description": "MCP server that refines and improves user prompts for AI-optimal readability",
   "type": "module",
   "bin": {
-    "prompttuner-mcp": "./dist/index.js"
+    "prompt-tuner-mcp-server": "./dist/index.js"
   },
   "main": "dist/index.js",
   "exports": {
@@ -15,12 +15,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/j0hanz/prompttuner-mcp.git"
+    "url": "https://github.com/j0hanz/prompt-tuner-mcp-server.git"
   },
   "bugs": {
-    "url": "https://github.com/j0hanz/prompttuner-mcp/issues"
+    "url": "https://github.com/j0hanz/prompt-tuner-mcp-server/issues"
   },
-  "homepage": "https://github.com/j0hanz/prompttuner-mcp#readme",
+  "homepage": "https://github.com/j0hanz/prompt-tuner-mcp-server#readme",
   "scripts": {
     "build": "tsc && node -e \"require('fs').chmodSync('dist/index.js', '755')\"",
     "prepare": "npm run build",
@@ -36,7 +36,7 @@
     "type-check": "tsc --noEmit",
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js",
     "inspector:http": "npx @modelcontextprotocol/inspector -- node dist/index.js --http",
-    "docker:build": "docker build -t prompttuner-mcp .",
+    "docker:build": "docker build -t prompt-tuner-mcp-server .",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down"
   },
