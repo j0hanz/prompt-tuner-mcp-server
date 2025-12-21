@@ -20,9 +20,19 @@ export function registerQuickWorkflowPrompts(server: McpServer): void {
           role: 'user',
           content: {
             type: 'text',
-            text: `Use refine_prompt with technique "basic" on this prompt. Show the improved version and briefly note key changes.
+            text: `<task>
+Use refine_prompt with technique "basic" on this prompt.
+</task>
 
-Prompt: ${prompt}`,
+<instructions>
+1. Apply basic refinement (grammar, clarity, vague words).
+2. Show the improved version.
+3. Briefly note key changes.
+</instructions>
+
+<prompt>
+${prompt}
+</prompt>`,
           },
         },
       ],
@@ -45,11 +55,20 @@ Prompt: ${prompt}`,
           role: 'user',
           content: {
             type: 'text',
-            text: `Use optimize_prompt with techniques ["comprehensive"].
+            text: `<task>
+Use optimize_prompt with techniques ["comprehensive"].
+</task>
 
-Show: before/after scores, all improvements made, final optimized prompt.
+<instructions>
+1. Apply comprehensive optimization.
+2. Show before/after scores.
+3. List all improvements made.
+4. Show the final optimized prompt.
+</instructions>
 
-Prompt: ${prompt}`,
+<prompt>
+${prompt}
+</prompt>`,
           },
         },
       ],
@@ -72,12 +91,19 @@ Prompt: ${prompt}`,
           role: 'user',
           content: {
             type: 'text',
-            text: `Analyze this prompt:
-1. Use analyze_prompt for scores (clarity, specificity, completeness, structure, effectiveness)
-2. Use detect_format to identify target format
-3. Summarize: overall score, strengths, top 3 recommendations
+            text: `<task>
+Analyze this prompt for quality and structure.
+</task>
 
-Prompt: ${prompt}`,
+<instructions>
+1. Use analyze_prompt for scores (clarity, specificity, completeness, structure, effectiveness).
+2. Use detect_format to identify target format.
+3. Summarize: overall score, strengths, top 3 recommendations.
+</instructions>
+
+<prompt>
+${prompt}
+</prompt>`,
           },
         },
       ],
@@ -100,12 +126,19 @@ Prompt: ${prompt}`,
           role: 'user',
           content: {
             type: 'text',
-            text: `Review this prompt against best practices:
-1. Use analyze_prompt for current state
-2. Check: clarity, context/role, structure, output format, constraints
-3. For each gap: what's missing, why it matters, how to fix
+            text: `<task>
+Review this prompt against best practices.
+</task>
 
-Prompt: ${prompt}`,
+<instructions>
+1. Use analyze_prompt for current state.
+2. Check: clarity, context/role, structure, output format, constraints.
+3. For each gap: what's missing, why it matters, how to fix.
+</instructions>
+
+<prompt>
+${prompt}
+</prompt>`,
           },
         },
       ],
@@ -129,18 +162,24 @@ Prompt: ${prompt}`,
           role: 'user',
           content: {
             type: 'text',
-            text: `Perform iterative refinement on this prompt:
+            text: `<task>
+Perform iterative refinement on this prompt.
+</task>
 
-1. Use analyze_prompt to identify issues
-2. Rank the top 3 weaknesses by severity
+<instructions>
+1. Use analyze_prompt to identify issues.
+2. Rank the top 3 weaknesses by severity.
 3. For each weakness:
    - What's wrong (specific issue)
    - Why it matters (impact on AI understanding)
    - Specific fix (concrete improvement)
-4. Use optimize_prompt with appropriate techniques to apply all fixes
-5. Show the final improved prompt with a summary of changes
+4. Use optimize_prompt with appropriate techniques to apply all fixes.
+5. Show the final improved prompt with a summary of changes.
+</instructions>
 
-Prompt: ${prompt}`,
+<prompt>
+${prompt}
+</prompt>`,
           },
         },
       ],
@@ -178,13 +217,17 @@ Prompt: ${prompt}`,
           role: 'user',
           content: {
             type: 'text',
-            text: `Recommend optimization techniques for this prompt:
+            text: `<task>
+Recommend optimization techniques for this prompt.
+</task>
 
+<context>
 Task Type: ${taskType}
+</context>
 
-Process:
-1. Use analyze_prompt to understand current state and weaknesses
-2. Use detect_format to understand target format preference
+<instructions>
+1. Use analyze_prompt to understand current state and weaknesses.
+2. Use detect_format to understand target format preference.
 3. Based on task type and analysis, recommend techniques in priority order:
    - basic: Always beneficial for grammar/clarity
    - chainOfThought: For reasoning, math, debugging, analysis tasks
@@ -196,9 +239,12 @@ Process:
    - Why it's beneficial for this prompt
    - Expected improvement area (clarity, structure, effectiveness)
    - Priority level (high/medium/low)
-5. Suggest optimal technique combination for optimize_prompt
+5. Suggest optimal technique combination for optimize_prompt.
+</instructions>
 
-Prompt: ${prompt}`,
+<prompt>
+${prompt}
+</prompt>`,
           },
         },
       ],
@@ -222,31 +268,34 @@ Prompt: ${prompt}`,
           role: 'user',
           content: {
             type: 'text',
-            text: `Scan this prompt for common anti-patterns:
+            text: `<task>
+Scan this prompt for common anti-patterns.
+</task>
 
-Use analyze_prompt to check for these issues:
+<instructions>
+1. Use analyze_prompt to check for issues.
+2. Detect these anti-patterns:
+   - Vague language (something, stuff, things)
+   - Missing role/persona context
+   - Unclear or missing output format specification
+   - No constraints or boundaries (ALWAYS/NEVER rules)
+   - Lack of examples for complex/ambiguous tasks
+   - Overly long run-on sentences (>30 words)
+   - Ambiguous pronouns (it, this, that without clear referent)
+   - Missing context for technical or domain-specific terms
+   - No success criteria or quality indicators
+   - Conflicting or contradictory instructions
 
-**Anti-Patterns to Detect:**
-1. Vague language (something, stuff, things, etc.)
-2. Missing role/persona context
-3. Unclear or missing output format specification
-4. No constraints or boundaries (ALWAYS/NEVER rules)
-5. Lack of examples for complex/ambiguous tasks
-6. Overly long run-on sentences (>30 words)
-7. Ambiguous pronouns (it, this, that without clear referent)
-8. Missing context for technical or domain-specific terms
-9. No success criteria or quality indicators
-10. Conflicting or contradictory instructions
+3. For each anti-pattern found:
+   - Quote the problematic text
+   - Explain why it's problematic
+   - Provide a corrected version
+   - Note the severity (high/medium/low impact)
 
-For each anti-pattern found:
-- Quote the problematic text
-- Explain why it's problematic
-- Provide a corrected version
-- Note the severity (high/medium/low impact)
+4. Use refine_prompt with technique "comprehensive" to show a fully corrected version.
+</instructions>
 
-Then use refine_prompt with technique "comprehensive" to show a fully corrected version.
-
-Summary format:
+<output_format>
 ## Anti-Patterns Detected: X
 [List each with severity]
 
@@ -255,8 +304,11 @@ Summary format:
 
 ## Impact
 Expected improvement in clarity, specificity, and effectiveness.
+</output_format>
 
-Prompt: ${prompt}`,
+<prompt>
+${prompt}
+</prompt>`,
           },
         },
       ],
