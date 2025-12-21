@@ -5,17 +5,13 @@ import type {
   PatternCache,
   PromptCharacteristics,
   PromptScore,
-  ScoreRule,
   SuggestionContext,
   SuggestionGenerator,
   TargetFormat,
 } from '../config/types.js';
 
 const SCORING_CONFIG = {
-  clarity: {
-    base: 70,
-    vaguePenalty: 5,
-  },
+  clarity: { base: 70, vaguePenalty: 5 },
   specificity: {
     base: 60,
     exampleBonus: 15,
@@ -45,27 +41,12 @@ const SCORING_CONFIG = {
     exampleBonus: 15,
     clarityBonus: 15,
   },
-  thresholds: {
-    low: 60,
-    mid: 70,
-    high: 80,
-  },
-  wordCount: {
-    simple: 50,
-    complex: 200,
-    min: 20,
-  },
+  thresholds: { low: 60, mid: 70, high: 80 },
+  wordCount: { simple: 50, complex: 200, min: 20 },
   promptLengthMin: 100,
 } as const;
 
 const WORD_BOUNDARY_RE = /\S+/g;
-
-function hasPromptStructure(prompt: string): boolean {
-  return (
-    PATTERNS.xmlStructure.test(prompt) ||
-    PATTERNS.markdownStructure.test(prompt)
-  );
-}
 
 function countWords(text: string): number {
   const matches = text.match(WORD_BOUNDARY_RE);
@@ -90,11 +71,16 @@ function estimateComplexity(
   return 'simple';
 }
 
+function hasPromptStructure(prompt: string): boolean {
+  return (
+    PATTERNS.xmlStructure.test(prompt) ||
+    PATTERNS.markdownStructure.test(prompt)
+  );
+}
+
 export function analyzePromptCharacteristics(
   prompt: string,
-  options?: {
-    detectedFormat?: TargetFormat;
-  }
+  options?: { detectedFormat?: TargetFormat }
 ): PromptCharacteristics {
   const wordCount = countWords(prompt);
   const detectedFormat =
@@ -111,131 +97,95 @@ export function analyzePromptCharacteristics(
   };
 }
 
-function calculateClarity(prompt: string): number {
+type ScoreCalculator = (
+  prompt: string,
+  characteristics: PromptCharacteristics,
+  clarityScore?: number
+) => number;
+
+const calculateClarity: ScoreCalculator = (prompt) => {
   const vagueCount = countRegexMatches(prompt, PATTERNS.vagueWords);
   const clarity =
     SCORING_CONFIG.clarity.base -
     vagueCount * SCORING_CONFIG.clarity.vaguePenalty;
   return Math.max(0, Math.min(100, clarity));
-}
+};
 
-function applyScoreRules(baseScore: number, rules: ScoreRule[]): number {
-  const score = rules.reduce(
-    (acc, rule) => (rule.condition ? acc + rule.bonus : acc),
-    baseScore
-  );
-  return Math.max(0, Math.min(100, score));
-}
-
-function calculateSpecificity(
-  prompt: string,
-  characteristics: PromptCharacteristics
-): number {
+const calculateSpecificity: ScoreCalculator = (prompt, characteristics) => {
   const config = SCORING_CONFIG.specificity;
-  const rules: ScoreRule[] = [
-    {
-      condition: characteristics.hasExamples,
-      bonus: config.exampleBonus,
-    },
-    {
-      condition: characteristics.hasRoleContext,
-      bonus: config.roleBonus,
-    },
-    { condition: /\d+/.test(prompt), bonus: config.numberBonus },
-    {
-      condition: prompt.length > SCORING_CONFIG.promptLengthMin,
-      bonus: config.lengthBonus,
-    },
-    {
-      condition:
-        prompt.includes('"') || prompt.includes("'") || prompt.includes('`'),
-      bonus: config.quoteBonus,
-    },
-    {
-      condition: /\b(not|no|never|don't|avoid)\b/i.test(prompt),
-      bonus: config.negationBonus,
-    },
-  ];
-  return applyScoreRules(config.base, rules);
-}
+  let score = config.base;
 
-function calculateCompleteness(
-  prompt: string,
-  characteristics: PromptCharacteristics
-): number {
+  if (characteristics.hasExamples) score += config.exampleBonus;
+  if (characteristics.hasRoleContext) score += config.roleBonus;
+  if (/\d+/.test(prompt)) score += config.numberBonus;
+  if (prompt.length > SCORING_CONFIG.promptLengthMin)
+    score += config.lengthBonus;
+  if (prompt.includes('"') || prompt.includes("'") || prompt.includes('`'))
+    score += config.quoteBonus;
+  if (/\b(not|no|never|don't|avoid)\b/i.test(prompt))
+    score += config.negationBonus;
+
+  return Math.max(0, Math.min(100, score));
+};
+
+const calculateCompleteness: ScoreCalculator = (prompt, characteristics) => {
   const config = SCORING_CONFIG.completeness;
-  const rules: ScoreRule[] = [
-    {
-      condition: characteristics.hasRoleContext,
-      bonus: config.roleBonus,
-    },
-    {
-      condition: characteristics.hasExamples,
-      bonus: config.exampleBonus,
-    },
-    {
-      condition: characteristics.hasStructure,
-      bonus: config.structureBonus,
-    },
-    {
-      condition: prompt.toLowerCase().includes('output'),
-      bonus: config.outputBonus,
-    },
-  ];
-  return applyScoreRules(config.base, rules);
-}
+  let score = config.base;
 
-function calculateStructure(
-  prompt: string,
-  characteristics: PromptCharacteristics
-): number {
+  if (characteristics.hasRoleContext) score += config.roleBonus;
+  if (characteristics.hasExamples) score += config.exampleBonus;
+  if (characteristics.hasStructure) score += config.structureBonus;
+  if (prompt.toLowerCase().includes('output')) score += config.outputBonus;
+
+  return Math.max(0, Math.min(100, score));
+};
+
+const calculateStructure: ScoreCalculator = (prompt, characteristics) => {
   const config = SCORING_CONFIG.structure;
-  const rules: ScoreRule[] = [
-    {
-      condition: characteristics.hasStructure,
-      bonus: config.hasStructureBonus,
-    },
-    { condition: characteristics.hasStepByStep, bonus: config.stepBonus },
-    { condition: prompt.includes('\n'), bonus: config.newlineBonus },
-    // Use characteristics.hasStructure instead of duplicate hasPromptStructure() call
-    { condition: characteristics.hasStructure, bonus: config.formatBonus },
-  ];
-  return applyScoreRules(config.base, rules);
-}
+  let score = config.base;
 
-function calculateEffectiveness(
-  characteristics: PromptCharacteristics,
-  clarity: number
-): number {
+  if (characteristics.hasStructure) score += config.hasStructureBonus;
+  if (characteristics.hasStepByStep) score += config.stepBonus;
+  if (prompt.includes('\n')) score += config.newlineBonus;
+  if (characteristics.hasStructure) score += config.formatBonus;
+
+  return Math.max(0, Math.min(100, score));
+};
+
+const calculateEffectiveness: ScoreCalculator = (
+  _prompt,
+  characteristics,
+  clarityScore = 0
+) => {
   const config = SCORING_CONFIG.effectiveness;
-  const rules: ScoreRule[] = [
-    {
-      condition:
-        characteristics.estimatedComplexity !== 'simple' &&
-        characteristics.hasStepByStep,
-      bonus: config.cotBonus,
-    },
-    {
-      condition: characteristics.hasExamples,
-      bonus: config.exampleBonus,
-    },
-    {
-      condition: clarity >= SCORING_CONFIG.thresholds.mid,
-      bonus: config.clarityBonus,
-    },
-  ];
-  return applyScoreRules(config.base, rules);
-}
+  let score = config.base;
+
+  if (
+    characteristics.estimatedComplexity !== 'simple' &&
+    characteristics.hasStepByStep
+  ) {
+    score += config.cotBonus;
+  }
+  if (characteristics.hasExamples) score += config.exampleBonus;
+  if (clarityScore >= SCORING_CONFIG.thresholds.mid)
+    score += config.clarityBonus;
+
+  return Math.max(0, Math.min(100, score));
+};
 
 export function calculatePromptScore(
   prompt: string,
   characteristics: PromptCharacteristics
 ): PromptScore {
-  const clarity = calculateClarity(prompt);
+  const clarity = calculateClarity(prompt, characteristics);
   const specificity = calculateSpecificity(prompt, characteristics);
   const completeness = calculateCompleteness(prompt, characteristics);
   const structure = calculateStructure(prompt, characteristics);
-  const effectiveness = calculateEffectiveness(characteristics, clarity);
+  const effectiveness = calculateEffectiveness(
+    prompt,
+    characteristics,
+    clarity
+  );
 
   const overall = Math.round(
     clarity * SCORING_WEIGHTS.clarity +
@@ -309,16 +259,6 @@ const SUGGESTION_GENERATORS: SuggestionGenerator[] = [
       : null,
 ];
 
-function getGeneralFeedback(score: PromptScore): string | null {
-  if (score.overall >= SCORING_CONFIG.thresholds.high) {
-    return 'Prompt is well-structured! Consider testing with edge cases to verify robustness.';
-  }
-  if (score.overall >= SCORING_CONFIG.thresholds.low) {
-    return `Prompt has good foundations. Focus on the suggestions above to reach ${SCORING_CONFIG.thresholds.high}+ score.`;
-  }
-  return null;
-}
-
 export function generateSuggestions(
   prompt: string,
   characteristics: PromptCharacteristics,
@@ -340,9 +280,14 @@ export function generateSuggestions(
     }
   }
 
-  const feedback = getGeneralFeedback(score);
-  if (feedback) {
-    suggestions.push(feedback);
+  if (score.overall >= SCORING_CONFIG.thresholds.high) {
+    suggestions.push(
+      'Prompt is well-structured! Consider testing with edge cases to verify robustness.'
+    );
+  } else if (score.overall >= SCORING_CONFIG.thresholds.low) {
+    suggestions.push(
+      `Prompt has good foundations. Focus on the suggestions above to reach ${SCORING_CONFIG.thresholds.high}+ score.`
+    );
   }
 
   return suggestions;
@@ -368,10 +313,6 @@ function cachePatterns(prompt: string): PatternCache {
     hasAngleBrackets: prompt.includes('<') && prompt.includes('>'),
     hasJsonChars: prompt.includes('"') && prompt.includes(':'),
   };
-}
-
-function scoreIf(condition: boolean, points: number): number {
-  return condition ? points : 0;
 }
 
 const FORMAT_SCORING_CONFIG: Record<
@@ -412,46 +353,24 @@ const FORMAT_SCORING_CONFIG: Record<
   },
 };
 
-function calculateFormatScore(
-  cache: PatternCache,
-  config: FormatScoringConfig
-): { score: number; negative: number } {
-  const score = config.positive.reduce(
-    (acc, { key, weight }) => acc + scoreIf(cache[key], weight),
-    0
-  );
-  const negative = config.negative.reduce(
-    (acc, { key, weight }) => acc + scoreIf(cache[key], weight),
-    0
-  );
-  return { score, negative };
-}
-
 const FORMAT_RECOMMENDATIONS: Record<'claude' | 'gpt' | 'json', string> = {
   claude: 'XML-style formatting detected. Optimal for Claude models.',
   gpt: 'Markdown formatting detected. Optimal for GPT models.',
   json: 'JSON structure detected. Good for structured data extraction.',
 };
 
-function getFormatResults(cache: PatternCache): FormatResult[] {
-  return (['claude', 'gpt', 'json'] as const).map((format) => {
-    const result = calculateFormatScore(cache, FORMAT_SCORING_CONFIG[format]);
-    return {
-      net: result.score - result.negative,
-      format,
-      recommendation: FORMAT_RECOMMENDATIONS[format],
-      rawScore: result.score,
-    };
-  });
-}
-
-function calculateConfidence(
-  winner: FormatResult,
-  formatResults: FormatResult[]
+function calculateFormatScore(
+  cache: PatternCache,
+  config: FormatScoringConfig
 ): number {
-  const conflictCount = formatResults.filter((r) => r.rawScore > 0).length;
-  const conflictPenalty = conflictCount > 1 ? 15 : 0;
-  return Math.min(100, Math.max(20, winner.rawScore + 20 - conflictPenalty));
+  let score = 0;
+  for (const { key, weight } of config.positive) {
+    if (cache[key]) score += weight;
+  }
+  for (const { key, weight } of config.negative) {
+    if (cache[key]) score -= weight;
+  }
+  return score;
 }
 
 export function detectTargetFormat(prompt: string): {
@@ -460,40 +379,52 @@ export function detectTargetFormat(prompt: string): {
   recommendation: string;
 } {
   const cache = cachePatterns(prompt);
-  const formatResults = getFormatResults(cache);
-  const maxNet = Math.max(...formatResults.map((r) => r.net));
+  const results: FormatResult[] = (['claude', 'gpt', 'json'] as const).map(
+    (format) => {
+      const rawScore = calculateFormatScore(
+        cache,
+        FORMAT_SCORING_CONFIG[format]
+      );
+      return {
+        net: rawScore,
+        format,
+        recommendation: FORMAT_RECOMMENDATIONS[format],
+        rawScore,
+      };
+    }
+  );
+
+  const maxNet = Math.max(...results.map((r) => r.net));
 
   if (maxNet <= 0) {
-    return createAutoFormatResult(
-      'No specific format detected. Consider using Claude XML or GPT Markdown based on your target model.'
-    );
+    return {
+      format: 'auto',
+      confidence: 30,
+      recommendation:
+        'No specific format detected. Consider using Claude XML or GPT Markdown based on your target model.',
+    };
   }
 
-  const winner = formatResults.find((r) => r.net === maxNet);
+  const winner = results.find((r) => r.net === maxNet);
 
   if (!winner) {
-    return createAutoFormatResult(
-      'Unable to determine format with confidence.'
-    );
+    return {
+      format: 'auto',
+      confidence: 30,
+      recommendation: 'Unable to determine format with confidence.',
+    };
   }
 
-  const confidence = calculateConfidence(winner, formatResults);
+  const conflictCount = results.filter((r) => r.rawScore > 0).length;
+  const conflictPenalty = conflictCount > 1 ? 15 : 0;
+  const confidence = Math.min(
+    100,
+    Math.max(20, winner.rawScore + 20 - conflictPenalty)
+  );
 
   return {
     format: winner.format,
     confidence,
     recommendation: winner.recommendation,
-  };
-}
-
-function createAutoFormatResult(recommendation: string): {
-  format: TargetFormat;
-  confidence: number;
-  recommendation: string;
-} {
-  return {
-    format: 'auto',
-    confidence: 30,
-    recommendation,
   };
 }
