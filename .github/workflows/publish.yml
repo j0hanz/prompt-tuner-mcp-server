@@ -64,7 +64,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Package** | [\`prompttuner-mcp\`](https://www.npmjs.com/package/prompttuner-mcp) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Package** | [\`@j0hanz/prompt-tuner-mcp-server\`](https://www.npmjs.com/package/@j0hanz/prompt-tuner-mcp-server) |" >> $GITHUB_STEP_SUMMARY
           echo "| **Version** | \`${{ steps.version.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Registry** | npmjs.com |" >> $GITHUB_STEP_SUMMARY
           echo "| **Auth** | 🔐 Trusted Publishing (OIDC) |" >> $GITHUB_STEP_SUMMARY
@@ -79,7 +79,7 @@ jobs:
           echo "  \"mcpServers\": {" >> $GITHUB_STEP_SUMMARY
           echo "    \"prompttuner\": {" >> $GITHUB_STEP_SUMMARY
           echo "      \"command\": \"npx\"," >> $GITHUB_STEP_SUMMARY
-          echo "      \"args\": [\"-y\", \"prompttuner-mcp@${{ steps.version.outputs.version }}\"]" >> $GITHUB_STEP_SUMMARY
+          echo "      \"args\": [\"-y\", \"@j0hanz/prompt-tuner-mcp-server@${{ steps.version.outputs.version }}\"]" >> $GITHUB_STEP_SUMMARY
           echo "    }" >> $GITHUB_STEP_SUMMARY
           echo "  }" >> $GITHUB_STEP_SUMMARY
           echo "}" >> $GITHUB_STEP_SUMMARY
@@ -87,5 +87,5 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Direct installation:**" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "npm install -g prompttuner-mcp" >> $GITHUB_STEP_SUMMARY
+          echo "npm install -g @j0hanz/prompt-tuner-mcp-server" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
