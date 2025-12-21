@@ -1,16 +1,13 @@
-// Prompt Template Resources for PromptTuner MCP
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-// Sanitize user input before reflecting in error messages to prevent injection
+// Sanitize user input to prevent injection
 function sanitizeInput(input: string, maxLength = 50): string {
   return input
     .replace(/[<>&"'\\\\]/g, '') // Remove potentially dangerous characters
     .slice(0, maxLength);
 }
 
-// Pre-built prompt templates organized by category
-// Based on 2024-2025 prompt engineering best practices
 const PROMPT_TEMPLATES: Record<string, Record<string, string>> = {
   coding: {
     'code-review': `# Identity

@@ -1,4 +1,3 @@
-// Zod input schemas for PromptTuner MCP
 import { z } from 'zod';
 
 import { MAX_PROMPT_LENGTH } from '../config/constants.js';

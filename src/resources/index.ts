@@ -1,4 +1,3 @@
-// Resource registration aggregator for PromptTuner MCP
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { registerPromptTemplateResources } from './prompt-templates.js';

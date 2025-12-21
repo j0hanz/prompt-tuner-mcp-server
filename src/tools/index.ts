@@ -1,4 +1,3 @@
-// Tool registration aggregator for PromptTuner MCP
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import type { ToolRegistrar } from '../config/types.js';
@@ -9,11 +8,7 @@ import { registerOptimizePromptTool } from './optimize-prompt.js';
 import { registerRefinePromptTool } from './refine-prompt.js';
 import { registerValidatePromptTool } from './validate-prompt.js';
 
-/**
- * Array of tool registration functions.
- * Add new tools here to auto-register them.
- * Order determines registration priority.
- */
+// Tool registration functions
 const TOOL_REGISTRARS: readonly ToolRegistrar[] = [
   registerRefinePromptTool,
   registerAnalyzePromptTool,
@@ -23,10 +18,7 @@ const TOOL_REGISTRARS: readonly ToolRegistrar[] = [
   registerValidatePromptTool,
 ] as const;
 
-/**
- * Registers all PromptTuner tools with the MCP server.
- * Uses data-driven pattern for easy extensibility.
- */
+// Registers all PromptTuner tools with the MCP server
 export function registerAllTools(server: McpServer): void {
   for (const registrar of TOOL_REGISTRARS) {
     registrar(server);

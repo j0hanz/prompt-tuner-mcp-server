@@ -1,6 +1,3 @@
-// Server instructions for MCP protocol
-// Based on 2024-2025 prompt engineering best practices
-
 export const SERVER_INSTRUCTIONS = `# PromptTuner MCP
 
 A professional prompt engineering toolkit that helps you write better prompts for AI assistants using modern best practices from Anthropic, OpenAI, and industry leaders.

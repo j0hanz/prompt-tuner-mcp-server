@@ -1,4 +1,3 @@
-// Compare Prompts Tool - LLM-powered prompt comparison
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import type { ComparisonResponse } from '../config/types.js';
@@ -82,7 +81,7 @@ Example valid response:
 }
 </schema>`;
 
-/** Formats comparison output as markdown report */
+// Formats comparison output as markdown report
 function formatComparisonOutput(
   labelA: string,
   labelB: string,
@@ -129,10 +128,7 @@ function formatComparisonOutput(
   return sections.join('\n');
 }
 
-/**
- * Registers the compare_prompts tool with the MCP server.
- * Uses external LLM to compare prompts.
- */
+// Registers the compare_prompts tool with the MCP server
 export function registerComparePromptsTool(server: McpServer): void {
   server.registerTool(
     'compare_prompts',

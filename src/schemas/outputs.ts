@@ -1,9 +1,8 @@
-// Zod output schemas for PromptTuner MCP
 import { z } from 'zod';
 
 import { OPTIMIZATION_TECHNIQUES, TARGET_FORMATS } from '../config/types.js';
 
-/** Schema for error details in responses */
+// Schema for error details in responses
 const ErrorSchema = z.object({
   code: z.string().describe('Error code (e.g., E_INVALID_INPUT)'),
   message: z.string().describe('Human-readable error message'),
@@ -14,7 +13,7 @@ const ErrorSchema = z.object({
     .describe('Additional error details'),
 });
 
-/** Schema for prompt analysis scores (0-100 for each dimension) */
+// Schema for prompt analysis scores (0-100 for each dimension)
 const ScoreSchema = z.object({
   clarity: z.number().min(0).max(100).describe('How clear and unambiguous'),
   specificity: z.number().min(0).max(100).describe('How specific and detailed'),
@@ -28,7 +27,7 @@ const ScoreSchema = z.object({
   overall: z.number().min(0).max(100).describe('Weighted overall score'),
 });
 
-/** Schema for detected prompt characteristics */
+// Schema for detected prompt characteristics
 const CharacteristicsSchema = z.object({
   detectedFormat: z.enum(TARGET_FORMATS).describe('Detected target format'),
   hasExamples: z.boolean().describe('Contains examples'),

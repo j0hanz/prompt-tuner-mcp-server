@@ -1,4 +1,3 @@
-// Zod schemas for validating LLM responses
 import { z } from 'zod';
 
 // Re-export types from centralized types.ts
@@ -13,14 +12,10 @@ export type {
   ValidationResponse,
 } from '../config/types.js';
 
-/**
- * Schema for score values (0-100).
- */
+// Schema for score values (0-100)
 const ScoreSchema = z.number().int().min(0).max(100);
 
-/**
- * Schema for optimization scores across dimensions.
- */
+// Schema for optimization scores across dimensions
 export const OptimizeScoreSchema = z.object({
   clarity: ScoreSchema,
   specificity: ScoreSchema,
@@ -30,9 +25,7 @@ export const OptimizeScoreSchema = z.object({
   overall: ScoreSchema,
 });
 
-/**
- * Schema for optimize_prompt LLM response.
- */
+// Schema for optimize_prompt LLM response
 export const OptimizeResponseSchema = z.object({
   optimized: z.string().min(1).describe('The fully optimized prompt'),
   techniquesApplied: z.array(z.string()).min(1).describe('Techniques applied'),
@@ -41,9 +34,7 @@ export const OptimizeResponseSchema = z.object({
   afterScore: OptimizeScoreSchema,
 });
 
-/**
- * Schema for analysis characteristics.
- */
+// Schema for analysis characteristics
 export const AnalysisCharacteristicsSchema = z.object({
   hasTypos: z.boolean(),
   isVague: z.boolean(),
@@ -57,18 +48,14 @@ export const AnalysisCharacteristicsSchema = z.object({
   estimatedComplexity: z.enum(['simple', 'moderate', 'complex']),
 });
 
-/**
- * Schema for analyze_prompt LLM response.
- */
+// Schema for analyze_prompt LLM response
 export const AnalysisResponseSchema = z.object({
   score: OptimizeScoreSchema,
   characteristics: AnalysisCharacteristicsSchema,
   suggestions: z.array(z.string()).describe('Improvement suggestions'),
 });
 
-/**
- * Schema for comparison response.
- */
+// Schema for comparison response
 export const ComparisonResponseSchema = z.object({
   winner: z.enum(['A', 'B', 'tie']),
   scoreA: OptimizeScoreSchema,
@@ -78,27 +65,21 @@ export const ComparisonResponseSchema = z.object({
   recommendation: z.string(),
 });
 
-/**
- * Schema for validation issue.
- */
+// Schema for validation issue
 export const ValidationIssueSchema = z.object({
   type: z.enum(['error', 'warning', 'info']),
   message: z.string(),
   suggestion: z.string().optional(),
 });
 
-/**
- * Schema for validate_prompt LLM response.
- */
+// Schema for validate_prompt LLM response
 export const ValidationResponseSchema = z.object({
   isValid: z.boolean(),
   tokenEstimate: z.number().int().min(0),
   issues: z.array(ValidationIssueSchema),
 });
 
-/**
- * Schema for format detection response.
- */
+// Schema for format detection response
 export const FormatDetectionResponseSchema = z.object({
   detectedFormat: z.enum(['claude', 'gpt', 'json', 'auto']),
   confidence: z.number().int().min(0).max(100),

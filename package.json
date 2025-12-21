@@ -35,10 +35,7 @@
     "format": "prettier --write .",
     "type-check": "tsc --noEmit",
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js",
-    "inspector:http": "npx @modelcontextprotocol/inspector -- node dist/index.js --http",
-    "docker:build": "docker build -t prompt-tuner-mcp-server .",
-    "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down"
+    "inspector:http": "npx @modelcontextprotocol/inspector -- node dist/index.js --http"
   },
   "keywords": [
     "mcp",

@@ -3,11 +3,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 export type ToolRegistrar = (server: McpServer) => void;
 
 export interface RefinedPrompt {
-  /** Original input prompt */
   original: string;
-  /** Refined output prompt */
   refined: string;
-  /** List of corrections/changes made */
   corrections: string[];
 }
 
@@ -33,11 +30,8 @@ export interface SuccessResponse<T extends Record<string, unknown>> {
 }
 
 export interface TechniqueTemplate {
-  /** Technique identifier */
   name: OptimizationTechnique;
-  /** Human-readable description */
   description: string;
-  /** System prompt for LLM refinement */
   systemPrompt: string;
 }
 

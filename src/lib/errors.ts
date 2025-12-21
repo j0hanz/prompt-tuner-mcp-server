@@ -60,10 +60,7 @@ export class McpError extends Error {
     }
   }
 
-  /**
-   * Custom inspect output for better console debugging.
-   * Shows concise error info when using console.log or util.inspect.
-   */
+  // Custom inspect output for better console debugging
   [inspect.custom](): string {
     const hint = this.recoveryHint ? ` (Hint: ${this.recoveryHint})` : '';
     const details = this.details ? ` ${JSON.stringify(this.details)}` : '';
@@ -81,9 +78,7 @@ export function createSuccessResponse<T extends Record<string, unknown>>(
   };
 }
 
-/**
- * Sanitizes context by removing API keys and truncating prompts.
- */
+// Sanitizes context by removing API keys and truncating prompts
 function sanitizeErrorContext(context?: string): string | undefined {
   if (!context) return undefined;
 

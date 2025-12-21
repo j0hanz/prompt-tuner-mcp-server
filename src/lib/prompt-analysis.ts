@@ -48,16 +48,19 @@ const SCORING_CONFIG = {
 
 const WORD_BOUNDARY_RE = /\S+/g;
 
+// Counts words in a string
 function countWords(text: string): number {
   const matches = text.match(WORD_BOUNDARY_RE);
   return matches?.length ?? 0;
 }
 
+// Counts regex matches in a string
 function countRegexMatches(text: string, regex: RegExp): number {
   const matches = text.match(regex);
   return matches?.length ?? 0;
 }
 
+// Estimates prompt complexity based on word count and structure
 function estimateComplexity(
   wordCount: number,
   prompt: string
@@ -71,6 +74,7 @@ function estimateComplexity(
   return 'simple';
 }
 
+// Checks if prompt has XML or Markdown structure
 function hasPromptStructure(prompt: string): boolean {
   return (
     PATTERNS.xmlStructure.test(prompt) ||
@@ -78,6 +82,7 @@ function hasPromptStructure(prompt: string): boolean {
   );
 }
 
+// Analyzes prompt characteristics for scoring and suggestions
 export function analyzePromptCharacteristics(
   prompt: string,
   options?: { detectedFormat?: TargetFormat }
@@ -103,6 +108,7 @@ type ScoreCalculator = (
   clarityScore?: number
 ) => number;
 
+// Calculates clarity score based on vague words
 const calculateClarity: ScoreCalculator = (prompt) => {
   const vagueCount = countRegexMatches(prompt, PATTERNS.vagueWords);
   const clarity =
@@ -111,6 +117,7 @@ const calculateClarity: ScoreCalculator = (prompt) => {
   return Math.max(0, Math.min(100, clarity));
 };
 
+// Calculates specificity score based on details and examples
 const calculateSpecificity: ScoreCalculator = (prompt, characteristics) => {
   const config = SCORING_CONFIG.specificity;
   let score = config.base;
@@ -128,6 +135,7 @@ const calculateSpecificity: ScoreCalculator = (prompt, characteristics) => {
   return Math.max(0, Math.min(100, score));
 };
 
+// Calculates completeness score based on context and requirements
 const calculateCompleteness: ScoreCalculator = (prompt, characteristics) => {
   const config = SCORING_CONFIG.completeness;
   let score = config.base;
@@ -140,6 +148,7 @@ const calculateCompleteness: ScoreCalculator = (prompt, characteristics) => {
   return Math.max(0, Math.min(100, score));
 };
 
+// Calculates structure score based on formatting and organization
 const calculateStructure: ScoreCalculator = (prompt, characteristics) => {
   const config = SCORING_CONFIG.structure;
   let score = config.base;
@@ -152,6 +161,7 @@ const calculateStructure: ScoreCalculator = (prompt, characteristics) => {
   return Math.max(0, Math.min(100, score));
 };
 
+// Calculates effectiveness score based on reasoning and clarity
 const calculateEffectiveness: ScoreCalculator = (
   _prompt,
   characteristics,
@@ -173,6 +183,7 @@ const calculateEffectiveness: ScoreCalculator = (
   return Math.max(0, Math.min(100, score));
 };
 
+// Calculates overall prompt score across all dimensions
 export function calculatePromptScore(
   prompt: string,
   characteristics: PromptCharacteristics
@@ -259,6 +270,7 @@ const SUGGESTION_GENERATORS: SuggestionGenerator[] = [
       : null,
 ];
 
+// Generates actionable improvement suggestions based on analysis
 export function generateSuggestions(
   prompt: string,
   characteristics: PromptCharacteristics,
@@ -293,6 +305,7 @@ export function generateSuggestions(
   return suggestions;
 }
 
+// Resolves target format, defaulting to GPT if auto-detection fails
 export function resolveFormat(
   format: TargetFormat,
   prompt: string
@@ -302,6 +315,7 @@ export function resolveFormat(
   return detected.format === 'auto' ? 'gpt' : detected.format;
 }
 
+// Caches pattern detection results for format scoring
 function cachePatterns(prompt: string): PatternCache {
   return {
     hasClaudePatterns: PATTERNS.claudePatterns.test(prompt),
@@ -359,6 +373,7 @@ const FORMAT_RECOMMENDATIONS: Record<'claude' | 'gpt' | 'json', string> = {
   json: 'JSON structure detected. Good for structured data extraction.',
 };
 
+// Calculates format score based on pattern weights
 function calculateFormatScore(
   cache: PatternCache,
   config: FormatScoringConfig
@@ -373,6 +388,7 @@ function calculateFormatScore(
   return score;
 }
 
+// Detects target format and confidence level
 export function detectTargetFormat(prompt: string): {
   format: TargetFormat;
   confidence: number;

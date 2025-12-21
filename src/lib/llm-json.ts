@@ -12,9 +12,7 @@ const CODE_BLOCK_START_RE = /^[\s\n]*```(?:json)?[\s\n]*/i;
 // Matches closing code block at end (with optional whitespace/newlines after)
 const CODE_BLOCK_END_RE = /[\s\n]*```[\s\n]*$/;
 
-/**
- * Strips code block markers from the start and end of a string.
- */
+// Strips code block markers from the start and end of a string
 function stripCodeBlockMarkers(text: string): string {
   let result = text;
 

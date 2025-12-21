@@ -1,4 +1,4 @@
-// Prompt refinement cache for PromptTuner MCP
+// Prompt refinement cache
 import { createHash } from 'node:crypto';
 
 import { LRUCache } from 'lru-cache';
@@ -11,9 +11,7 @@ const refinementCache = new LRUCache<string, string>({
   max: MAX_CACHE_SIZE,
 });
 
-/**
- * Generates SHA-256 hash for cache key.
- */
+// Generates SHA-256 hash for cache key
 function generateCacheKey(
   prompt: string,
   technique: string,
@@ -23,9 +21,7 @@ function generateCacheKey(
   return createHash('sha256').update(data).digest('hex');
 }
 
-/**
- * Retrieves cached refinement result if available.
- */
+// Retrieves cached refinement result if available
 export function getCachedRefinement(
   prompt: string,
   technique: string,
@@ -37,9 +33,7 @@ export function getCachedRefinement(
   return cached;
 }
 
-/**
- * Caches a refinement result.
- */
+// Caches a refinement result
 export function setCachedRefinement(
   prompt: string,
   technique: string,
@@ -55,9 +49,7 @@ export function setCachedRefinement(
   );
 }
 
-/**
- * Clears the refinement cache.
- */
+// Clears the refinement cache
 export function clearCache(): void {
   refinementCache.clear();
 }

@@ -47,12 +47,12 @@ Return JSON:
 }
 </output_format>`;
 
-/** Formats a validation issue as markdown */
+// Formats a validation issue as markdown
 function formatIssue(issue: ValidationIssue): string {
   return `- ${issue.message}\n  💡 ${issue.suggestion ?? 'N/A'}`;
 }
 
-/** Formats validation output as markdown report */
+// Formats validation output as markdown report
 function formatValidationOutput(
   parsed: ValidationResponse,
   targetModel: string
@@ -104,10 +104,7 @@ function formatValidationOutput(
   return sections.join('\n');
 }
 
-/**
- * Registers the validate_prompt tool with the MCP server.
- * Uses external LLM for validation.
- */
+// Registers the validate_prompt tool with the MCP server
 export function registerValidatePromptTool(server: McpServer): void {
   server.registerTool(
     'validate_prompt',

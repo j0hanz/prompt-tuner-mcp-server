@@ -70,21 +70,14 @@ const TYPO_MAP = new Map<string, string>([
   ['dependancy', 'dependency'],
 ]);
 
-/**
- * Combined regex for single-pass typo detection.
- * Much faster than testing 68 individual patterns - O(n) vs O(68n).
- * Uses word boundaries to match whole words only.
- */
+// Combined regex for single-pass typo detection
 const TYPO_WORDS = [...TYPO_MAP.keys()];
-const COMBINED_TYPO_REGEX = new RegExp(`\\b(${TYPO_WORDS.join('|')})\\b`, 'gi');
+const COMBINED_TYPO_REGEX = new RegExp(
+  `\\\\b(${TYPO_WORDS.join('|')})\\\\b`,
+  'gi'
+);
 
-/**
- * Fix all typos in a single pass using combined regex.
- * Returns the corrected text and list of corrections made.
- *
- * Performance: Single regex match + Map lookup per typo found,
- * instead of 68 separate regex.test() calls.
- */
+// Fix all typos in a single pass using combined regex
 export function fixTyposBatch(text: string): {
   fixed: string;
   corrections: string[];

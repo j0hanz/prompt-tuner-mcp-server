@@ -373,7 +373,7 @@ class AnthropicClient implements LLMClient {
   }
 }
 
-/** Google safety categories for content filtering */
+// Google safety categories for content filtering
 const GOOGLE_SAFETY_CATEGORIES = [
   HarmCategory.HARM_CATEGORY_HATE_SPEECH,
   HarmCategory.HARM_CATEGORY_HARASSMENT,

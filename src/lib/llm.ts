@@ -5,10 +5,7 @@ import { withRetry } from './retry.js';
 import { buildRefinementPrompt } from './technique-templates.js';
 import { validateLLMOutput } from './validation.js';
 
-/**
- * Creates an AbortSignal that automatically aborts after the specified timeout.
- * Uses Node.js built-in AbortSignal.timeout() for cleaner timeout handling.
- */
+// Creates an AbortSignal that automatically aborts after the specified timeout
 function createTimeoutSignal(timeoutMs: number): AbortSignal {
   return AbortSignal.timeout(timeoutMs);
 }

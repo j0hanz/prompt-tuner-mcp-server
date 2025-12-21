@@ -1,5 +1,3 @@
-// Optimization technique templates for PromptTuner MCP
-// Based on 2024-2025 prompt engineering best practices from Anthropic, OpenAI, and industry leaders
 import type {
   OptimizationTechnique,
   TargetFormat,
@@ -215,7 +213,7 @@ function getTechniqueTemplate(
   return TECHNIQUE_TEMPLATES[technique];
 }
 
-/** Format-specific instruction templates */
+// Format-specific instruction templates
 const FORMAT_INSTRUCTIONS: Record<Exclude<TargetFormat, 'auto'>, string> = {
   claude: `
 <format_instructions>

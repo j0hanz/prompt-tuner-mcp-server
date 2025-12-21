@@ -1,4 +1,3 @@
-// Detect Format Tool - LLM-powered format detection
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import type { FormatDetectionResponse } from '../config/types.js';
@@ -65,10 +64,7 @@ Required JSON schema:
   "recommendation": string
 }`;
 
-/**
- * Registers the detect_format tool with the MCP server.
- * Uses external LLM to detect format.
- */
+// Registers the detect_format tool with the MCP server
 export function registerDetectFormatTool(server: McpServer): void {
   server.registerTool(
     'detect_format',

@@ -114,10 +114,7 @@ export function validateFormat(format: string): TargetFormat {
   return format;
 }
 
-/**
- * Sanitizes user input to prevent prompt injection attacks.
- * Removes script tags, iframes, and dangerous protocols.
- */
+// Sanitizes user input to prevent prompt injection attacks
 export function sanitizePromptInput(input: string): string {
   return input
     .replace(/(<\/?script[^>]*>|<\/?iframe[^>]*>)/gi, '')

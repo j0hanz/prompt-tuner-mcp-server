@@ -71,8 +71,8 @@ export function registerRefinePromptTool(server: McpServer): void {
           validatedPrompt,
           validatedTechnique,
           resolvedFormat,
-          2000, // maxTokens
-          60000 // timeoutMs
+          2000,
+          60000
         );
 
         const finalCorrections: string[] = [];

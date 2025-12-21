@@ -45,7 +45,7 @@ export async function validateApiKeys(): Promise<void> {
           ? 'ANTHROPIC_API_KEY'
           : 'GOOGLE_API_KEY';
 
-    // Only throw specific error if it's a known provider, otherwise let getLLMClient handle invalid provider
+    // Only throw for known providers; let getLLMClient handle others
     if (['openai', 'anthropic', 'google'].includes(provider)) {
       throw new McpError(
         ErrorCode.E_INVALID_INPUT,
