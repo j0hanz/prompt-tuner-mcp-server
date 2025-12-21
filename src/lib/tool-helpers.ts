@@ -28,16 +28,3 @@ export async function executeLLMWithJsonResponse<T>(
     debugLabel,
   });
 }
-
-export function formatScoreList(
-  scores: Record<string, number>,
-  suffix = '/100'
-): string {
-  return Object.entries(scores)
-    .map(([key, value]) => `- **${capitalizeFirst(key)}**: ${value}${suffix}`)
-    .join('\n');
-}
-
-function capitalizeFirst(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}

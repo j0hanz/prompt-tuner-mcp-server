@@ -176,14 +176,13 @@ export function registerOptimizePromptTool(server: McpServer): void {
         openWorldHint: false,
       },
     },
-    async ({
-      prompt,
-      techniques,
-      targetFormat,
-    }): Promise<
+    async (
+      input
+    ): Promise<
       | ReturnType<typeof createSuccessResponse>
       | ReturnType<typeof createErrorResponse>
     > => {
+      const { prompt, techniques, targetFormat } = input;
       try {
         const validatedPrompt = validatePrompt(prompt);
         const validatedTechniques = validateTechniques(techniques);

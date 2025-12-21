@@ -1,83 +1,36 @@
-import { debuglog, inspect } from 'node:util';
+import { inspect } from 'node:util';
+
+import pino from 'pino';
 
 import { config } from '../config/env.js';
 import {
   ErrorCode,
   type ErrorCodeType,
   type ErrorResponse,
-  type LogFormat,
-  type LogLevel,
   type McpErrorOptions,
   type SuccessResponse,
 } from '../config/types.js';
-import { getRequestId } from './context.js';
 
-const { LOG_FORMAT: RAW_LOG_FORMAT } = config;
-const LOG_FORMAT: LogFormat = RAW_LOG_FORMAT;
+const stderrDestination = pino.destination({ fd: 2 });
 
-const JSON_LOGGING = LOG_FORMAT === 'json';
-
-/**
- * Namespaced debug loggers using Node.js built-in util.debuglog().
- * Enable via NODE_DEBUG environment variable:
- * - NODE_DEBUG=prompttuner:llm - LLM operations
- * - NODE_DEBUG=prompttuner:cache - Cache operations
- * - NODE_DEBUG=prompttuner:retry - Retry operations
- * - NODE_DEBUG=prompttuner:* - All debug logs
- */
-export const debugLLM = debuglog('prompttuner:llm');
-export const debugCache = debuglog('prompttuner:cache');
-export const debugRetry = debuglog('prompttuner:retry');
-
-function formatLogEntry(
-  level: LogLevel,
-  message: string,
-  args: unknown[]
-): string {
-  const requestId = getRequestId();
-
-  if (JSON_LOGGING) {
-    return JSON.stringify({
-      level,
-      message,
-      requestId,
-      args: args.length > 0 ? args : undefined,
-      ts: new Date().toISOString(),
-    });
-  }
-  const timestamp = new Date().toISOString();
-  const reqIdStr = requestId ? `[${requestId}] ` : '';
-  return `${timestamp} [${level.toUpperCase()}] ${reqIdStr}${message}`;
-}
-
-export const logger = {
-  error: (message: string, ...args: unknown[]): void => {
-    console.error(
-      formatLogEntry('error', message, args),
-      ...(!JSON_LOGGING ? args : [])
-    );
+export const logger = pino(
+  {
+    level: config.DEBUG ? 'debug' : 'info',
+    base: { pid: process.pid },
   },
-  warn: (message: string, ...args: unknown[]): void => {
-    console.error(
-      formatLogEntry('warn', message, args),
-      ...(!JSON_LOGGING ? args : [])
-    );
-  },
-  info: (message: string, ...args: unknown[]): void => {
-    console.error(
-      formatLogEntry('info', message, args),
-      ...(!JSON_LOGGING ? args : [])
-    );
-  },
-  debug: (message: string, ...args: unknown[]): void => {
-    if (config.DEBUG) {
-      console.error(
-        formatLogEntry('debug', message, args),
-        ...(!JSON_LOGGING ? args : [])
-      );
-    }
-  },
-} as const;
+  stderrDestination
+);
+
+// Re-export debug loggers as sub-loggers if needed, or just use logger.debug
+export const debugLLM = (msg: string, ...args: unknown[]): void => {
+  logger.debug({ module: 'llm' }, msg, ...args);
+};
+export const debugCache = (msg: string, ...args: unknown[]): void => {
+  logger.debug({ module: 'cache' }, msg, ...args);
+};
+export const debugRetry = (msg: string, ...args: unknown[]): void => {
+  logger.debug({ module: 'retry' }, msg, ...args);
+};
 
 export class McpError extends Error {
   readonly code: ErrorCodeType;

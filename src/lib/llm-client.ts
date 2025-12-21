@@ -1,6 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk';
+
 import { GoogleGenAI, HarmBlockThreshold, HarmCategory } from '@google/genai';
+
 import OpenAI from 'openai';
+
+import invariant from 'tiny-invariant';
 
 import { DEFAULT_MODELS, LLM_MAX_TOKENS } from '../config/constants.js';
 import { config } from '../config/env.js';
@@ -258,20 +262,6 @@ function checkAborted(signal?: AbortSignal): void {
   }
 }
 
-function assertNonEmptyContent(
-  content: string | undefined | null,
-  provider: LLMProvider
-): asserts content is string {
-  if (!content?.trim()) {
-    throw new McpError(
-      ErrorCode.E_LLM_FAILED,
-      'LLM returned empty response',
-      undefined,
-      { provider }
-    );
-  }
-}
-
 class OpenAIClient implements LLMClient {
   private readonly client: OpenAI;
   private readonly model: string;
@@ -303,7 +293,7 @@ class OpenAIClient implements LLMClient {
           }
         );
         const content = response.choices[0]?.message.content?.trim() ?? '';
-        assertNonEmptyContent(content, this.provider);
+        invariant(content, 'LLM returned empty response');
 
         const durationMs = Number(process.hrtime.bigint() - start) / 1_000_000;
         logger.debug(
@@ -360,7 +350,7 @@ class AnthropicClient implements LLMClient {
         );
         const content =
           textBlock && 'text' in textBlock ? textBlock.text.trim() : '';
-        assertNonEmptyContent(content, this.provider);
+        invariant(content, 'LLM returned empty response');
 
         const durationMs = Number(process.hrtime.bigint() - start) / 1_000_000;
         logger.debug(
@@ -412,7 +402,7 @@ class GoogleClient implements LLMClient {
       try {
         checkAborted(options?.signal);
         const response = await this.executeRequest(prompt, maxTokens, options);
-        assertNonEmptyContent(response, this.provider);
+        invariant(response, 'LLM returned empty response');
 
         const durationMs = Number(process.hrtime.bigint() - start) / 1_000_000;
         logger.debug(

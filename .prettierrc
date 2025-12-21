@@ -14,11 +14,13 @@
   "plugins": ["@trivago/prettier-plugin-sort-imports"],
   "importOrder": [
     "^node:(.*)$",
-    "^(fs|path|os|crypto|util|stream|events|buffer|url|http|https|child_process)(/.*)?$",
     "^@modelcontextprotocol/(.*)$",
-    "^(zod|glob)(.*)$",
+    "^@anthropic-ai/(.*)$",
+    "^@google/(.*)$",
+    "^openai$",
     "^[a-zA-Z@]",
-    "^[./]"
+    "^(.*)$",
+    "^[./](.*)$"
   ],
   "importOrderSeparation": true,
   "importOrderSortSpecifiers": true,

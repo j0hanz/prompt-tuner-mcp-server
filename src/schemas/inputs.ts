@@ -23,7 +23,7 @@ const targetFormatSchema = z
   .enum(TARGET_FORMATS)
   .describe('auto | claude | gpt | json');
 
-export const RefinePromptInputSchema = {
+export const RefinePromptInputSchema = z.object({
   prompt: promptSchema,
   technique: techniqueSchema
     .optional()
@@ -35,13 +35,13 @@ export const RefinePromptInputSchema = {
     .optional()
     .default('auto')
     .describe('auto | claude | gpt | json'),
-};
+});
 
-export const AnalyzePromptInputSchema = {
+export const AnalyzePromptInputSchema = z.object({
   prompt: promptSchema,
-};
+});
 
-export const OptimizePromptInputSchema = {
+export const OptimizePromptInputSchema = z.object({
   prompt: promptSchema,
   techniques: z
     .array(techniqueSchema)
@@ -55,13 +55,13 @@ export const OptimizePromptInputSchema = {
     .optional()
     .default('auto')
     .describe('auto | claude | gpt | json'),
-};
+});
 
-export const DetectFormatInputSchema = {
+export const DetectFormatInputSchema = z.object({
   prompt: promptSchema,
-};
+});
 
-export const ComparePromptsInputSchema = {
+export const ComparePromptsInputSchema = z.object({
   promptA: promptSchema.describe('First prompt to compare'),
   promptB: promptSchema.describe('Second prompt to compare'),
   labelA: z
@@ -74,9 +74,9 @@ export const ComparePromptsInputSchema = {
     .optional()
     .default('Prompt B')
     .describe('Label for second prompt'),
-};
+});
 
-export const ValidatePromptInputSchema = {
+export const ValidatePromptInputSchema = z.object({
   prompt: promptSchema.describe('Prompt to validate'),
   targetModel: z
     .enum(['claude', 'gpt', 'gemini', 'generic'])
@@ -88,4 +88,4 @@ export const ValidatePromptInputSchema = {
     .optional()
     .default(true)
     .describe('Check for prompt injection patterns'),
-};
+});

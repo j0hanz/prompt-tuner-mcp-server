@@ -172,10 +172,13 @@ export function registerAnalyzePromptTool(server: McpServer): void {
       try {
         const { sessionId, signal, sendNotification } = extra;
 
-        logger.info('analyze_prompt called', {
-          sessionId,
-          promptLength: prompt.length,
-        });
+        logger.info(
+          {
+            sessionId,
+            promptLength: prompt.length,
+          },
+          'analyze_prompt called'
+        );
         const validatedPrompt = validatePrompt(prompt);
 
         if (typeof sendNotification === 'function') {

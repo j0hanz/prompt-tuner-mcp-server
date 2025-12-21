@@ -1,4 +1,5 @@
 import process from 'node:process';
+import { styleText } from 'node:util';
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -17,10 +18,13 @@ import { registerAllTools } from './tools/index.js';
 
 // Monitor Node.js warnings for deprecations and potential issues
 process.on('warning', (warning) => {
-  logger.warn(`Node.js warning: ${warning.name}`, {
-    message: warning.message,
-    code: (warning as NodeJS.ErrnoException).code,
-  });
+  logger.warn(
+    {
+      message: warning.message,
+      code: (warning as NodeJS.ErrnoException).code,
+    },
+    `Node.js warning: ${warning.name}`
+  );
 });
 
 export async function validateApiKeys(): Promise<void> {
@@ -95,5 +99,7 @@ export async function startServer(server: McpServer): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  logger.info(`${SERVER_NAME} v${SERVER_VERSION} started`);
+  logger.info(
+    `${styleText('green', SERVER_NAME)} v${styleText('blue', SERVER_VERSION)} started`
+  );
 }

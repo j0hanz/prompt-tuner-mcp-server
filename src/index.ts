@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import closeWithGrace from 'close-with-grace';
+
 import { logger } from './lib/errors.js';
 import { createServer, startServer, validateApiKeys } from './server.js';
 
@@ -9,13 +11,12 @@ async function main(): Promise<void> {
   await startServer(server);
 }
 
-process.on('SIGTERM', () => process.exit(0));
-process.on('SIGINT', () => process.exit(0));
+closeWithGrace({ delay: 500 }, ({ signal, err }) => {
+  if (err) logger.error({ err }, 'Server closing due to error');
+  logger.info({ signal }, 'Server shutting down gracefully');
+});
 
 main().catch((error: unknown) => {
-  logger.error(
-    'Fatal error:',
-    error instanceof Error ? error.message : String(error)
-  );
+  logger.error({ err: error }, 'Fatal error');
   process.exit(1);
 });
