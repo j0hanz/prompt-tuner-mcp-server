@@ -1,6 +1,6 @@
 {
   "name": "prompt-tuner-mcp-server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MCP server that refines and improves user prompts for AI-optimal readability",
   "type": "module",
   "bin": {
