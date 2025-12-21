@@ -59,7 +59,6 @@
     "@modelcontextprotocol/sdk": "^1.25.1",
     "lru-cache": "^11.2.4",
     "openai": "^6.14.0",
-    "safe-regex2": "^5.0.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {

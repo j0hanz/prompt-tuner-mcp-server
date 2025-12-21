@@ -1,3 +1,5 @@
+import { config } from './env.js';
+
 export { PATTERNS } from './patterns.js';
 export { SERVER_INSTRUCTIONS } from './instructions.js';
 export { TYPO_PATTERNS } from './typos.js';
@@ -14,20 +16,17 @@ export const SERVER_NAME = 'prompttuner-mcp';
 export const SERVER_VERSION = '1.0.0';
 
 // Configurable via environment variables
-export const MAX_PROMPT_LENGTH = parseInt(
-  process.env.MAX_PROMPT_LENGTH ?? '10000',
-  10
-);
+const {
+  MAX_PROMPT_LENGTH: ENV_MAX_PROMPT_LENGTH,
+  LLM_TIMEOUT_MS: ENV_LLM_TIMEOUT_MS,
+  LLM_MAX_TOKENS: ENV_LLM_MAX_TOKENS,
+} = config;
+
+export const MAX_PROMPT_LENGTH = ENV_MAX_PROMPT_LENGTH;
 export const MIN_PROMPT_LENGTH = 1;
 
-export const LLM_TIMEOUT_MS = parseInt(
-  process.env.LLM_TIMEOUT_MS ?? '60000',
-  10
-);
-export const LLM_MAX_TOKENS = parseInt(
-  process.env.LLM_MAX_TOKENS ?? '2000',
-  10
-);
+export const LLM_TIMEOUT_MS = ENV_LLM_TIMEOUT_MS;
+export const LLM_MAX_TOKENS = ENV_LLM_MAX_TOKENS;
 
 export const ANALYSIS_MAX_TOKENS = 1500;
 export const ANALYSIS_TIMEOUT_MS = 60000;

@@ -1,11 +1,12 @@
+import { config } from '../config/env.js';
 import type { RetryOptions } from '../config/types.js';
 import { ErrorCode, logger, McpError } from './errors.js';
 
 const DEFAULT_OPTIONS: Required<RetryOptions> = {
-  maxRetries: parseInt(process.env.RETRY_MAX_ATTEMPTS ?? '3', 10),
-  baseDelayMs: parseInt(process.env.RETRY_BASE_DELAY_MS ?? '1000', 10),
-  maxDelayMs: parseInt(process.env.RETRY_MAX_DELAY_MS ?? '10000', 10),
-  totalTimeoutMs: parseInt(process.env.RETRY_TOTAL_TIMEOUT_MS ?? '180000', 10),
+  maxRetries: config.RETRY_MAX_ATTEMPTS,
+  baseDelayMs: config.RETRY_BASE_DELAY_MS,
+  maxDelayMs: config.RETRY_MAX_DELAY_MS,
+  totalTimeoutMs: config.RETRY_TOTAL_TIMEOUT_MS,
 };
 
 const RETRYABLE_ERROR_CODES = new Set([

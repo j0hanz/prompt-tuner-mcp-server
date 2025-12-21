@@ -3,6 +3,7 @@ import { GoogleGenAI, HarmBlockThreshold, HarmCategory } from '@google/genai';
 import OpenAI from 'openai';
 
 import { DEFAULT_MODELS, LLM_MAX_TOKENS } from '../config/constants.js';
+import { config } from '../config/env.js';
 import type {
   ErrorCodeType,
   LLMClient,
@@ -402,10 +403,11 @@ class GoogleClient implements LLMClient {
     category: HarmCategory;
     threshold: HarmBlockThreshold;
   }[] {
-    const threshold =
-      process.env.GOOGLE_SAFETY_DISABLED === 'true'
-        ? HarmBlockThreshold.OFF
-        : HarmBlockThreshold.BLOCK_ONLY_HIGH;
+    // WARNING: Disabling safety settings can expose the application to harmful content.
+    // Use with caution and only in trusted environments.
+    const threshold = config.GOOGLE_SAFETY_DISABLED
+      ? HarmBlockThreshold.OFF
+      : HarmBlockThreshold.BLOCK_ONLY_HIGH;
 
     return GOOGLE_SAFETY_CATEGORIES.map((category) => ({
       category,
@@ -469,34 +471,27 @@ const PROVIDER_CONFIG = {
   },
 } as const;
 
-function isValidProvider(value: string): value is ValidProvider {
-  return value in PROVIDER_CONFIG;
-}
-
 let llmClientPromise: Promise<LLMClient> | null = null;
 
 function createLLMClient(): LLMClient {
-  const providerEnv = process.env.LLM_PROVIDER ?? 'openai';
+  const providerEnv = config.LLM_PROVIDER;
 
-  if (!isValidProvider(providerEnv)) {
-    throw new McpError(
-      ErrorCode.E_INVALID_INPUT,
-      'Invalid LLM_PROVIDER. Must be: openai, anthropic, or google'
-    );
-  }
-
-  const config = PROVIDER_CONFIG[providerEnv];
-  const apiKey = process.env[config.envKey];
+  const providerConfig = PROVIDER_CONFIG[providerEnv];
+  // We access the key from config based on the provider
+  let apiKey: string | undefined;
+  if (providerEnv === 'openai') apiKey = config.OPENAI_API_KEY;
+  else if (providerEnv === 'anthropic') apiKey = config.ANTHROPIC_API_KEY;
+  else apiKey = config.GOOGLE_API_KEY;
 
   if (!apiKey) {
     throw new McpError(
       ErrorCode.E_INVALID_INPUT,
-      `Missing ${config.envKey} environment variable for provider: ${providerEnv}`
+      `Missing ${providerConfig.envKey} environment variable for provider: ${providerEnv}`
     );
   }
 
-  const model = process.env.LLM_MODEL ?? config.defaultModel;
-  return config.create(apiKey, model);
+  const model = config.LLM_MODEL ?? providerConfig.defaultModel;
+  return providerConfig.create(apiKey, model);
 }
 
 export async function getLLMClient(): Promise<LLMClient> {

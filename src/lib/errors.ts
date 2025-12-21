@@ -1,3 +1,4 @@
+import { config } from '../config/env.js';
 import {
   ErrorCode,
   type ErrorCodeType,
@@ -8,17 +9,8 @@ import {
   type SuccessResponse,
 } from '../config/types.js';
 
-const RAW_LOG_FORMAT = process.env.LOG_FORMAT;
-const LOG_FORMAT: LogFormat =
-  RAW_LOG_FORMAT === 'json' || RAW_LOG_FORMAT === 'text'
-    ? RAW_LOG_FORMAT
-    : 'text';
-
-if (RAW_LOG_FORMAT && RAW_LOG_FORMAT !== LOG_FORMAT) {
-  console.error(
-    `[WARN] Invalid LOG_FORMAT: "${RAW_LOG_FORMAT}". Defaulting to "text". Valid: json, text`
-  );
-}
+const { LOG_FORMAT: RAW_LOG_FORMAT } = config;
+const LOG_FORMAT: LogFormat = RAW_LOG_FORMAT;
 
 const JSON_LOGGING = LOG_FORMAT === 'json';
 
@@ -59,7 +51,7 @@ export const logger = {
     );
   },
   debug: (message: string, ...args: unknown[]): void => {
-    if (process.env.DEBUG === 'true') {
+    if (config.DEBUG) {
       console.error(
         formatLogEntry('debug', message, args),
         ...(!JSON_LOGGING ? args : [])
@@ -117,7 +109,7 @@ export function createErrorResponse(
   const details = error instanceof McpError ? error.details : undefined;
 
   const CONTEXT_MAX_LENGTH = 500;
-  const includeContext = process.env.INCLUDE_ERROR_CONTEXT === 'true';
+  const includeContext = config.INCLUDE_ERROR_CONTEXT;
 
   const truncatedContext = context
     ? context.length > CONTEXT_MAX_LENGTH

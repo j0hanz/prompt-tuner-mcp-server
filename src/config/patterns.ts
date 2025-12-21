@@ -8,7 +8,7 @@ export const PATTERNS = {
   stepByStepIndicators:
     /(?:^|\s|[([{])(step by step|step-by-step|first,|then,|finally,|1\.|2\.|3\.|let's think|let's work through|let's analyze|let's break|systematically)(?:$|\s|[)\]}.!?,])/i,
 
-  xmlStructure: /<[a-z_]+>.*<\/[a-z_]+>/is,
+  xmlStructure: /<[a-z_]+>[^<]*<\/[a-z_]+>/is,
   markdownStructure: /^#+\s|^\*\s|^-\s|^\d+\.\s|```/m,
   jsonStructure: /^\s*\{[\s\S]*\}\s*$|^\s*\[[\s\S]*\]\s*$/,
 

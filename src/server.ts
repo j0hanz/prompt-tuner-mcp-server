@@ -6,6 +6,7 @@ import {
   SERVER_NAME,
   SERVER_VERSION,
 } from './config/constants.js';
+import { config } from './config/env.js';
 import { ErrorCode, logger, McpError } from './lib/errors.js';
 import { getLLMClient } from './lib/llm-client.js';
 import { registerAllPrompts } from './prompts/index.js';
@@ -13,14 +14,14 @@ import { registerAllResources } from './resources/index.js';
 import { registerAllTools } from './tools/index.js';
 
 async function validateApiKeys(): Promise<void> {
-  const provider = process.env.LLM_PROVIDER ?? 'openai';
+  const provider = config.LLM_PROVIDER;
   const providers = {
-    openai: process.env.OPENAI_API_KEY,
-    anthropic: process.env.ANTHROPIC_API_KEY,
-    google: process.env.GOOGLE_API_KEY,
+    openai: config.OPENAI_API_KEY,
+    anthropic: config.ANTHROPIC_API_KEY,
+    google: config.GOOGLE_API_KEY,
   };
 
-  const activeKey = providers[provider as keyof typeof providers];
+  const activeKey = providers[provider];
 
   if (!activeKey) {
     const envVar =

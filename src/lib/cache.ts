@@ -1,7 +1,9 @@
 // Prompt refinement cache for PromptTuner MCP
 import { LRUCache } from 'lru-cache';
 
-const MAX_CACHE_SIZE = parseInt(process.env.CACHE_MAX_SIZE ?? '1000', 10);
+import { config } from '../config/env.js';
+
+const MAX_CACHE_SIZE = config.CACHE_MAX_SIZE;
 const refinementCache = new LRUCache<string, string>({
   max: MAX_CACHE_SIZE,
 });
