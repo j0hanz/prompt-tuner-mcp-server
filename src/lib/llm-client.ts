@@ -400,8 +400,16 @@ class GoogleClient implements LLMClient {
     return withRetry(async () => {
       const start = process.hrtime.bigint();
       try {
-        checkAborted(options?.signal);
-        const response = await this.executeRequest(prompt, maxTokens, options);
+        const effectiveSignal =
+          options?.signal ??
+          (options?.timeoutMs
+            ? AbortSignal.timeout(options.timeoutMs)
+            : undefined);
+        checkAborted(effectiveSignal);
+        const response = await this.executeRequest(prompt, maxTokens, {
+          ...options,
+          signal: effectiveSignal,
+        });
         invariant(response, 'LLM returned empty response');
 
         const durationMs = Number(process.hrtime.bigint() - start) / 1_000_000;

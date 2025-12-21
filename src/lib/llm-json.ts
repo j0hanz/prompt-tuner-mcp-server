@@ -90,6 +90,12 @@ export function parseJsonFromLlmResponse<T>(
   // Both strategies failed - throw error with helpful context
   const debugEnabled = process.env.DEBUG === 'true';
   const contextLabel = options.debugLabel ?? 'LLM response';
+  if (debugEnabled) {
+    logger.debug(
+      { preview: llmResponseText.slice(0, maxPreviewChars) },
+      `${contextLabel}: raw response preview`
+    );
+  }
 
   throw new McpError(
     options.errorCode,
@@ -97,9 +103,6 @@ export function parseJsonFromLlmResponse<T>(
     undefined,
     {
       strategiesAttempted: ['raw', 'codeblock-stripped'],
-      ...(debugEnabled && {
-        rawResponse: llmResponseText.slice(0, maxPreviewChars),
-      }),
     }
   );
 }

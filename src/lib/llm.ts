@@ -1,7 +1,6 @@
 import { LLM_MAX_TOKENS, LLM_TIMEOUT_MS } from '../config/constants.js';
 import type { OptimizationTechnique, TargetFormat } from '../config/types.js';
 import { getLLMClient } from './llm-client.js';
-import { withRetry } from './retry.js';
 import { buildRefinementPrompt } from './technique-templates.js';
 import { validateLLMOutput } from './validation.js';
 
@@ -24,21 +23,11 @@ export async function refineLLM(
     targetFormat
   );
 
-  const refined = await withRetry(
-    async () => {
-      const signal = createTimeoutSignal(timeoutMs);
-      return client.generateText(refinementPrompt, maxTokens, {
-        timeoutMs,
-        signal,
-      });
-    },
-    {
-      maxRetries: 3,
-      baseDelayMs: 1000,
-      maxDelayMs: 8000,
-      totalTimeoutMs: 180000,
-    }
-  );
+  const signal = createTimeoutSignal(timeoutMs);
+  const refined = await client.generateText(refinementPrompt, maxTokens, {
+    timeoutMs,
+    signal,
+  });
 
   const validated = validateLLMOutput(refined);
 
