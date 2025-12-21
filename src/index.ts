@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 import { logger } from './lib/errors.js';
-import { createServer, startServer } from './server.js';
+import { createServer, startServer, validateApiKeys } from './server.js';
 
 async function main(): Promise<void> {
+  // Validate API keys first to fail fast
+  await validateApiKeys();
   const server = createServer();
   await startServer(server);
 }

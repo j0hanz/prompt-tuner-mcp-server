@@ -1,4 +1,8 @@
-import { MAX_PROMPT_LENGTH, MIN_PROMPT_LENGTH } from '../config/constants.js';
+import {
+  LLM_MAX_RESPONSE_LENGTH,
+  MAX_PROMPT_LENGTH,
+  MIN_PROMPT_LENGTH,
+} from '../config/constants.js';
 import {
   OPTIMIZATION_TECHNIQUES,
   type OptimizationTechnique,
@@ -110,7 +114,21 @@ export function validateFormat(format: string): TargetFormat {
   return format;
 }
 
-export function validateLLMOutput(output: string, maxLength = 15000): string {
+/**
+ * Sanitizes user input to prevent prompt injection attacks.
+ * Removes script tags, iframes, and dangerous protocols.
+ */
+export function sanitizePromptInput(input: string): string {
+  return input
+    .replace(/(<\/?script[^>]*>|<\/?iframe[^>]*>)/gi, '')
+    .replace(/(javascript:|data:text\/html|vbscript:)/gi, '')
+    .replace(/on\w+\s*=/gi, ''); // Remove event handlers
+}
+
+export function validateLLMOutput(
+  output: string,
+  maxLength = LLM_MAX_RESPONSE_LENGTH
+): string {
   if (output.length > maxLength) {
     throw new McpError(
       ErrorCode.E_INVALID_INPUT,

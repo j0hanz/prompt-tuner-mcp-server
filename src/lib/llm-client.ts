@@ -288,6 +288,7 @@ class OpenAIClient implements LLMClient {
     options?: LLMRequestOptions
   ): Promise<string> {
     return withRetry(async () => {
+      const start = process.hrtime.bigint();
       try {
         const response = await this.client.chat.completions.create(
           {
@@ -296,10 +297,19 @@ class OpenAIClient implements LLMClient {
             max_tokens: maxTokens,
             temperature: 0.7,
           },
-          getRequestOptions(options)
+          {
+            ...getRequestOptions(options),
+            timeout: options?.timeoutMs ?? 60000,
+          }
         );
         const content = response.choices[0]?.message.content?.trim() ?? '';
         assertNonEmptyContent(content, this.provider);
+
+        const durationMs = Number(process.hrtime.bigint() - start) / 1_000_000;
+        logger.debug(
+          `LLM generation (${this.provider}) took ${durationMs.toFixed(2)}ms`
+        );
+
         return content;
       } catch (error) {
         throw classifyLLMError(error, this.provider);
@@ -332,6 +342,7 @@ class AnthropicClient implements LLMClient {
     options?: LLMRequestOptions
   ): Promise<string> {
     return withRetry(async () => {
+      const start = process.hrtime.bigint();
       try {
         const response = await this.client.messages.create(
           {
@@ -339,7 +350,10 @@ class AnthropicClient implements LLMClient {
             max_tokens: maxTokens,
             messages: [{ role: 'user', content: prompt }],
           },
-          getRequestOptions(options)
+          {
+            ...getRequestOptions(options),
+            timeout: options?.timeoutMs ?? 60000,
+          }
         );
         const textBlock = response.content.find(
           (block) => block.type === 'text'
@@ -347,6 +361,12 @@ class AnthropicClient implements LLMClient {
         const content =
           textBlock && 'text' in textBlock ? textBlock.text.trim() : '';
         assertNonEmptyContent(content, this.provider);
+
+        const durationMs = Number(process.hrtime.bigint() - start) / 1_000_000;
+        logger.debug(
+          `LLM generation (${this.provider}) took ${durationMs.toFixed(2)}ms`
+        );
+
         return content;
       } catch (error) {
         throw classifyLLMError(error, this.provider);
@@ -388,10 +408,17 @@ class GoogleClient implements LLMClient {
     options?: LLMRequestOptions
   ): Promise<string> {
     return withRetry(async () => {
+      const start = process.hrtime.bigint();
       try {
         checkAborted(options?.signal);
         const response = await this.executeRequest(prompt, maxTokens, options);
         assertNonEmptyContent(response, this.provider);
+
+        const durationMs = Number(process.hrtime.bigint() - start) / 1_000_000;
+        logger.debug(
+          `LLM generation (${this.provider}) took ${durationMs.toFixed(2)}ms`
+        );
+
         return response.trim();
       } catch (error) {
         throw classifyLLMError(error, this.provider);

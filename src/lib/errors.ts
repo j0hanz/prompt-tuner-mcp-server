@@ -1,3 +1,5 @@
+import { debuglog, inspect } from 'node:util';
+
 import { config } from '../config/env.js';
 import {
   ErrorCode,
@@ -8,27 +10,44 @@ import {
   type McpErrorOptions,
   type SuccessResponse,
 } from '../config/types.js';
+import { getRequestId } from './context.js';
 
 const { LOG_FORMAT: RAW_LOG_FORMAT } = config;
 const LOG_FORMAT: LogFormat = RAW_LOG_FORMAT;
 
 const JSON_LOGGING = LOG_FORMAT === 'json';
 
+/**
+ * Namespaced debug loggers using Node.js built-in util.debuglog().
+ * Enable via NODE_DEBUG environment variable:
+ * - NODE_DEBUG=prompttuner:llm - LLM operations
+ * - NODE_DEBUG=prompttuner:cache - Cache operations
+ * - NODE_DEBUG=prompttuner:retry - Retry operations
+ * - NODE_DEBUG=prompttuner:* - All debug logs
+ */
+export const debugLLM = debuglog('prompttuner:llm');
+export const debugCache = debuglog('prompttuner:cache');
+export const debugRetry = debuglog('prompttuner:retry');
+
 function formatLogEntry(
   level: LogLevel,
   message: string,
   args: unknown[]
 ): string {
+  const requestId = getRequestId();
+
   if (JSON_LOGGING) {
     return JSON.stringify({
       level,
       message,
+      requestId,
       args: args.length > 0 ? args : undefined,
       ts: new Date().toISOString(),
     });
   }
   const timestamp = new Date().toISOString();
-  return `${timestamp} [${level.toUpperCase()}] ${message}`;
+  const reqIdStr = requestId ? `[${requestId}] ` : '';
+  return `${timestamp} [${level.toUpperCase()}] ${reqIdStr}${message}`;
 }
 
 export const logger = {
@@ -87,6 +106,16 @@ export class McpError extends Error {
       this.recoveryHint = recoveryHint;
     }
   }
+
+  /**
+   * Custom inspect output for better console debugging.
+   * Shows concise error info when using console.log or util.inspect.
+   */
+  [inspect.custom](): string {
+    const hint = this.recoveryHint ? ` (Hint: ${this.recoveryHint})` : '';
+    const details = this.details ? ` ${JSON.stringify(this.details)}` : '';
+    return `McpError[${this.code}]: ${this.message}${hint}${details}`;
+  }
 }
 
 export function createSuccessResponse<T extends Record<string, unknown>>(
@@ -99,6 +128,27 @@ export function createSuccessResponse<T extends Record<string, unknown>>(
   };
 }
 
+/**
+ * Sanitizes context by removing API keys and truncating prompts.
+ */
+function sanitizeErrorContext(context?: string): string | undefined {
+  if (!context) return undefined;
+
+  // Redact API keys (OpenAI, Anthropic, Google patterns)
+  let sanitized = context
+    .replace(/sk-[A-Za-z0-9_-]{20,}/g, '[REDACTED_OPENAI_KEY]')
+    .replace(/sk-ant-[A-Za-z0-9_-]{20,}/g, '[REDACTED_ANTHROPIC_KEY]')
+    .replace(/AIza[A-Za-z0-9_-]{35}/g, '[REDACTED_GOOGLE_KEY]');
+
+  // Truncate to first 200 chars for privacy
+  const CONTEXT_MAX_LENGTH = 200;
+  if (sanitized.length > CONTEXT_MAX_LENGTH) {
+    sanitized = `${sanitized.slice(0, CONTEXT_MAX_LENGTH)}...`;
+  }
+
+  return sanitized;
+}
+
 export function createErrorResponse(
   error: unknown,
   fallbackCode: ErrorCodeType = ErrorCode.E_LLM_FAILED,
@@ -108,15 +158,10 @@ export function createErrorResponse(
   const message = error instanceof Error ? error.message : 'Unknown error';
   const details = error instanceof McpError ? error.details : undefined;
 
-  const CONTEXT_MAX_LENGTH = 500;
   const includeContext = config.INCLUDE_ERROR_CONTEXT;
-
-  const truncatedContext = context
-    ? context.length > CONTEXT_MAX_LENGTH
-      ? `${context.slice(0, CONTEXT_MAX_LENGTH)}...`
-      : context
+  const safeContext = includeContext
+    ? sanitizeErrorContext(context)
     : undefined;
-  const safeContext = includeContext ? truncatedContext : undefined;
 
   const structuredError = {
     ok: false as const,

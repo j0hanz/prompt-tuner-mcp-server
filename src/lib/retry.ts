@@ -1,3 +1,5 @@
+import { setTimeout } from 'node:timers/promises';
+
 import { config } from '../config/env.js';
 import type { RetryOptions } from '../config/types.js';
 import { ErrorCode, logger, McpError } from './errors.js';
@@ -69,10 +71,6 @@ function calculateDelay(
   return Math.min(exponentialDelay + jitter, maxDelayMs);
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 export async function withRetry<T>(
   handler: () => Promise<T>,
   options: RetryOptions = {}
@@ -120,7 +118,7 @@ export async function withRetry<T>(
         `Retry ${attempt + 1}/${opts.maxRetries + 1} in ${Math.round(delayMs)}ms: ${error instanceof Error ? error.message : String(error)}`
       );
 
-      await sleep(delayMs);
+      await setTimeout(delayMs);
 
       if (Date.now() - startTime > opts.totalTimeoutMs) {
         throw new McpError(
@@ -131,5 +129,8 @@ export async function withRetry<T>(
     }
   }
 
+  logger.warn(
+    `All ${opts.maxRetries + 1} retry attempts exhausted: ${lastError instanceof Error ? lastError.message : String(lastError)}`
+  );
   throw lastError;
 }

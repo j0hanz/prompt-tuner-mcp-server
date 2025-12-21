@@ -7,13 +7,15 @@ const booleanString = z
   .transform((v) => v === 'true');
 
 const numberString = (
-  def: number
+  def: number,
+  min = 0
 ): z.ZodType<number, z.ZodTypeDef, string | undefined> =>
   z
     .string()
     .optional()
     .default(String(def))
-    .transform((v) => parseInt(v, 10));
+    .transform((v) => parseInt(v, 10))
+    .refine((n) => n >= min, { message: `Must be >= ${min}` });
 
 const envSchema = z.object({
   // Server
@@ -27,9 +29,13 @@ const envSchema = z.object({
     .optional()
     .default('openai'),
   LLM_MODEL: z.string().optional(),
-  LLM_TIMEOUT_MS: numberString(60000),
-  LLM_MAX_TOKENS: numberString(2000),
-  GOOGLE_SAFETY_DISABLED: booleanString,
+  LLM_TIMEOUT_MS: numberString(60000, 1000),
+  LLM_MAX_TOKENS: numberString(2000, 1),
+  GOOGLE_SAFETY_DISABLED: z
+    .enum(['true', 'false'])
+    .optional()
+    .default('false')
+    .transform((v) => v === 'true'),
 
   // Keys
   OPENAI_API_KEY: z.string().optional(),
@@ -37,16 +43,16 @@ const envSchema = z.object({
   GOOGLE_API_KEY: z.string().optional(),
 
   // Constraints
-  MAX_PROMPT_LENGTH: numberString(10000),
+  MAX_PROMPT_LENGTH: numberString(10000, 1),
 
   // Cache
-  CACHE_MAX_SIZE: numberString(1000),
+  CACHE_MAX_SIZE: numberString(1000, 1),
 
   // Retry
-  RETRY_MAX_ATTEMPTS: numberString(3),
-  RETRY_BASE_DELAY_MS: numberString(1000),
-  RETRY_MAX_DELAY_MS: numberString(10000),
-  RETRY_TOTAL_TIMEOUT_MS: numberString(180000),
+  RETRY_MAX_ATTEMPTS: numberString(3, 0),
+  RETRY_BASE_DELAY_MS: numberString(1000, 100),
+  RETRY_MAX_DELAY_MS: numberString(10000, 1000),
+  RETRY_TOTAL_TIMEOUT_MS: numberString(180000, 10000),
 });
 
 export const config = envSchema.parse(process.env);

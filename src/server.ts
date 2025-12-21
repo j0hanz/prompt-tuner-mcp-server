@@ -1,3 +1,5 @@
+import process from 'node:process';
+
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
@@ -13,7 +15,15 @@ import { registerAllPrompts } from './prompts/index.js';
 import { registerAllResources } from './resources/index.js';
 import { registerAllTools } from './tools/index.js';
 
-async function validateApiKeys(): Promise<void> {
+// Monitor Node.js warnings for deprecations and potential issues
+process.on('warning', (warning) => {
+  logger.warn(`Node.js warning: ${warning.name}`, {
+    message: warning.message,
+    code: (warning as NodeJS.ErrnoException).code,
+  });
+});
+
+export async function validateApiKeys(): Promise<void> {
   const provider = config.LLM_PROVIDER;
   const providers = {
     openai: config.OPENAI_API_KEY,
@@ -82,9 +92,6 @@ export function createServer(): McpServer {
 }
 
 export async function startServer(server: McpServer): Promise<void> {
-  // Validate API keys before connecting - REQUIRED
-  await validateApiKeys();
-
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
