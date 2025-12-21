@@ -34,3 +34,9 @@ export const ANALYSIS_TIMEOUT_MS = 60000;
 
 export const LLM_MAX_RESPONSE_LENGTH = 500_000;
 export const LLM_ERROR_PREVIEW_CHARS = 500;
+
+export const DEFAULT_MODELS = {
+  openai: 'gpt-4o',
+  anthropic: 'claude-3-5-sonnet-20241022',
+  google: 'gemini-2.0-flash-exp',
+} as const;

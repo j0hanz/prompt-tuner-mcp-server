@@ -20,13 +20,23 @@ async function validateApiKeys(): Promise<void> {
     google: process.env.GOOGLE_API_KEY,
   };
 
-  const hasAnyKey = Object.values(providers).some((key) => key !== undefined);
+  const activeKey = providers[provider as keyof typeof providers];
 
-  if (!hasAnyKey) {
-    throw new McpError(
-      ErrorCode.E_INVALID_INPUT,
-      `❌ API key is REQUIRED. Set one of: OPENAI_API_KEY, ANTHROPIC_API_KEY, or GOOGLE_API_KEY`
-    );
+  if (!activeKey) {
+    const envVar =
+      provider === 'openai'
+        ? 'OPENAI_API_KEY'
+        : provider === 'anthropic'
+          ? 'ANTHROPIC_API_KEY'
+          : 'GOOGLE_API_KEY';
+
+    // Only throw specific error if it's a known provider, otherwise let getLLMClient handle invalid provider
+    if (['openai', 'anthropic', 'google'].includes(provider)) {
+      throw new McpError(
+        ErrorCode.E_INVALID_INPUT,
+        `❌ API key is REQUIRED for provider "${provider}". Set ${envVar}.`
+      );
+    }
   }
 
   // Validate the configured provider has a key

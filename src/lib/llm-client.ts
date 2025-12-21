@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenAI, HarmBlockThreshold, HarmCategory } from '@google/genai';
 import OpenAI from 'openai';
 
-import { LLM_MAX_TOKENS } from '../config/constants.js';
+import { DEFAULT_MODELS, LLM_MAX_TOKENS } from '../config/constants.js';
 import type {
   ErrorCodeType,
   LLMClient,
@@ -453,18 +453,18 @@ class GoogleClient implements LLMClient {
 const PROVIDER_CONFIG = {
   openai: {
     envKey: 'OPENAI_API_KEY',
-    defaultModel: 'gpt-4o',
+    defaultModel: DEFAULT_MODELS.openai,
     create: (apiKey: string, model: string) => new OpenAIClient(apiKey, model),
   },
   anthropic: {
     envKey: 'ANTHROPIC_API_KEY',
-    defaultModel: 'claude-3-5-sonnet-20241022',
+    defaultModel: DEFAULT_MODELS.anthropic,
     create: (apiKey: string, model: string) =>
       new AnthropicClient(apiKey, model),
   },
   google: {
     envKey: 'GOOGLE_API_KEY',
-    defaultModel: 'gemini-2.0-flash-exp',
+    defaultModel: DEFAULT_MODELS.google,
     create: (apiKey: string, model: string) => new GoogleClient(apiKey, model),
   },
 } as const;
