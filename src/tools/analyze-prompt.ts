@@ -1,4 +1,9 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type {
+  ServerNotification,
+  ServerRequest,
+} from '@modelcontextprotocol/sdk/types.js';
 
 import {
   ANALYSIS_MAX_TOKENS,
@@ -6,11 +11,12 @@ import {
 } from '../config/constants.js';
 import type { AnalysisResponse } from '../config/types.js';
 import {
-  createErrorResponse,
   createSuccessResponse,
   ErrorCode,
   logger,
+  toJsonRpcError,
 } from '../lib/errors.js';
+import { getToolContext, type ToolContext } from '../lib/tool-context.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
 import { escapePromptForXml, validatePrompt } from '../lib/validation.js';
 import {
@@ -128,18 +134,12 @@ interface AnalyzePromptInput {
   prompt: string;
 }
 
-interface AnalyzePromptExtra {
-  sessionId?: string;
-  signal?: AbortSignal;
-  sendNotification?: (params: unknown) => Promise<void>;
-}
-
 const ANALYZE_PROMPT_TOOL = {
   title: 'Analyze Prompt',
   description:
     'Score prompt quality (0-100) across 5 dimensions using AI analysis: clarity, specificity, completeness, structure, effectiveness. Returns actionable suggestions.',
-  inputSchema: AnalyzePromptInputSchema,
-  outputSchema: AnalyzePromptOutputSchema,
+  inputSchema: AnalyzePromptInputSchema.shape,
+  outputSchema: AnalyzePromptOutputSchema.shape,
   annotations: {
     readOnlyHint: true,
     idempotentHint: false,
@@ -203,18 +203,17 @@ function formatAnalysisOutput(analysisResult: AnalysisResponse): string {
 }
 
 async function sendProgress(
-  extra: AnalyzePromptExtra,
+  context: ToolContext,
   message: string,
   progress: number
 ): Promise<void> {
-  if (typeof extra.sendNotification !== 'function') return;
-  await extra.sendNotification({
+  await context.sendNotification({
     method: 'notifications/progress',
     params: {
-      progressToken: `analyze_prompt:${extra.sessionId ?? 'unknown'}`,
+      progressToken: `analyze_prompt:${context.sessionId ?? 'unknown'}`,
       progress,
       message,
-      _meta: { tool: 'analyze_prompt', sessionId: extra.sessionId },
+      _meta: { tool: 'analyze_prompt', sessionId: context.sessionId },
     },
   });
 }
@@ -255,13 +254,11 @@ function buildAnalysisResponse(
 
 async function handleAnalyzePrompt(
   input: AnalyzePromptInput,
-  extra: unknown
-): Promise<
-  | ReturnType<typeof createSuccessResponse>
-  | ReturnType<typeof createErrorResponse>
-> {
+  extra: RequestHandlerExtra<ServerRequest, ServerNotification>
+): Promise<ReturnType<typeof createSuccessResponse>> {
+  const context = getToolContext(extra);
+
   try {
-    const context = (extra ?? {}) as AnalyzePromptExtra;
     logger.info(
       { sessionId: context.sessionId, promptLength: input.prompt.length },
       'analyze_prompt called'
@@ -272,10 +269,13 @@ async function handleAnalyzePrompt(
 
     const safePrompt = escapePromptForXml(validatedPrompt);
     const analysisPrompt = buildAnalysisPrompt(safePrompt);
-    const analysisResult = await runAnalysis(analysisPrompt, context.signal);
+    const analysisResult = await runAnalysis(
+      analysisPrompt,
+      context.request.signal
+    );
     return buildAnalysisResponse(analysisResult);
   } catch (error) {
-    return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
+    throw toJsonRpcError(error, ErrorCode.E_LLM_FAILED, input.prompt);
   }
 }
 

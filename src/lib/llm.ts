@@ -9,12 +9,18 @@ function createTimeoutSignal(timeoutMs: number): AbortSignal {
   return AbortSignal.timeout(timeoutMs);
 }
 
+function combineSignals(timeoutMs: number, signal?: AbortSignal): AbortSignal {
+  const timeoutSignal = createTimeoutSignal(timeoutMs);
+  return signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+}
+
 export async function refineLLM(
   prompt: string,
   technique: OptimizationTechnique,
   targetFormat: TargetFormat,
   maxTokens = LLM_MAX_TOKENS,
-  timeoutMs = LLM_TIMEOUT_MS
+  timeoutMs = LLM_TIMEOUT_MS,
+  signal?: AbortSignal
 ): Promise<string> {
   const client = await getLLMClient();
   const refinementPrompt = buildRefinementPrompt(
@@ -23,10 +29,10 @@ export async function refineLLM(
     targetFormat
   );
 
-  const signal = createTimeoutSignal(timeoutMs);
+  const combinedSignal = combineSignals(timeoutMs, signal);
   const refined = await client.generateText(refinementPrompt, maxTokens, {
     timeoutMs,
-    signal,
+    signal: combinedSignal,
   });
 
   const validated = validateLLMOutput(refined);

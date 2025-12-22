@@ -2,122 +2,211 @@ import { z } from 'zod';
 
 import { OPTIMIZATION_TECHNIQUES, TARGET_FORMATS } from '../config/types.js';
 
-// Schema for error details in responses
-const ErrorSchema = z.object({
-  code: z.string().describe('Error code (e.g., E_INVALID_INPUT)'),
-  message: z.string().describe('Human-readable error message'),
-  context: z.string().optional().describe('Additional context (truncated)'),
-  details: z
-    .record(z.unknown())
-    .optional()
-    .describe('Additional error details'),
-});
+const ErrorSchema = z
+  .object({
+    code: z.string().describe('Machine-readable error code'),
+    message: z.string().describe('Human-readable error message'),
+    context: z.string().optional().describe('Safe, truncated context'),
+    details: z
+      .record(z.unknown())
+      .optional()
+      .describe('Additional error details'),
+    recoveryHint: z.string().optional().describe('Suggested recovery action'),
+  })
+  .describe('Error payload');
 
-// Schema for prompt analysis scores (0-100 for each dimension)
-const ScoreSchema = z.object({
-  clarity: z.number().min(0).max(100).describe('How clear and unambiguous'),
-  specificity: z.number().min(0).max(100).describe('How specific and detailed'),
-  completeness: z
-    .number()
-    .min(0)
-    .max(100)
-    .describe('How complete with context'),
-  structure: z.number().min(0).max(100).describe('How well-organized'),
-  effectiveness: z.number().min(0).max(100).describe('Predicted effectiveness'),
-  overall: z.number().min(0).max(100).describe('Weighted overall score'),
-});
+const ScoreSchema = z
+  .object({
+    clarity: z.number().min(0).max(100).describe('Clarity score (0-100)'),
+    specificity: z
+      .number()
+      .min(0)
+      .max(100)
+      .describe('Specificity score (0-100)'),
+    completeness: z
+      .number()
+      .min(0)
+      .max(100)
+      .describe('Completeness score (0-100)'),
+    structure: z.number().min(0).max(100).describe('Structure score (0-100)'),
+    effectiveness: z
+      .number()
+      .min(0)
+      .max(100)
+      .describe('Effectiveness score (0-100)'),
+    overall: z.number().min(0).max(100).describe('Overall score (0-100)'),
+  })
+  .describe('Score breakdown');
 
-// Schema for detected prompt characteristics
-const CharacteristicsSchema = z.object({
-  detectedFormat: z.enum(TARGET_FORMATS).describe('Detected target format'),
-  hasExamples: z.boolean().describe('Contains examples'),
-  hasRoleContext: z.boolean().describe('Has role/persona defined'),
-  hasStructure: z.boolean().describe('Has XML/Markdown structure'),
-  hasStepByStep: z.boolean().describe('Has step-by-step guidance'),
-  wordCount: z.number().describe('Total word count'),
-  estimatedComplexity: z
-    .enum(['simple', 'moderate', 'complex'])
-    .describe('Estimated complexity'),
-});
+const ScoreDeltaSchema = z
+  .object({
+    clarity: z.number().min(-100).max(100).describe('Delta clarity score'),
+    specificity: z
+      .number()
+      .min(-100)
+      .max(100)
+      .describe('Delta specificity score'),
+    completeness: z
+      .number()
+      .min(-100)
+      .max(100)
+      .describe('Delta completeness score'),
+    structure: z.number().min(-100).max(100).describe('Delta structure score'),
+    effectiveness: z
+      .number()
+      .min(-100)
+      .max(100)
+      .describe('Delta effectiveness score'),
+    overall: z.number().min(-100).max(100).describe('Delta overall score'),
+  })
+  .describe('Score deltas (B minus A)');
 
-const techniqueSchema = z.enum(OPTIMIZATION_TECHNIQUES);
+const CharacteristicsSchema = z
+  .object({
+    detectedFormat: z.enum(TARGET_FORMATS).describe('Detected prompt format'),
+    hasExamples: z.boolean().describe('Whether examples are present'),
+    hasRoleContext: z.boolean().describe('Whether a role/persona is defined'),
+    hasStructure: z
+      .boolean()
+      .describe('Whether structured sections are present'),
+    hasStepByStep: z
+      .boolean()
+      .describe('Whether step-by-step guidance is present'),
+    wordCount: z.number().describe('Total word count'),
+    estimatedComplexity: z
+      .enum(['simple', 'moderate', 'complex'])
+      .describe('Estimated complexity level'),
+  })
+  .describe('Detected characteristics');
 
-export const RefinePromptOutputSchema = {
-  ok: z.boolean(),
-  original: z.string().optional(),
-  refined: z.string().optional(),
-  corrections: z.array(z.string()).optional(),
-  technique: techniqueSchema.optional(),
-  targetFormat: z.enum(TARGET_FORMATS).optional(),
-  usedFallback: z.boolean().optional(),
-  fromCache: z.boolean().optional(),
-  error: ErrorSchema.optional(),
-};
+const TechniqueSchema = z
+  .enum(OPTIMIZATION_TECHNIQUES)
+  .describe('Optimization technique identifier');
 
-export const AnalyzePromptOutputSchema = {
-  ok: z.boolean(),
-  hasTypos: z.boolean().optional(),
-  isVague: z.boolean().optional(),
-  missingContext: z.boolean().optional(),
-  suggestions: z.array(z.string()).optional(),
-  score: ScoreSchema.optional(),
-  characteristics: CharacteristicsSchema.optional(),
-  error: ErrorSchema.optional(),
-};
+const ValidationIssueSchema = z
+  .object({
+    type: z.enum(['error', 'warning', 'info']).describe('Issue severity'),
+    message: z.string().describe('Issue description'),
+    suggestion: z.string().optional().describe('Suggested fix'),
+  })
+  .describe('Validation issue');
 
-export const OptimizePromptOutputSchema = {
-  ok: z.boolean(),
-  original: z.string().optional(),
-  optimized: z.string().optional(),
-  techniquesApplied: z.array(techniqueSchema).optional(),
-  targetFormat: z.enum(TARGET_FORMATS).optional(),
-  beforeScore: ScoreSchema.optional(),
-  afterScore: ScoreSchema.optional(),
-  scoreDelta: z
-    .number()
-    .describe('Difference between after and before overall scores')
-    .optional(),
-  improvements: z.array(z.string()).optional(),
-  usedFallback: z.boolean().optional(),
-  error: ErrorSchema.optional(),
-};
+export const RefinePromptOutputSchema = z
+  .object({
+    ok: z.boolean().describe('True if refinement succeeded'),
+    original: z.string().optional().describe('Original prompt text'),
+    refined: z.string().optional().describe('Refined prompt text'),
+    corrections: z.array(z.string()).optional().describe('Applied corrections'),
+    technique: TechniqueSchema.optional().describe('Technique used'),
+    targetFormat: z.enum(TARGET_FORMATS).optional().describe('Resolved format'),
+    usedFallback: z
+      .boolean()
+      .optional()
+      .describe('Whether a fallback was used'),
+    fromCache: z.boolean().optional().describe('Whether result was cached'),
+    error: ErrorSchema.optional().describe('Error details when ok=false'),
+  })
+  .describe('Refine prompt response');
 
-export const DetectFormatOutputSchema = {
-  ok: z.boolean(),
-  detectedFormat: z.enum(TARGET_FORMATS).optional(),
-  confidence: z.number().min(0).max(100).optional(),
-  characteristics: CharacteristicsSchema.optional(),
-  recommendation: z.string().optional(),
-  error: ErrorSchema.optional(),
-};
+export const AnalyzePromptOutputSchema = z
+  .object({
+    ok: z.boolean().describe('True if analysis succeeded'),
+    hasTypos: z.boolean().optional().describe('Typos detected'),
+    isVague: z.boolean().optional().describe('Vague language detected'),
+    missingContext: z.boolean().optional().describe('Missing context detected'),
+    suggestions: z
+      .array(z.string())
+      .optional()
+      .describe('Improvement suggestions'),
+    score: ScoreSchema.optional().describe('Score breakdown'),
+    characteristics: CharacteristicsSchema.optional().describe(
+      'Prompt characteristics'
+    ),
+    error: ErrorSchema.optional().describe('Error details when ok=false'),
+  })
+  .describe('Analyze prompt response');
 
-export const ComparePromptsOutputSchema = {
-  ok: z.boolean(),
-  promptA: z.string().optional(),
-  promptB: z.string().optional(),
-  scoreA: ScoreSchema.optional(),
-  scoreB: ScoreSchema.optional(),
-  scoreDelta: ScoreSchema.optional(),
-  winner: z.enum(['A', 'B', 'tie']).optional(),
-  improvements: z.array(z.string()).optional(),
-  regressions: z.array(z.string()).optional(),
-  recommendation: z.string().optional(),
-  error: ErrorSchema.optional(),
-};
+export const OptimizePromptOutputSchema = z
+  .object({
+    ok: z.boolean().describe('True if optimization succeeded'),
+    original: z.string().optional().describe('Original prompt text'),
+    optimized: z.string().optional().describe('Optimized prompt text'),
+    techniquesApplied: z
+      .array(TechniqueSchema)
+      .optional()
+      .describe('Techniques actually applied'),
+    targetFormat: z.enum(TARGET_FORMATS).optional().describe('Resolved format'),
+    beforeScore: ScoreSchema.optional().describe('Scores before optimization'),
+    afterScore: ScoreSchema.optional().describe('Scores after optimization'),
+    scoreDelta: z
+      .number()
+      .optional()
+      .describe('After minus before overall score'),
+    improvements: z
+      .array(z.string())
+      .optional()
+      .describe('List of improvements'),
+    usedFallback: z
+      .boolean()
+      .optional()
+      .describe('Whether a fallback was used'),
+    error: ErrorSchema.optional().describe('Error details when ok=false'),
+  })
+  .describe('Optimize prompt response');
 
-export const ValidatePromptOutputSchema = {
-  ok: z.boolean(),
-  isValid: z.boolean().optional(),
-  issues: z
-    .array(
-      z.object({
-        type: z.enum(['error', 'warning', 'info']),
-        message: z.string(),
-        suggestion: z.string().optional(),
-      })
-    )
-    .optional(),
-  tokenEstimate: z.number().optional(),
-  securityFlags: z.array(z.string()).optional(),
-  error: ErrorSchema.optional(),
-};
+export const DetectFormatOutputSchema = z
+  .object({
+    ok: z.boolean().describe('True if detection succeeded'),
+    detectedFormat: z
+      .enum(TARGET_FORMATS)
+      .optional()
+      .describe('Detected format'),
+    confidence: z
+      .number()
+      .min(0)
+      .max(100)
+      .optional()
+      .describe('Confidence score'),
+    characteristics: CharacteristicsSchema.optional().describe(
+      'Detected characteristics'
+    ),
+    recommendation: z.string().optional().describe('Format recommendation'),
+    error: ErrorSchema.optional().describe('Error details when ok=false'),
+  })
+  .describe('Detect format response');
+
+export const ComparePromptsOutputSchema = z
+  .object({
+    ok: z.boolean().describe('True if comparison succeeded'),
+    promptA: z.string().optional().describe('Prompt A text'),
+    promptB: z.string().optional().describe('Prompt B text'),
+    scoreA: ScoreSchema.optional().describe('Scores for prompt A'),
+    scoreB: ScoreSchema.optional().describe('Scores for prompt B'),
+    scoreDelta: ScoreDeltaSchema.optional().describe('B minus A deltas'),
+    winner: z.enum(['A', 'B', 'tie']).optional().describe('Winner label'),
+    improvements: z
+      .array(z.string())
+      .optional()
+      .describe('Improvements in prompt B'),
+    regressions: z
+      .array(z.string())
+      .optional()
+      .describe('Regressions in prompt B'),
+    recommendation: z.string().optional().describe('Overall recommendation'),
+    error: ErrorSchema.optional().describe('Error details when ok=false'),
+  })
+  .describe('Compare prompts response');
+
+export const ValidatePromptOutputSchema = z
+  .object({
+    ok: z.boolean().describe('True if validation succeeded'),
+    isValid: z.boolean().optional().describe('Overall validity'),
+    issues: z
+      .array(ValidationIssueSchema)
+      .optional()
+      .describe('Validation issues'),
+    tokenEstimate: z.number().optional().describe('Estimated token count'),
+    securityFlags: z.array(z.string()).optional().describe('Security flags'),
+    error: ErrorSchema.optional().describe('Error details when ok=false'),
+  })
+  .describe('Validate prompt response');

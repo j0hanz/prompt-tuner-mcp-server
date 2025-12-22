@@ -67,7 +67,6 @@ async function main() {
 
   try {
     await server.connect();
-    console.log('Server connected');
   } catch (error: any) {
     logger.error(\`Fatal error: \${error.message}\`);
     process.exit(1);

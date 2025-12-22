@@ -1,12 +1,15 @@
 import { inspect } from 'node:util';
 
+import { McpError as JsonRpcMcpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode as JsonRpcErrorCode } from '@modelcontextprotocol/sdk/types.js';
+
 import pino from 'pino';
+import type { ZodError } from 'zod';
 
 import { config } from '../config/env.js';
 import {
   ErrorCode,
   type ErrorCodeType,
-  type ErrorResponse,
   type McpErrorOptions,
   type SuccessResponse,
 } from '../config/types.js';
@@ -101,13 +104,6 @@ function resolveMcpError(error: unknown): McpError | null {
   return error instanceof McpError ? error : null;
 }
 
-function resolveErrorCode(
-  mcpError: McpError | null,
-  fallbackCode: ErrorCodeType
-): ErrorCodeType {
-  return mcpError?.code ?? fallbackCode;
-}
-
 function resolveErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Unknown error';
 }
@@ -143,49 +139,76 @@ function resolveSafeContext(context?: string): string | undefined {
     : undefined;
 }
 
-function buildStructuredError(
-  code: ErrorCodeType,
-  message: string,
-  safeContext: string | undefined,
-  details: Record<string, unknown> | undefined,
-  recoveryHint: string | undefined
-): ErrorResponse['structuredContent'] {
+export { ErrorCode };
+
+function resolveJsonRpcCode(
+  mcpError: McpError | null,
+  fallbackCode: ErrorCodeType
+): JsonRpcErrorCode {
+  if (mcpError?.code === ErrorCode.E_INVALID_INPUT) {
+    return JsonRpcErrorCode.InvalidParams;
+  }
+
+  if (fallbackCode === ErrorCode.E_INVALID_INPUT) {
+    return JsonRpcErrorCode.InvalidParams;
+  }
+
+  return JsonRpcErrorCode.InternalError;
+}
+
+function buildSafeErrorData(
+  mcpError: McpError | null,
+  context?: string
+): Record<string, unknown> | undefined {
+  const safeContext = resolveSafeContext(context);
+  const details = resolveErrorDetails(mcpError);
+  const recoveryHint = resolveRecoveryHint(mcpError);
+
+  if (!safeContext && !details && !recoveryHint) return undefined;
+
   return {
-    ok: false as const,
-    error: {
-      code,
-      message,
-      context: safeContext,
-      ...(details && { details }),
-      ...(recoveryHint ? { recoveryHint } : {}),
-    },
+    ...(safeContext ? { context: safeContext } : {}),
+    ...(details ? { details } : {}),
+    ...(recoveryHint ? { recoveryHint } : {}),
   };
 }
 
-export function createErrorResponse(
+function isZodError(error: unknown): error is ZodError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'issues' in (error as Record<string, unknown>)
+  );
+}
+
+export function toJsonRpcError(
   error: unknown,
   fallbackCode: ErrorCodeType = ErrorCode.E_LLM_FAILED,
   context?: string
-): ErrorResponse {
+): JsonRpcMcpError {
+  if (error instanceof JsonRpcMcpError) return error;
+
+  if (isZodError(error)) {
+    return new JsonRpcMcpError(
+      JsonRpcErrorCode.InvalidParams,
+      `Invalid params: ${error.message}`,
+      { issues: error.issues }
+    );
+  }
+
   const mcpError = resolveMcpError(error);
-  const code = resolveErrorCode(mcpError, fallbackCode);
+  if (mcpError) {
+    return new JsonRpcMcpError(
+      resolveJsonRpcCode(mcpError, fallbackCode),
+      mcpError.message,
+      buildSafeErrorData(mcpError, context)
+    );
+  }
+
   const message = resolveErrorMessage(error);
-  const details = resolveErrorDetails(mcpError);
-  const recoveryHint = resolveRecoveryHint(mcpError);
-  const safeContext = resolveSafeContext(context);
-  const structuredError = buildStructuredError(
-    code,
+  return new JsonRpcMcpError(
+    resolveJsonRpcCode(null, fallbackCode),
     message,
-    safeContext,
-    details,
-    recoveryHint
+    buildSafeErrorData(null, context)
   );
-
-  return {
-    content: [{ type: 'text', text: `Error [${code}]: ${message}` }],
-    structuredContent: structuredError,
-    isError: true,
-  };
 }
-
-export { ErrorCode };

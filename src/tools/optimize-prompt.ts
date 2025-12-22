@@ -1,4 +1,9 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type {
+  ServerNotification,
+  ServerRequest,
+} from '@modelcontextprotocol/sdk/types.js';
 
 import type {
   OptimizationTechnique,
@@ -6,11 +11,12 @@ import type {
   TargetFormat,
 } from '../config/types.js';
 import {
-  createErrorResponse,
   createSuccessResponse,
   ErrorCode,
+  toJsonRpcError,
 } from '../lib/errors.js';
 import { resolveFormat } from '../lib/prompt-analysis.js';
+import { getToolContext } from '../lib/tool-context.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
 import {
   escapePromptForXml,
@@ -204,8 +210,8 @@ const OPTIMIZE_PROMPT_TOOL = {
   title: 'Optimize Prompt',
   description:
     'Apply multiple optimization techniques using AI (e.g., ["basic", "roleBased", "structured"]). Returns before/after scores and improvements.',
-  inputSchema: OptimizePromptInputSchema,
-  outputSchema: OptimizePromptOutputSchema,
+  inputSchema: OptimizePromptInputSchema.shape,
+  outputSchema: OptimizePromptOutputSchema.shape,
   annotations: {
     readOnlyHint: true,
     idempotentHint: false,
@@ -236,14 +242,15 @@ function resolveOptimizeInputs(
 }
 
 async function runOptimization(
-  optimizePrompt: string
+  optimizePrompt: string,
+  signal: AbortSignal
 ): Promise<OptimizeResponse> {
   return executeLLMWithJsonResponse<OptimizeResponse>(
     optimizePrompt,
     (value) => OptimizeResponseSchema.parse(value),
     ErrorCode.E_LLM_FAILED,
     'optimize_prompt',
-    { maxTokens: 3000, timeoutMs: 60000 }
+    { maxTokens: 3000, timeoutMs: 60000, signal }
   );
 }
 
@@ -269,11 +276,11 @@ function buildOptimizeResponse(
 }
 
 async function handleOptimizePrompt(
-  input: OptimizePromptInput
-): Promise<
-  | ReturnType<typeof createSuccessResponse>
-  | ReturnType<typeof createErrorResponse>
-> {
+  input: OptimizePromptInput,
+  extra: RequestHandlerExtra<ServerRequest, ServerNotification>
+): Promise<ReturnType<typeof createSuccessResponse>> {
+  const context = getToolContext(extra);
+
   try {
     const resolved = resolveOptimizeInputs(input);
     const safePrompt = escapePromptForXml(resolved.validatedPrompt);
@@ -282,14 +289,17 @@ async function handleOptimizePrompt(
       resolved.resolvedFormat,
       resolved.validatedTechniques
     );
-    const optimizationResult = await runOptimization(optimizePrompt);
+    const optimizationResult = await runOptimization(
+      optimizePrompt,
+      context.request.signal
+    );
     return buildOptimizeResponse(
       optimizationResult,
       resolved.validatedPrompt,
       resolved.resolvedFormat
     );
   } catch (error) {
-    return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
+    throw toJsonRpcError(error, ErrorCode.E_LLM_FAILED, input.prompt);
   }
 }
 

@@ -1,12 +1,18 @@
 // Validate Prompt Tool - LLM-powered validation
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type {
+  ServerNotification,
+  ServerRequest,
+} from '@modelcontextprotocol/sdk/types.js';
 
 import type { ValidationIssue, ValidationResponse } from '../config/types.js';
 import {
-  createErrorResponse,
   createSuccessResponse,
   ErrorCode,
+  toJsonRpcError,
 } from '../lib/errors.js';
+import { getToolContext } from '../lib/tool-context.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
 import { escapePromptForXml, validatePrompt } from '../lib/validation.js';
 import {
@@ -89,8 +95,8 @@ const VALIDATE_PROMPT_TOOL = {
   title: 'Validate Prompt',
   description:
     'Pre-flight validation using AI: checks issues, estimates tokens, detects security risks. Returns isValid boolean and categorized issues.',
-  inputSchema: ValidatePromptInputSchema,
-  outputSchema: ValidatePromptOutputSchema,
+  inputSchema: ValidatePromptInputSchema.shape,
+  outputSchema: ValidatePromptOutputSchema.shape,
   annotations: {
     readOnlyHint: true,
     idempotentHint: false,
@@ -197,16 +203,16 @@ function buildValidationResponse(
 }
 
 async function handleValidatePrompt(
-  input: ValidatePromptInput
-): Promise<
-  | ReturnType<typeof createSuccessResponse>
-  | ReturnType<typeof createErrorResponse>
-> {
+  input: ValidatePromptInput,
+  extra: RequestHandlerExtra<ServerRequest, ServerNotification>
+): Promise<ReturnType<typeof createSuccessResponse>> {
+  const context = getToolContext(extra);
+
   let validatedPrompt: string;
   try {
     validatedPrompt = validatePrompt(input.prompt);
   } catch (error) {
-    return createErrorResponse(error, ErrorCode.E_INVALID_INPUT, input.prompt);
+    throw toJsonRpcError(error, ErrorCode.E_INVALID_INPUT, input.prompt);
   }
 
   const targetModel = resolveTargetModel(input);
@@ -224,12 +230,12 @@ async function handleValidatePrompt(
       (value) => ValidationResponseSchema.parse(value),
       ErrorCode.E_LLM_FAILED,
       'validate_prompt',
-      { maxTokens: 1000 }
+      { maxTokens: 1000, signal: context.request.signal }
     );
 
     return buildValidationResponse(parsed, targetModel, checkInjection);
   } catch (error) {
-    return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
+    throw toJsonRpcError(error, ErrorCode.E_LLM_FAILED, input.prompt);
   }
 }
 

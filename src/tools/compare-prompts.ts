@@ -1,11 +1,17 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type {
+  ServerNotification,
+  ServerRequest,
+} from '@modelcontextprotocol/sdk/types.js';
 
 import type { ComparisonResponse } from '../config/types.js';
 import {
-  createErrorResponse,
   createSuccessResponse,
   ErrorCode,
+  toJsonRpcError,
 } from '../lib/errors.js';
+import { getToolContext } from '../lib/tool-context.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
 import { escapePromptForXml, validatePrompt } from '../lib/validation.js';
 import {
@@ -103,8 +109,8 @@ const COMPARE_PROMPTS_TOOL = {
   title: 'Compare Prompts',
   description:
     'Compare two prompt versions using AI analysis. Returns scores, winner, improvements/regressions, and recommendations.',
-  inputSchema: ComparePromptsInputSchema,
-  outputSchema: ComparePromptsOutputSchema,
+  inputSchema: ComparePromptsInputSchema.shape,
+  outputSchema: ComparePromptsOutputSchema.shape,
   annotations: {
     readOnlyHint: true,
     idempotentHint: false,
@@ -201,14 +207,15 @@ function buildComparePrompt(
 }
 
 async function runComparison(
-  comparePrompt: string
+  comparePrompt: string,
+  signal: AbortSignal
 ): Promise<ComparisonResponse> {
   return executeLLMWithJsonResponse<ComparisonResponse>(
     comparePrompt,
     (value: unknown) => ComparisonResponseSchema.parse(value),
     ErrorCode.E_LLM_FAILED,
     'compare_prompts',
-    { maxTokens: 1500 }
+    { maxTokens: 1500, signal }
   );
 }
 
@@ -235,15 +242,15 @@ function buildCompareResponse(
 }
 
 async function handleComparePrompts(
-  input: ComparePromptsInput
-): Promise<
-  | ReturnType<typeof createSuccessResponse>
-  | ReturnType<typeof createErrorResponse>
-> {
+  input: ComparePromptsInput,
+  extra: RequestHandlerExtra<ServerRequest, ServerNotification>
+): Promise<ReturnType<typeof createSuccessResponse>> {
+  const context = getToolContext(extra);
+
   try {
-    return await runCompareFlow(input);
+    return await runCompareFlow(input, context.request.signal);
   } catch (error) {
-    return createErrorResponse(
+    throw toJsonRpcError(
       error,
       ErrorCode.E_LLM_FAILED,
       `${input.promptA} | ${input.promptB}`
@@ -252,7 +259,8 @@ async function handleComparePrompts(
 }
 
 async function runCompareFlow(
-  input: ComparePromptsInput
+  input: ComparePromptsInput,
+  signal: AbortSignal
 ): Promise<ReturnType<typeof createSuccessResponse>> {
   const validatedA = validatePrompt(input.promptA);
   const validatedB = validatePrompt(input.promptB);
@@ -260,7 +268,7 @@ async function runCompareFlow(
   const safeA = escapePromptForXml(validatedA);
   const safeB = escapePromptForXml(validatedB);
   const comparePrompt = buildComparePrompt(labelA, labelB, safeA, safeB);
-  const parsed = await runComparison(comparePrompt);
+  const parsed = await runComparison(comparePrompt, signal);
   return buildCompareResponse(parsed, validatedA, validatedB, labelA, labelB);
 }
 

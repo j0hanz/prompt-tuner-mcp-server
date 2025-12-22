@@ -1,15 +1,21 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type {
+  ServerNotification,
+  ServerRequest,
+} from '@modelcontextprotocol/sdk/types.js';
 
 import type { OptimizationTechnique, TargetFormat } from '../config/types.js';
 import { getCachedRefinement, setCachedRefinement } from '../lib/cache.js';
 import {
-  createErrorResponse,
   createSuccessResponse,
   ErrorCode,
   logger,
+  toJsonRpcError,
 } from '../lib/errors.js';
 import { refineLLM } from '../lib/llm.js';
 import { resolveFormat } from '../lib/prompt-analysis.js';
+import { getToolContext } from '../lib/tool-context.js';
 import {
   validateFormat,
   validatePrompt,
@@ -36,8 +42,8 @@ const REFINE_PROMPT_TOOL = {
   title: 'Refine Prompt',
   description:
     'Fix grammar, improve clarity, and apply optimization techniques. Use when: user asks to fix/improve/optimize a prompt, prompt has typos, or prompt is vague. Default technique: "basic" for quick fixes. Use "comprehensive" for best results.',
-  inputSchema: RefinePromptInputSchema,
-  outputSchema: RefinePromptOutputSchema,
+  inputSchema: RefinePromptInputSchema.shape,
+  outputSchema: RefinePromptOutputSchema.shape,
   annotations: {
     readOnlyHint: true,
     idempotentHint: false,
@@ -90,14 +96,16 @@ function buildRefineResponse(
 }
 
 async function refineAndCache(
-  input: ResolvedRefineInputs
+  input: ResolvedRefineInputs,
+  signal: AbortSignal
 ): Promise<{ refined: string; corrections: string[] }> {
   const refined = await refineLLM(
     input.validatedPrompt,
     input.validatedTechnique,
     input.resolvedFormat,
     2000,
-    60000
+    60000,
+    signal
   );
   const corrections: string[] = [];
   if (refined !== input.validatedPrompt) {
@@ -116,11 +124,11 @@ async function refineAndCache(
 }
 
 async function handleRefinePrompt(
-  input: RefinePromptInput
-): Promise<
-  | ReturnType<typeof createSuccessResponse>
-  | ReturnType<typeof createErrorResponse>
-> {
+  input: RefinePromptInput,
+  extra: RequestHandlerExtra<ServerRequest, ServerNotification>
+): Promise<ReturnType<typeof createSuccessResponse>> {
+  const context = getToolContext(extra);
+
   try {
     const resolved = resolveInputs(input);
     const cached = getCachedRefinement(
@@ -129,10 +137,13 @@ async function handleRefinePrompt(
       resolved.resolvedFormat
     );
     if (cached) return buildCacheHitResponse(cached, resolved);
-    const { refined, corrections } = await refineAndCache(resolved);
+    const { refined, corrections } = await refineAndCache(
+      resolved,
+      context.request.signal
+    );
     return buildRefineResponse(refined, corrections, resolved);
   } catch (error) {
-    return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
+    throw toJsonRpcError(error, ErrorCode.E_LLM_FAILED, input.prompt);
   }
 }
 

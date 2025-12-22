@@ -1,11 +1,17 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type {
+  ServerNotification,
+  ServerRequest,
+} from '@modelcontextprotocol/sdk/types.js';
 
 import type { FormatDetectionResponse } from '../config/types.js';
 import {
-  createErrorResponse,
   createSuccessResponse,
   ErrorCode,
+  toJsonRpcError,
 } from '../lib/errors.js';
+import { getToolContext } from '../lib/tool-context.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
 import { escapePromptForXml, validatePrompt } from '../lib/validation.js';
 import {
@@ -87,8 +93,8 @@ const DETECT_FORMAT_TOOL = {
   title: 'Detect Format',
   description:
     'Identify if prompt targets Claude XML, GPT Markdown, or JSON schema using AI analysis. Returns confidence score and recommendations.',
-  inputSchema: DetectFormatInputSchema,
-  outputSchema: DetectFormatOutputSchema,
+  inputSchema: DetectFormatInputSchema.shape,
+  outputSchema: DetectFormatOutputSchema.shape,
   annotations: {
     readOnlyHint: true,
     idempotentHint: false,
@@ -109,11 +115,11 @@ function formatDetectionOutput(parsed: FormatDetectionResponse): string {
 }
 
 async function handleDetectFormat(
-  input: DetectFormatInput
-): Promise<
-  | ReturnType<typeof createSuccessResponse>
-  | ReturnType<typeof createErrorResponse>
-> {
+  input: DetectFormatInput,
+  extra: RequestHandlerExtra<ServerRequest, ServerNotification>
+): Promise<ReturnType<typeof createSuccessResponse>> {
+  const context = getToolContext(extra);
+
   try {
     const validatedPrompt = validatePrompt(input.prompt);
     const safePrompt = escapePromptForXml(validatedPrompt);
@@ -124,7 +130,7 @@ async function handleDetectFormat(
       (value) => FormatDetectionResponseSchema.parse(value),
       ErrorCode.E_LLM_FAILED,
       'detect_format',
-      { maxTokens: 500 }
+      { maxTokens: 500, signal: context.request.signal }
     );
 
     const output = formatDetectionOutput(parsed);
@@ -135,7 +141,7 @@ async function handleDetectFormat(
       recommendation: parsed.recommendation,
     });
   } catch (error) {
-    return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
+    throw toJsonRpcError(error, ErrorCode.E_LLM_FAILED, input.prompt);
   }
 }
 
