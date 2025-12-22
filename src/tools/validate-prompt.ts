@@ -15,25 +15,40 @@ import {
 } from '../schemas/index.js';
 import { ValidationResponseSchema } from '../schemas/llm-responses.js';
 
-const VALIDATION_SYSTEM_PROMPT = `You are an expert prompt validator. Check prompts for issues, estimate tokens, and detect security risks.
+const VALIDATION_SYSTEM_PROMPT = `<role>
+You are an expert prompt validator.
+</role>
+
+<task>
+Check prompts for issues, estimate tokens, and detect security risks.
+</task>
 
 <validation_checks>
-1. **Anti-patterns**: Vague language, missing context, overly long sentences
-2. **Token limits**: Estimate tokens (1 token ≈ 4 chars), check against model limits
-3. **Security**: Prompt injection patterns, script injection
-4. **Typos**: Common misspellings
-5. **Quality**: Role definition, output format, examples
+1. Anti-patterns: Vague language, missing context, overly long sentences
+2. Token limits: Estimate tokens (1 token ~ 4 characters) and compare to model limits
+3. Security: Prompt injection patterns or script injection (only if Check Injection is true)
+4. Typos: Common misspellings
+5. Quality: Role definition, output format, examples
 </validation_checks>
 
 <model_limits>
-- claude: 200,000 tokens
-- gpt: 128,000 tokens
-- gemini: 1,000,000 tokens
-- generic: 8,000 tokens
+claude: 200000 tokens
+gpt: 128000 tokens
+gemini: 1000000 tokens
+generic: 8000 tokens
 </model_limits>
 
-<output_format>
-Return JSON:
+<output_rules>
+Return valid JSON only. Do not include markdown, code fences, or extra text.
+Requirements:
+1. Start with { and end with }
+2. Double quotes for all strings
+3. No trailing commas
+4. Include every required field
+5. If there are no issues, return an empty issues array
+</output_rules>
+
+<schema>
 {
   "isValid": boolean,
   "tokenEstimate": number,
@@ -45,7 +60,11 @@ Return JSON:
     }
   ]
 }
-</output_format>`;
+</schema>
+
+<final_reminder>
+Return JSON only. No markdown. No code fences. No extra text.
+</final_reminder>`;
 
 // Formats a validation issue as markdown
 function formatIssue(issue: ValidationIssue): string {
@@ -135,7 +154,9 @@ function buildValidationPrompt(
   targetModel: string,
   checkInjection: boolean
 ): string {
-  return `${VALIDATION_SYSTEM_PROMPT}\n\nTarget Model: ${targetModel}\nCheck Injection: ${String(checkInjection)}\n\nPROMPT TO VALIDATE:\n${validatedPrompt}`;
+  return `${VALIDATION_SYSTEM_PROMPT}\n\nTarget Model: ${targetModel}\nCheck Injection: ${String(
+    checkInjection
+  )}\n\n<prompt_to_validate>\n${validatedPrompt}\n</prompt_to_validate>`;
 }
 
 function buildSecurityFlags(

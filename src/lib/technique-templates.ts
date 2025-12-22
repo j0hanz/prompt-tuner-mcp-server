@@ -31,7 +31,11 @@ NEVER:
 
 <output_format>
 Return ONLY the refined prompt text.
-</output_format>`,
+</output_format>
+
+<final_reminder>
+Return only the refined prompt text. No commentary or extra formatting.
+</final_reminder>`,
   },
 
   chainOfThought: {
@@ -46,17 +50,17 @@ Enhance the prompt by adding step-by-step reasoning guidance (Chain-of-Thought) 
 </task>
 
 <examples>
-Math: "Let's calculate step by step."
-Analysis: "Let's analyze systematically."
-Debug: "Let's trace through carefully."
-Planning: "Let's break this into phases."
+Math: Add a short step-by-step cue (for example, "Calculate step by step.")
+Analysis: Add a systematic analysis cue (for example, "Analyze systematically.")
+Debug: Add a tracing cue (for example, "Trace the logic carefully.")
+Planning: Add a phased approach cue (for example, "Break this into phases.")
 </examples>
 
 <rules>
 ALWAYS:
-- Insert a reasoning trigger phrase (e.g., "Let's think step by step")
+- Insert a reasoning trigger phrase appropriate for the task
 - Place the trigger after the main task instruction
-- Ensure the trigger matches the task domain (math vs. writing vs. coding)
+- Match the trigger to the task domain (math vs. writing vs. coding)
 
 NEVER:
 - Add reasoning triggers to simple, factual queries
@@ -65,7 +69,11 @@ NEVER:
 
 <output_format>
 Return ONLY the optimized prompt.
-</output_format>`,
+</output_format>
+
+<final_reminder>
+Return only the optimized prompt text. Do not add explanations.
+</final_reminder>`,
   },
 
   fewShot: {
@@ -82,7 +90,7 @@ Enhance the prompt by adding 2-3 diverse input/output examples to demonstrate th
 <rules>
 ALWAYS:
 - Create 2-3 diverse examples covering different use cases
-- Ensure examples show clear Input -> Output mapping
+- Ensure examples show clear Input to Output mapping
 - Place examples before the main task instruction
 - Use consistent formatting for all examples
 
@@ -94,7 +102,11 @@ NEVER:
 
 <output_format>
 Return ONLY the optimized prompt.
-</output_format>`,
+</output_format>
+
+<final_reminder>
+Return only the optimized prompt text. Do not add commentary.
+</final_reminder>`,
   },
 
   roleBased: {
@@ -109,9 +121,9 @@ Enhance the prompt by adding a specific, expert role/persona relevant to the dom
 </task>
 
 <examples>
-Code: "You are a senior software engineer with expertise in TypeScript..."
-Writing: "You are a professional editor for a tech blog..."
-Analysis: "You are a data scientist specializing in time-series analysis..."
+Code: You are a senior software engineer with expertise in TypeScript.
+Writing: You are a professional editor for a tech blog.
+Analysis: You are a data scientist specializing in time-series analysis.
 </examples>
 
 <rules>
@@ -127,7 +139,11 @@ NEVER:
 
 <output_format>
 Return ONLY the optimized prompt.
-</output_format>`,
+</output_format>
+
+<final_reminder>
+Return only the optimized prompt text. No extra commentary.
+</final_reminder>`,
   },
 
   structured: {
@@ -147,8 +163,8 @@ For Claude (XML):
 - Keep nesting shallow
 
 For GPT (Markdown):
-- Use headers: # Identity, ## Context, ## Task, ## Requirements
-- Use bullet points and bold text for emphasis
+- Use Markdown headings for sections (level 1 for Identity, level 2 for the rest)
+- Use bullet points and emphasis sparingly for readability
 </format_guidance>
 
 <rules>
@@ -164,7 +180,11 @@ NEVER:
 
 <output_format>
 Return ONLY the structured prompt.
-</output_format>`,
+</output_format>
+
+<final_reminder>
+Return only the structured prompt text. No extra commentary.
+</final_reminder>`,
   },
 
   comprehensive: {
@@ -179,13 +199,13 @@ Rewrite the prompt to maximize effectiveness by applying multiple optimization t
 </task>
 
 <approach>
-1. **Role**: Add a specific expert persona.
-2. **Context**: Clarify background and motivation.
-3. **Structure**: Organize with clear sections (XML or Markdown).
-4. **Instructions**: Make steps explicit and positive.
-5. **Reasoning**: Add Chain-of-Thought triggers for complex tasks.
-6. **Examples**: Add few-shot examples if the task is pattern-based.
-7. **Constraints**: Use ALWAYS/NEVER rules.
+1. Role: Add a specific expert persona.
+2. Context: Clarify background and motivation.
+3. Structure: Organize with clear sections (XML or Markdown).
+4. Instructions: Make steps explicit and positive.
+5. Reasoning: Add step-by-step guidance for complex tasks.
+6. Examples: Add few-shot examples if the task is pattern-based.
+7. Constraints: Use ALWAYS and NEVER rules.
 </approach>
 
 <rules>
@@ -203,7 +223,11 @@ NEVER:
 
 <output_format>
 Return ONLY the fully optimized prompt.
-</output_format>`,
+</output_format>
+
+<final_reminder>
+Return only the fully optimized prompt text. No extra commentary.
+</final_reminder>`,
   },
 };
 
@@ -233,12 +257,12 @@ Use semantic XML tags to organize content. Recommended structure:
 TARGET FORMAT: GPT (Markdown structure)
 
 Use Markdown formatting for clarity. Recommended structure:
-1. # Identity - Who the model is
-2. ## Context - Background info
-3. ## Task - Main objective
-4. ## Requirements - Specific rules (bullet points)
-5. ## Output Format - Expected response structure
-6. ## Examples - Input/output pairs
+1. Identity (level-1 heading) - Who the model is
+2. Context (level-2 heading) - Background info
+3. Task (level-2 heading) - Main objective
+4. Requirements (level-2 heading) - Specific rules (bullet points)
+5. Output Format (level-2 heading) - Expected response structure
+6. Examples (level-2 heading) - Input/output pairs
 </format_instructions>`,
 
   json: `
@@ -249,7 +273,7 @@ Structure the prompt to request a valid JSON response:
 - Define the JSON schema explicitly
 - Describe each field's type and purpose
 - Provide a valid JSON example
-- Wrap the output in a markdown code block: \`\`\`json
+- Request raw JSON output with no code fences
 </format_instructions>`,
 };
 

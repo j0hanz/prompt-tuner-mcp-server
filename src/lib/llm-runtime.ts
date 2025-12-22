@@ -217,7 +217,10 @@ export async function runGeneration(
     const start = process.hrtime.bigint();
     try {
       const content = await requestFn();
-      invariant(content, 'LLM returned empty response');
+      invariant(
+        content,
+        'LLM returned empty response (possibly blocked or filtered)'
+      );
 
       const durationMs = Number(process.hrtime.bigint() - start) / 1_000_000;
       logger.debug(

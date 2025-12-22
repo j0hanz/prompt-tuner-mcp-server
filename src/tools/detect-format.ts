@@ -14,55 +14,70 @@ import {
 } from '../schemas/index.js';
 import { FormatDetectionResponseSchema } from '../schemas/llm-responses.js';
 
-const FORMAT_DETECTION_PROMPT = `You are an expert at detecting AI prompt formats. Analyze the prompt and determine its target format.
+const FORMAT_DETECTION_PROMPT = `<role>
+You are an expert at detecting AI prompt formats.
+</role>
+
+<task>
+Analyze the prompt and determine its target format.
+</task>
 
 <formats>
-1. **Claude XML**: Uses <context>, <task>, <requirements>, <output_format> tags
-2. **GPT Markdown**: Uses ## headers, **bold**, bullet lists, numbered steps
-3. **JSON**: Structured data format with schemas and key-value patterns
-4. **Auto/Generic**: No specific format detected
+1. Claude XML: Uses tags such as <context>, <task>, <requirements>, <output_format>
+2. GPT Markdown: Uses Markdown headings, emphasis, and bullet lists
+3. JSON: Structured schema or key-value patterns
+4. Auto: No dominant format detected
 </formats>
 
 <detection_criteria>
 Claude XML indicators:
-- Presence of XML tags like <context>, <task>, <instructions>
-- Structured semantic sections in angle brackets
-- Anthropic-style formatting
+- XML tags for semantic sections
+- Angle-bracketed structure
 
 GPT Markdown indicators:
-- ## Headers for sections
-- **Bold** emphasis
-- Bullet lists with - or *
-- Markdown syntax
+- Markdown heading structure
+- Emphasis markers
+- Bullet or numbered lists
 
 JSON indicators:
-- Schema definitions
-- Key-value pair structures  
-- Curly braces and quotes
-- Data extraction focus
+- Explicit schema or key-value structures
+- Curly braces with quoted keys
 </detection_criteria>
 
-**CRITICAL: Your response MUST be valid, parseable JSON only. No markdown, no code blocks, no explanatory text.**
+<decision_rules>
+- If multiple formats appear, choose the dominant one.
+- If ambiguous, return "auto" with confidence 60 or lower.
+- Provide a single-sentence recommendation to improve format clarity.
+</decision_rules>
 
-1. Start your response with { (opening brace)
-2. End your response with } (closing brace)  
-3. Use proper JSON syntax: double quotes for strings, no trailing commas
-4. All required fields MUST be present
-5. Do NOT wrap in \`\`\`json code blocks
+<output_rules>
+Return valid JSON only. No markdown, no code fences, no extra text.
+Requirements:
+1. Start with { and end with }
+2. Double quotes for all strings
+3. No trailing commas
+4. Include every required field
+</output_rules>
 
-Example valid response:
+<example_json>
 {
   "detectedFormat": "gpt",
   "confidence": 85,
-  "recommendation": "This prompt uses Markdown headers (##), bold emphasis (**), and bullet lists, indicating GPT format. Consider adding more specific examples."
+  "recommendation": "The prompt uses Markdown-style headings and lists; add an explicit output section to strengthen GPT structure."
 }
+</example_json>
 
-Required JSON schema:
+<schema>
 {
   "detectedFormat": "claude" | "gpt" | "json" | "auto",
   "confidence": number (0-100),
   "recommendation": string
-}`;
+}
+</schema>
+
+<final_reminder>
+Return JSON only. No markdown. No code fences. No extra text.
+</final_reminder>`;
 
 interface DetectFormatInput {
   prompt: string;
@@ -101,7 +116,7 @@ async function handleDetectFormat(
 > {
   try {
     const validatedPrompt = validatePrompt(input.prompt);
-    const detectionPrompt = `${FORMAT_DETECTION_PROMPT}\n\nPROMPT TO ANALYZE:\n${validatedPrompt}`;
+    const detectionPrompt = `${FORMAT_DETECTION_PROMPT}\n\n<prompt_to_analyze>\n${validatedPrompt}\n</prompt_to_analyze>`;
 
     const parsed = await executeLLMWithJsonResponse<FormatDetectionResponse>(
       detectionPrompt,

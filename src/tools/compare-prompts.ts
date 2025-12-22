@@ -14,34 +14,41 @@ import {
 } from '../schemas/index.js';
 import { ComparisonResponseSchema } from '../schemas/llm-responses.js';
 
-const COMPARE_SYSTEM_PROMPT = `You are an expert prompt evaluator.
+const COMPARE_SYSTEM_PROMPT = `<role>
+You are an expert prompt evaluator.
+</role>
 
 <task>
-Compare two prompts and determine which is better across 5 dimensions.
+Compare two prompts and determine which is better across five dimensions.
 </task>
 
 <criteria>
-Evaluate each prompt on:
-
-1. Clarity - Clearer, less vague language
-2. Specificity - More concrete details
-3. Completeness - Better context and requirements
-4. Structure - Better organization
-5. Effectiveness - Likely to produce better responses
-
-Provide scores (0-100) for each dimension and overall.
+Score each prompt from 0 to 100 for:
+1. Clarity - Clear, unambiguous language
+2. Specificity - Concrete details and constraints
+3. Completeness - Context, requirements, output format
+4. Structure - Organization and logical flow
+5. Effectiveness - Likely to produce strong responses
 </criteria>
 
-<output>
-**CRITICAL: Your response MUST be valid, parseable JSON only. No markdown, no code blocks, no explanatory text.**
+<comparison_rules>
+- Use integer scores only.
+- If scores are within 2 points overall, you may choose "tie".
+- List improvements and regressions as short, actionable phrases.
+- "improvements" describes what is better in prompt B.
+- "regressions" describes what is worse in prompt B.
+</comparison_rules>
 
-1. Start your response with { (opening brace)
-2. End your response with } (closing brace)
-3. Use proper JSON syntax: double quotes for strings, no trailing commas
-4. All required fields MUST be present
-5. Do NOT wrap in \`\`\`json code blocks
+<output_rules>
+Return valid JSON only. No markdown, no code fences, no extra text.
+Requirements:
+1. Start with { and end with }
+2. Double quotes for all strings
+3. No trailing commas
+4. Include every required field
+</output_rules>
 
-Example valid response:
+<example_json>
 {
   "scoreA": {
     "clarity": 70,
@@ -61,25 +68,29 @@ Example valid response:
   },
   "winner": "B",
   "improvements": [
-    "Added clear role definition (senior engineer)",
-    "Structured with numbered steps",
-    "Included specific output requirements"
+    "Adds a clear expert role",
+    "Introduces explicit output format",
+    "Uses numbered steps for structure"
   ],
   "regressions": [],
-  "recommendation": "Prompt B is significantly better due to clear structure and role definition. Consider adopting this approach."
+  "recommendation": "Adopt prompt B and keep its structured sections and explicit output format."
 }
-</output>
+</example_json>
 
 <schema>
 {
   "scoreA": {"clarity": 0-100, "specificity": 0-100, "completeness": 0-100, "structure": 0-100, "effectiveness": 0-100, "overall": 0-100},
   "scoreB": {"clarity": 0-100, "specificity": 0-100, "completeness": 0-100, "structure": 0-100, "effectiveness": 0-100, "overall": 0-100},
   "winner": "A" | "B" | "tie",
-  "improvements": string[] (what's better in B),
-  "regressions": string[] (what's worse in B),
-  "recommendation": string (actionable advice)
+  "improvements": string[],
+  "regressions": string[],
+  "recommendation": string
 }
-</schema>`;
+</schema>
+
+<final_reminder>
+Return JSON only. No markdown. No code fences. No extra text.
+</final_reminder>`;
 
 interface ComparePromptsInput {
   promptA: string;
@@ -186,7 +197,7 @@ function buildComparePrompt(
   promptA: string,
   promptB: string
 ): string {
-  return `${COMPARE_SYSTEM_PROMPT}\n\n${labelA}:\n${promptA}\n\n${labelB}:\n${promptB}`;
+  return `${COMPARE_SYSTEM_PROMPT}\n\n<prompt_a label="${labelA}">\n${promptA}\n</prompt_a>\n\n<prompt_b label="${labelB}">\n${promptB}\n</prompt_b>`;
 }
 
 async function runComparison(

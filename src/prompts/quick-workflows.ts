@@ -63,7 +63,11 @@ Use refine_prompt with technique "basic" on this prompt.
 
 <prompt>
 {{PROMPT}}
-</prompt>`;
+</prompt>
+
+<final_reminder>
+Use refine_prompt output for the improved version. Do not invent changes.
+</final_reminder>`;
 
 const TEMPLATE_DEEP_OPTIMIZE = `<task>
 Use optimize_prompt with techniques ["comprehensive"].
@@ -78,7 +82,11 @@ Use optimize_prompt with techniques ["comprehensive"].
 
 <prompt>
 {{PROMPT}}
-</prompt>`;
+</prompt>
+
+<final_reminder>
+Use optimize_prompt output for scores and the final prompt.
+</final_reminder>`;
 
 const TEMPLATE_ANALYZE = `<task>
 Analyze this prompt for quality and structure.
@@ -92,7 +100,11 @@ Analyze this prompt for quality and structure.
 
 <prompt>
 {{PROMPT}}
-</prompt>`;
+</prompt>
+
+<final_reminder>
+Base your summary on tool outputs only.
+</final_reminder>`;
 
 const TEMPLATE_REVIEW = `<task>
 Review this prompt against best practices.
@@ -106,7 +118,11 @@ Review this prompt against best practices.
 
 <prompt>
 {{PROMPT}}
-</prompt>`;
+</prompt>
+
+<final_reminder>
+Tie each recommendation to a specific gap you identified.
+</final_reminder>`;
 
 const TEMPLATE_ITERATIVE_REFINE = `<task>
 Perform iterative refinement on this prompt.
@@ -125,7 +141,11 @@ Perform iterative refinement on this prompt.
 
 <prompt>
 {{PROMPT}}
-</prompt>`;
+</prompt>
+
+<final_reminder>
+Ensure the final prompt reflects the fixes you described.
+</final_reminder>`;
 
 const TEMPLATE_RECOMMEND_TECHNIQUES = `<task>
 Recommend optimization techniques for this prompt.
@@ -154,7 +174,11 @@ Task Type: {{TASK_TYPE}}
 
 <prompt>
 {{PROMPT}}
-</prompt>`;
+</prompt>
+
+<final_reminder>
+Recommend only techniques that add concrete value for this prompt.
+</final_reminder>`;
 
 const TEMPLATE_SCAN_ANTIPATTERNS = `<task>
 Scan this prompt for common anti-patterns.
@@ -184,19 +208,23 @@ Scan this prompt for common anti-patterns.
 </instructions>
 
 <output_format>
-## Anti-Patterns Detected: X
-[List each with severity]
+Anti-Patterns Detected: X
+- [Severity] [Issue] - [Quote] - [Fix]
 
-## Corrected Prompt
+Corrected Prompt:
 [Show improved version]
 
-## Impact
+Impact:
 Expected improvement in clarity, specificity, and effectiveness.
 </output_format>
 
 <prompt>
 {{PROMPT}}
-</prompt>`;
+</prompt>
+
+<final_reminder>
+Quote the problematic text exactly and keep fixes concise.
+</final_reminder>`;
 
 const QUICK_WORKFLOW_PROMPTS: QuickWorkflowDefinition[] = [
   {

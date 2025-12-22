@@ -14,6 +14,8 @@ Provide a comprehensive pros and cons analysis.
 - Consider multiple perspectives.
 - Consider short-term and long-term implications.
 - Be objective and balanced.
+- Provide 3-5 pros and 3-5 cons with clear categories.
+- Note key assumptions if any are required.
 
 # Output Format
 ## Pros
@@ -39,6 +41,11 @@ Two options need to be compared.
 
 # Task
 Compare and contrast these two options.
+
+# Requirements
+- Use 3-6 comparison criteria (include cost, effort, risk, and impact if relevant).
+- Be explicit about trade-offs.
+- Base the recommendation on scenarios or priorities.
 
 # Output Format
 ## Comparison Table
@@ -71,6 +78,7 @@ Identify the root cause using the "5 Whys" technique.
 2. Ask "Why?" five times, drilling down into the cause each time.
 3. Identify the fundamental root cause.
 4. Propose solutions that address the root cause.
+5. Note any assumptions or missing data.
 
 # Output Format
 ## Problem Statement
@@ -106,6 +114,7 @@ Evaluate the options using a weighted decision matrix.
 2. Score each option on each criterion (1-10).
 3. Calculate the weighted scores.
 4. Analyze the results to recommend the best option.
+5. Normalize weights so the total equals 100.
 
 # Output Format
 ## Criteria Weights

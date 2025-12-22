@@ -295,6 +295,11 @@ class GoogleClient implements LLMClient {
     }
 
     const response = await generatePromise;
+
+    if (String(response.candidates?.[0]?.finishReason) === 'SAFETY') {
+      throw new Error('Content filtered by safety settings');
+    }
+
     return response.text ?? '';
   }
 

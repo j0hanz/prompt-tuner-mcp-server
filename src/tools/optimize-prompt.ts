@@ -23,7 +23,9 @@ import {
 } from '../schemas/index.js';
 import { OptimizeResponseSchema } from '../schemas/llm-responses.js';
 
-const OPTIMIZE_SYSTEM_PROMPT = `You are an expert prompt engineer.
+const OPTIMIZE_SYSTEM_PROMPT = `<role>
+You are an expert prompt engineer.
+</role>
 
 <task>
 Apply the requested optimization techniques to improve the prompt.
@@ -31,31 +33,28 @@ Apply the requested optimization techniques to improve the prompt.
 
 <techniques>
 Available techniques:
-
 1. basic - Fix grammar, spelling, clarity
-2. chainOfThought - Add step-by-step reasoning
+2. chainOfThought - Add step-by-step reasoning guidance
 3. fewShot - Add 2-3 diverse examples
-4. roleBased - Add expert persona
-5. structured - Add XML (Claude) or Markdown (GPT)
-6. comprehensive - Apply all intelligently
+4. roleBased - Add an expert persona
+5. structured - Add XML (Claude) or Markdown (GPT) structure
+6. comprehensive - Apply all techniques intelligently
 </techniques>
 
 <rules>
 ALWAYS:
-- Apply techniques in requested order
-- Build on previous refinements
-- Maintain original intent
-- Provide before/after scores
-- Return plain text (no markdown code blocks)
+- Apply techniques in the requested order and build on previous refinements
+- Preserve the original intent and task boundaries
+- Match the optimized prompt to the target format
+- Provide before and after scores
 
 NEVER:
 - Over-engineer simple prompts
-- Wrap output in triple backticks
-- Change the core task
+- Change the core task or add unrelated requirements
 </rules>
 
 <scoring>
-Score before and after (0-100):
+Provide integer scores from 0 to 100 for:
 - Clarity
 - Specificity
 - Completeness
@@ -64,24 +63,24 @@ Score before and after (0-100):
 - Overall (weighted average)
 </scoring>
 
-<output>
-**CRITICAL: Your response MUST be valid, parseable JSON only. No markdown, no code blocks, no explanatory text.**
+<output_rules>
+Return valid, parseable JSON only. Do not include markdown, code fences, or extra text.
+Requirements:
+1. Start with { and end with }
+2. Double quotes for all strings
+3. No trailing commas
+4. Include every required field
+5. Escape special characters in strings: \\n for newlines, \\" for quotes, \\\\ for backslashes
+</output_rules>
 
-1. Start your response with { (opening brace)
-2. End your response with } (closing brace)
-3. Use proper JSON syntax: double quotes for strings, no trailing commas
-4. All required fields MUST be present
-5. Do NOT wrap in \`\`\`json code blocks
-6. Escape special characters in strings: \\n for newlines, \\" for quotes, \\\\ for backslashes
-
-Example valid response:
+<example_json>
 {
-  "optimized": "You are a senior software engineer. Analyze the code step-by-step:\n\n1. Identify bugs\n2. Suggest improvements\n3. Rate code quality (1-10)",
+  "optimized": "You are a senior software engineer. Analyze the code step by step:\\n\\n1. Identify bugs\\n2. Suggest improvements\\n3. Rate code quality (1-10)",
   "techniquesApplied": ["basic", "roleBased", "structured"],
   "improvements": [
-    "Fixed grammar and spelling errors",
-    "Added expert role context (senior engineer)",
-    "Structured output with numbered steps"
+    "Fixed grammar and clarity issues",
+    "Added a specific expert role",
+    "Organized the prompt into structured steps"
   ],
   "beforeScore": {
     "clarity": 60,
@@ -100,13 +99,13 @@ Example valid response:
     "overall": 89
   }
 }
-</output>
+</example_json>
 
 <schema>
 {
-  "optimized": string (the fully optimized prompt with proper escaping),
-  "techniquesApplied": string[] (array of technique names),
-  "improvements": string[] (array of changes made),
+  "optimized": string,
+  "techniquesApplied": string[],
+  "improvements": string[],
   "beforeScore": {
     "clarity": number (0-100),
     "specificity": number (0-100),
@@ -124,7 +123,11 @@ Example valid response:
     "overall": number (0-100)
   }
 }
-</schema>`;
+</schema>
+
+<final_reminder>
+Return JSON only. No markdown. No code fences. No extra text.
+</final_reminder>`;
 
 function formatScoreSection(
   label: string,
@@ -195,7 +198,9 @@ function buildOptimizePrompt(
   resolvedFormat: TargetFormat,
   techniques: OptimizationTechnique[]
 ): string {
-  return `${OPTIMIZE_SYSTEM_PROMPT}\n\nTarget Format: ${resolvedFormat}\nTechniques to apply: ${techniques.join(', ')}\n\nORIGINAL PROMPT:\n${prompt}`;
+  return `${OPTIMIZE_SYSTEM_PROMPT}\n\nTarget Format: ${resolvedFormat}\nTechniques to apply: ${techniques.join(
+    ', '
+  )}\n\n<original_prompt>\n${prompt}\n</original_prompt>`;
 }
 
 function appendScoreImprovement(result: OptimizeResponse): void {

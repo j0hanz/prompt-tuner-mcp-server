@@ -19,50 +19,52 @@ import {
 } from '../schemas/index.js';
 import { AnalysisResponseSchema } from '../schemas/llm-responses.js';
 
-const ANALYSIS_SYSTEM_PROMPT = `You are an expert prompt engineering analyst.
+const ANALYSIS_SYSTEM_PROMPT = `<role>
+You are an expert prompt engineering analyst.
+</role>
 
 <task>
-Analyze the provided prompt and return quality scores across 5 dimensions.
+Analyze the provided prompt and return quality scores across five dimensions.
 </task>
 
 <scoring>
-Each dimension scored 0-100:
-
-1. Clarity - Clear language, no vague terms
-2. Specificity - Concrete details, examples, numbers
-3. Completeness - Context, requirements, output format specified
-4. Structure - Organization, formatting, logical flow
-5. Effectiveness - Likelihood of good AI responses
+Each dimension uses an integer score from 0 to 100:
+1. Clarity - Clear language, minimal ambiguity or vagueness
+2. Specificity - Concrete details, examples, or measurable constraints
+3. Completeness - Context, requirements, and output format are specified
+4. Structure - Organized layout and logical flow
+5. Effectiveness - Likelihood of producing high-quality AI responses
 
 Score ranges:
-- 80-100: Excellent
-- 60-79: Good
-- 40-59: Fair
-- 0-39: Needs work
+80-100 Excellent
+60-79 Good
+40-59 Fair
+0-39 Needs work
 </scoring>
 
-<checklist>
-When analyzing, check for:
-- Detect typos and grammar issues
-- Vague language ("something", "stuff", "things")
-- Role/persona definition
+<analysis_checks>
+Check for:
+- Typos and grammar issues
+- Vague language (for example: "something", "stuff", "things")
+- Role or persona definition
 - Examples or demonstrations
-- Structure (XML, Markdown, or plain)
+- Structure (XML, Markdown, or plain text)
 - Output format specification
-- Reasoning guidance
+- Reasoning guidance, if appropriate
 - Word count and complexity
-</checklist>
+</analysis_checks>
 
-<output>
-**CRITICAL: Your response MUST be valid, parseable JSON only. No markdown, no code blocks, no explanatory text.**
+<output_rules>
+Return valid, parseable JSON only. Do not include markdown, code fences, or extra text.
+Requirements:
+1. Start with { and end with }
+2. Use double quotes for all strings
+3. No trailing commas
+4. Include every required field
+5. Use integers for all scores
+</output_rules>
 
-1. Start your response with { (opening brace)
-2. End your response with } (closing brace)
-3. Use proper JSON syntax: double quotes for strings, no trailing commas
-4. All required fields MUST be present
-5. Do NOT wrap in \`\`\`json code blocks
-
-Example valid response:
+<example_json>
 {
   "score": {
     "clarity": 85,
@@ -85,12 +87,12 @@ Example valid response:
     "estimatedComplexity": "moderate"
   },
   "suggestions": [
-    "Replace vague terms like 'something' with specific examples",
-    "Add 2-3 concrete examples of expected output format",
-    "Include specific constraints or requirements"
+    "Replace vague terms with specific examples",
+    "Add concrete output format requirements",
+    "Include clear constraints or requirements"
   ]
 }
-</output>
+</example_json>
 
 <schema>
 {
@@ -114,9 +116,13 @@ Example valid response:
     "detectedFormat": "claude" | "gpt" | "json" | "auto",
     "estimatedComplexity": "simple" | "moderate" | "complex"
   },
-  "suggestions": string[] (array of actionable improvement recommendations)
+  "suggestions": string[]
 }
-</schema>`;
+</schema>
+
+<final_reminder>
+Return JSON only. No markdown. No code fences. No extra text.
+</final_reminder>`;
 
 interface AnalyzePromptInput {
   prompt: string;
@@ -214,7 +220,7 @@ async function sendProgress(
 }
 
 function buildAnalysisPrompt(prompt: string): string {
-  return `${ANALYSIS_SYSTEM_PROMPT}\n\nPROMPT TO ANALYZE:\n${prompt}`;
+  return `${ANALYSIS_SYSTEM_PROMPT}\n\n<prompt_to_analyze>\n${prompt}\n</prompt_to_analyze>`;
 }
 
 async function runAnalysis(
