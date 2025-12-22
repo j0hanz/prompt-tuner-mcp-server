@@ -52,7 +52,48 @@ function formatIssue(issue: ValidationIssue): string {
   return `- ${issue.message}\n  💡 ${issue.suggestion ?? 'N/A'}`;
 }
 
-// Formats validation output as markdown report
+interface ValidatePromptInput {
+  prompt: string;
+  targetModel?: string;
+  checkInjection?: boolean;
+}
+
+const VALIDATE_PROMPT_TOOL = {
+  title: 'Validate Prompt',
+  description:
+    'Pre-flight validation using AI: checks issues, estimates tokens, detects security risks. Returns isValid boolean and categorized issues.',
+  inputSchema: ValidatePromptInputSchema,
+  outputSchema: ValidatePromptOutputSchema,
+  annotations: {
+    readOnlyHint: true,
+    idempotentHint: false,
+    openWorldHint: false,
+  },
+};
+
+function buildValidationHeader(
+  parsed: ValidationResponse,
+  targetModel: string
+): string[] {
+  return [
+    '# Prompt Validation',
+    '',
+    `**Status**: ${parsed.isValid ? '✅ Valid' : '❌ Invalid'}`,
+    `**Token Estimate**: ~${parsed.tokenEstimate} tokens`,
+    `**Target Model**: ${targetModel}`,
+    '',
+  ];
+}
+
+function appendIssueSection(
+  sections: string[],
+  title: string,
+  issues: ValidationIssue[]
+): void {
+  if (issues.length === 0) return;
+  sections.push(title, issues.map(formatIssue).join('\n'), '');
+}
+
 function formatValidationOutput(
   parsed: ValidationResponse,
   targetModel: string
@@ -61,102 +102,103 @@ function formatValidationOutput(
   const warnings = parsed.issues.filter((i) => i.type === 'warning');
   const infos = parsed.issues.filter((i) => i.type === 'info');
 
-  const sections = [
-    `# Prompt Validation`,
-    ``,
-    `**Status**: ${parsed.isValid ? '✅ Valid' : '❌ Invalid'}`,
-    `**Token Estimate**: ~${parsed.tokenEstimate} tokens`,
-    `**Target Model**: ${targetModel}`,
-    ``,
-  ];
-
-  if (errors.length > 0) {
-    sections.push(
-      `## ❌ Errors (${errors.length})`,
-      errors.map(formatIssue).join('\n'),
-      ``
-    );
-  }
-
-  if (warnings.length > 0) {
-    sections.push(
-      `## ⚠️ Warnings (${warnings.length})`,
-      warnings.map(formatIssue).join('\n'),
-      ``
-    );
-  }
-
-  if (infos.length > 0) {
-    sections.push(
-      `## ℹ️ Info (${infos.length})`,
-      infos.map(formatIssue).join('\n'),
-      ``
-    );
-  }
+  const sections = buildValidationHeader(parsed, targetModel);
+  appendIssueSection(sections, `## ❌ Errors (${errors.length})`, errors);
+  appendIssueSection(sections, `## ⚠️ Warnings (${warnings.length})`, warnings);
+  appendIssueSection(sections, `## ℹ️ Info (${infos.length})`, infos);
 
   sections.push(
-    ``,
+    '',
     parsed.isValid
       ? '✅ Prompt is ready to use!'
       : '❌ Fix errors before using this prompt.'
   );
-
   return sections.join('\n');
+}
+
+function hasInjectionError(parsed: ValidationResponse): boolean {
+  return parsed.issues
+    .filter((issue) => issue.type === 'error')
+    .some((issue) => issue.message.includes('injection'));
+}
+
+function resolveTargetModel(input: ValidatePromptInput): string {
+  return input.targetModel ?? 'generic';
+}
+
+function resolveCheckInjection(input: ValidatePromptInput): boolean {
+  return input.checkInjection ?? true;
+}
+
+function buildValidationPrompt(
+  validatedPrompt: string,
+  targetModel: string,
+  checkInjection: boolean
+): string {
+  return `${VALIDATION_SYSTEM_PROMPT}\n\nTarget Model: ${targetModel}\nCheck Injection: ${String(checkInjection)}\n\nPROMPT TO VALIDATE:\n${validatedPrompt}`;
+}
+
+function buildSecurityFlags(
+  parsed: ValidationResponse,
+  checkInjection: boolean
+): string[] {
+  return checkInjection && hasInjectionError(parsed)
+    ? ['injection_detected']
+    : [];
+}
+
+function buildValidationResponse(
+  parsed: ValidationResponse,
+  targetModel: string,
+  checkInjection: boolean
+): ReturnType<typeof createSuccessResponse> {
+  const output = formatValidationOutput(parsed, targetModel);
+  const securityFlags = buildSecurityFlags(parsed, checkInjection);
+
+  return createSuccessResponse(output, {
+    ok: true,
+    isValid: parsed.isValid,
+    issues: parsed.issues,
+    tokenEstimate: parsed.tokenEstimate,
+    securityFlags,
+  });
+}
+
+async function handleValidatePrompt(
+  input: ValidatePromptInput
+): Promise<
+  | ReturnType<typeof createSuccessResponse>
+  | ReturnType<typeof createErrorResponse>
+> {
+  try {
+    const validatedPrompt = validatePrompt(input.prompt);
+    const targetModel = resolveTargetModel(input);
+    const checkInjection = resolveCheckInjection(input);
+    const validationPrompt = buildValidationPrompt(
+      validatedPrompt,
+      targetModel,
+      checkInjection
+    );
+
+    const parsed = await executeLLMWithJsonResponse<ValidationResponse>(
+      validationPrompt,
+      (value) => ValidationResponseSchema.parse(value),
+      ErrorCode.E_LLM_FAILED,
+      'validate_prompt',
+      { maxTokens: 1000 }
+    );
+
+    return buildValidationResponse(parsed, targetModel, checkInjection);
+  } catch (error) {
+    return createErrorResponse(error, ErrorCode.E_INVALID_INPUT, input.prompt);
+  }
 }
 
 // Registers the validate_prompt tool with the MCP server
 export function registerValidatePromptTool(server: McpServer): void {
   server.registerTool(
     'validate_prompt',
-    {
-      title: 'Validate Prompt',
-      description:
-        'Pre-flight validation using AI: checks issues, estimates tokens, detects security risks. Returns isValid boolean and categorized issues.',
-      inputSchema: ValidatePromptInputSchema,
-      outputSchema: ValidatePromptOutputSchema,
-      annotations: {
-        readOnlyHint: true,
-        idempotentHint: false,
-        openWorldHint: false,
-      },
-    },
-    async ({
-      prompt,
-      targetModel = 'generic',
-      checkInjection = true,
-    }: {
-      prompt: string;
-      targetModel?: string;
-      checkInjection?: boolean;
-    }) => {
-      try {
-        const validatedPrompt = validatePrompt(prompt);
-        const validationPrompt = `${VALIDATION_SYSTEM_PROMPT}\n\nTarget Model: ${targetModel}\nCheck Injection: ${String(checkInjection)}\n\nPROMPT TO VALIDATE:\n${validatedPrompt}`;
-
-        const parsed = await executeLLMWithJsonResponse<ValidationResponse>(
-          validationPrompt,
-          (value) => ValidationResponseSchema.parse(value),
-          ErrorCode.E_LLM_FAILED,
-          'validate_prompt',
-          { maxTokens: 1000 }
-        );
-
-        const errors = parsed.issues.filter((i) => i.type === 'error');
-        const hasInjectionIssue =
-          checkInjection && errors.some((e) => e.message.includes('injection'));
-
-        const output = formatValidationOutput(parsed, targetModel);
-
-        return createSuccessResponse(output, {
-          ok: true,
-          isValid: parsed.isValid,
-          issues: parsed.issues,
-          tokenEstimate: parsed.tokenEstimate,
-          securityFlags: hasInjectionIssue ? ['injection_detected'] : [],
-        });
-      } catch (error) {
-        return createErrorResponse(error, ErrorCode.E_INVALID_INPUT, prompt);
-      }
-    }
+    VALIDATE_PROMPT_TOOL,
+    handleValidatePrompt
   );
 }

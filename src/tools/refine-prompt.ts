@@ -1,5 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
+import type { OptimizationTechnique, TargetFormat } from '../config/types.js';
 import { getCachedRefinement, setCachedRefinement } from '../lib/cache.js';
 import {
   createErrorResponse,
@@ -19,91 +20,122 @@ import {
   RefinePromptOutputSchema,
 } from '../schemas/index.js';
 
-export function registerRefinePromptTool(server: McpServer): void {
-  server.registerTool(
-    'refine_prompt',
-    {
-      title: 'Refine Prompt',
-      description:
-        'Fix grammar, improve clarity, and apply optimization techniques. Use when: user asks to fix/improve/optimize a prompt, prompt has typos, or prompt is vague. Default technique: "basic" for quick fixes. Use "comprehensive" for best results.',
-      inputSchema: RefinePromptInputSchema,
-      outputSchema: RefinePromptOutputSchema,
-      annotations: {
-        readOnlyHint: true,
-        idempotentHint: false,
-        openWorldHint: false,
-      },
-    },
-    async ({
-      prompt,
-      technique,
-      targetFormat,
-    }): Promise<
-      | ReturnType<typeof createSuccessResponse>
-      | ReturnType<typeof createErrorResponse>
-    > => {
-      try {
-        const validatedPrompt = validatePrompt(prompt);
-        const validatedTechnique = validateTechnique(technique);
-        const validatedFormat = validateFormat(targetFormat);
-        const resolvedFormat = resolveFormat(validatedFormat, validatedPrompt);
+interface RefinePromptInput {
+  prompt: string;
+  technique?: string;
+  targetFormat?: string;
+}
 
-        const cached = getCachedRefinement(
-          validatedPrompt,
-          validatedTechnique,
-          resolvedFormat
-        );
-        if (cached) {
-          logger.debug('Cache hit for refinement');
-          return createSuccessResponse(cached, {
-            ok: true,
-            original: validatedPrompt,
-            refined: cached,
-            corrections: ['Retrieved from cache'],
-            technique: validatedTechnique,
-            targetFormat: resolvedFormat,
-            usedFallback: false,
-            fromCache: true,
-          });
-        }
+interface ResolvedRefineInputs {
+  validatedPrompt: string;
+  validatedTechnique: OptimizationTechnique;
+  resolvedFormat: TargetFormat;
+}
 
-        const refined = await refineLLM(
-          validatedPrompt,
-          validatedTechnique,
-          resolvedFormat,
-          2000,
-          60000
-        );
+const REFINE_PROMPT_TOOL = {
+  title: 'Refine Prompt',
+  description:
+    'Fix grammar, improve clarity, and apply optimization techniques. Use when: user asks to fix/improve/optimize a prompt, prompt has typos, or prompt is vague. Default technique: "basic" for quick fixes. Use "comprehensive" for best results.',
+  inputSchema: RefinePromptInputSchema,
+  outputSchema: RefinePromptOutputSchema,
+  annotations: {
+    readOnlyHint: true,
+    idempotentHint: false,
+    openWorldHint: false,
+  },
+};
 
-        const finalCorrections: string[] = [];
-        if (refined !== validatedPrompt) {
-          finalCorrections.push('Applied LLM refinement');
-          finalCorrections.push(`Technique: ${validatedTechnique}`);
-          setCachedRefinement(
-            validatedPrompt,
-            validatedTechnique,
-            resolvedFormat,
-            refined
-          );
-        } else {
-          finalCorrections.push(
-            'No changes needed - prompt is already well-formed'
-          );
-        }
+function resolveInputs(input: RefinePromptInput): ResolvedRefineInputs {
+  const validatedPrompt = validatePrompt(input.prompt);
+  const technique = input.technique ?? 'basic';
+  const targetFormat = input.targetFormat ?? 'auto';
+  const validatedTechnique = validateTechnique(technique);
+  const validatedFormat = validateFormat(targetFormat);
+  const resolvedFormat = resolveFormat(validatedFormat, validatedPrompt);
+  return { validatedPrompt, validatedTechnique, resolvedFormat };
+}
 
-        return createSuccessResponse(refined, {
-          ok: true,
-          original: validatedPrompt,
-          refined,
-          corrections: finalCorrections,
-          technique: validatedTechnique,
-          targetFormat: resolvedFormat,
-          usedFallback: false,
-          fromCache: false,
-        });
-      } catch (error) {
-        return createErrorResponse(error, ErrorCode.E_LLM_FAILED, prompt);
-      }
-    }
+function buildCacheHitResponse(
+  refined: string,
+  input: ResolvedRefineInputs
+): ReturnType<typeof createSuccessResponse> {
+  logger.debug('Cache hit for refinement');
+  return createSuccessResponse(refined, {
+    ok: true,
+    original: input.validatedPrompt,
+    refined,
+    corrections: ['Retrieved from cache'],
+    technique: input.validatedTechnique,
+    targetFormat: input.resolvedFormat,
+    usedFallback: false,
+    fromCache: true,
+  });
+}
+
+function buildRefineResponse(
+  refined: string,
+  corrections: string[],
+  input: ResolvedRefineInputs
+): ReturnType<typeof createSuccessResponse> {
+  return createSuccessResponse(refined, {
+    ok: true,
+    original: input.validatedPrompt,
+    refined,
+    corrections,
+    technique: input.validatedTechnique,
+    targetFormat: input.resolvedFormat,
+    usedFallback: false,
+    fromCache: false,
+  });
+}
+
+async function refineAndCache(
+  input: ResolvedRefineInputs
+): Promise<{ refined: string; corrections: string[] }> {
+  const refined = await refineLLM(
+    input.validatedPrompt,
+    input.validatedTechnique,
+    input.resolvedFormat,
+    2000,
+    60000
   );
+  const corrections: string[] = [];
+  if (refined !== input.validatedPrompt) {
+    corrections.push('Applied LLM refinement');
+    corrections.push(`Technique: ${input.validatedTechnique}`);
+    setCachedRefinement(
+      input.validatedPrompt,
+      input.validatedTechnique,
+      input.resolvedFormat,
+      refined
+    );
+  } else {
+    corrections.push('No changes needed - prompt is already well-formed');
+  }
+  return { refined, corrections };
+}
+
+async function handleRefinePrompt(
+  input: RefinePromptInput
+): Promise<
+  | ReturnType<typeof createSuccessResponse>
+  | ReturnType<typeof createErrorResponse>
+> {
+  try {
+    const resolved = resolveInputs(input);
+    const cached = getCachedRefinement(
+      resolved.validatedPrompt,
+      resolved.validatedTechnique,
+      resolved.resolvedFormat
+    );
+    if (cached) return buildCacheHitResponse(cached, resolved);
+    const { refined, corrections } = await refineAndCache(resolved);
+    return buildRefineResponse(refined, corrections, resolved);
+  } catch (error) {
+    return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
+  }
+}
+
+export function registerRefinePromptTool(server: McpServer): void {
+  server.registerTool('refine_prompt', REFINE_PROMPT_TOOL, handleRefinePrompt);
 }

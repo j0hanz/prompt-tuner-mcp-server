@@ -16,6 +16,12 @@ import { registerAllPrompts } from './prompts/index.js';
 import { registerAllResources } from './resources/index.js';
 import { registerAllTools } from './tools/index.js';
 
+const PROVIDER_ENV_KEYS = {
+  openai: 'OPENAI_API_KEY',
+  anthropic: 'ANTHROPIC_API_KEY',
+  google: 'GOOGLE_API_KEY',
+} as const;
+
 // Monitor Node.js warnings for deprecations and potential issues
 process.on('warning', (warning) => {
   logger.warn(
@@ -27,34 +33,32 @@ process.on('warning', (warning) => {
   );
 });
 
-export async function validateApiKeys(): Promise<void> {
-  const provider = config.LLM_PROVIDER;
-  const providers = {
-    openai: config.OPENAI_API_KEY,
-    anthropic: config.ANTHROPIC_API_KEY,
-    google: config.GOOGLE_API_KEY,
-  };
-
-  const activeKey = providers[provider];
-
-  if (!activeKey) {
-    const envVar =
-      provider === 'openai'
-        ? 'OPENAI_API_KEY'
-        : provider === 'anthropic'
-          ? 'ANTHROPIC_API_KEY'
-          : 'GOOGLE_API_KEY';
-
-    // Only throw for known providers; let getLLMClient handle others
-    if (['openai', 'anthropic', 'google'].includes(provider)) {
-      throw new McpError(
-        ErrorCode.E_INVALID_INPUT,
-        `❌ API key is REQUIRED for provider "${provider}". Set ${envVar}.`
-      );
-    }
+function getProviderEnvKey(provider: string): string | null {
+  if (provider in PROVIDER_ENV_KEYS) {
+    return PROVIDER_ENV_KEYS[provider as keyof typeof PROVIDER_ENV_KEYS];
   }
+  return null;
+}
 
-  // Validate the configured provider has a key
+function getProviderKey(provider: string): string | undefined {
+  if (provider === 'openai') return config.OPENAI_API_KEY;
+  if (provider === 'anthropic') return config.ANTHROPIC_API_KEY;
+  if (provider === 'google') return config.GOOGLE_API_KEY;
+  return undefined;
+}
+
+function ensureProviderKey(provider: string): void {
+  const envKey = getProviderEnvKey(provider);
+  const activeKey = getProviderKey(provider);
+  if (activeKey || !envKey) return;
+
+  throw new McpError(
+    ErrorCode.E_INVALID_INPUT,
+    `❌ API key is REQUIRED for provider "${provider}". Set ${envKey}.`
+  );
+}
+
+async function validateClient(provider: string): Promise<void> {
   try {
     const client = await getLLMClient();
     logger.info(
@@ -69,6 +73,12 @@ export async function validateApiKeys(): Promise<void> {
       `❌ Failed to initialize LLM client for provider: ${provider}. Check your API key.`
     );
   }
+}
+
+export async function validateApiKeys(): Promise<void> {
+  const provider = config.LLM_PROVIDER;
+  ensureProviderKey(provider);
+  await validateClient(provider);
 }
 
 export function createServer(): McpServer {

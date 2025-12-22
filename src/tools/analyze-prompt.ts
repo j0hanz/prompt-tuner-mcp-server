@@ -118,12 +118,31 @@ Example valid response:
 }
 </schema>`;
 
-function formatAnalysisOutput(analysisResult: AnalysisResponse): string {
-  const { score, characteristics, suggestions } = analysisResult;
+interface AnalyzePromptInput {
+  prompt: string;
+}
 
+interface AnalyzePromptExtra {
+  sessionId?: string;
+  signal?: AbortSignal;
+  sendNotification?: (params: unknown) => Promise<void>;
+}
+
+const ANALYZE_PROMPT_TOOL = {
+  title: 'Analyze Prompt',
+  description:
+    'Score prompt quality (0-100) across 5 dimensions using AI analysis: clarity, specificity, completeness, structure, effectiveness. Returns actionable suggestions.',
+  inputSchema: AnalyzePromptInputSchema,
+  outputSchema: AnalyzePromptOutputSchema,
+  annotations: {
+    readOnlyHint: true,
+    idempotentHint: false,
+    openWorldHint: false,
+  },
+};
+
+function formatScoreLines(score: AnalysisResponse['score']): string[] {
   return [
-    `# Prompt Analysis`,
-    ``,
     `## Quality Scores`,
     `- **Clarity**: ${score.clarity}/100`,
     `- **Specificity**: ${score.specificity}/100`,
@@ -131,95 +150,132 @@ function formatAnalysisOutput(analysisResult: AnalysisResponse): string {
     `- **Structure**: ${score.structure}/100`,
     `- **Effectiveness**: ${score.effectiveness}/100`,
     `- **Overall**: ${score.overall}/100`,
-    ``,
+  ];
+}
+
+function formatYesNo(label: string, value: boolean): string {
+  return `- ${label}: ${value ? 'Yes' : 'No'}`;
+}
+
+function formatCharacteristicLines(
+  characteristics: AnalysisResponse['characteristics']
+): string[] {
+  const yesNoEntries: [string, boolean][] = [
+    ['Typos detected', characteristics.hasTypos],
+    ['Vague language', characteristics.isVague],
+    ['Missing context', characteristics.missingContext],
+    ['Role defined', characteristics.hasRoleContext],
+    ['Examples present', characteristics.hasExamples],
+  ];
+
+  return [
     `## Characteristics`,
-    `- Typos detected: ${characteristics.hasTypos ? 'Yes' : 'No'}`,
-    `- Vague language: ${characteristics.isVague ? 'Yes' : 'No'}`,
-    `- Missing context: ${characteristics.missingContext ? 'Yes' : 'No'}`,
-    `- Role defined: ${characteristics.hasRoleContext ? 'Yes' : 'No'}`,
-    `- Examples present: ${characteristics.hasExamples ? 'Yes' : 'No'}`,
+    ...yesNoEntries.map(([label, value]) => formatYesNo(label, value)),
     `- Word count: ${characteristics.wordCount}`,
-    ``,
+  ];
+}
+
+function formatSuggestionLines(suggestions: string[]): string[] {
+  return [
     `## Improvement Suggestions`,
     suggestions
       .map((suggestion, index) => `${index + 1}. ${suggestion}`)
       .join('\n'),
+  ];
+}
+
+function formatAnalysisOutput(analysisResult: AnalysisResponse): string {
+  return [
+    '# Prompt Analysis',
+    '',
+    ...formatScoreLines(analysisResult.score),
+    '',
+    ...formatCharacteristicLines(analysisResult.characteristics),
+    '',
+    ...formatSuggestionLines(analysisResult.suggestions),
   ].join('\n');
+}
+
+async function sendProgress(
+  extra: AnalyzePromptExtra,
+  message: string,
+  progress: number
+): Promise<void> {
+  if (typeof extra.sendNotification !== 'function') return;
+  await extra.sendNotification({
+    method: 'notifications/progress',
+    params: {
+      progressToken: `analyze_prompt:${extra.sessionId ?? 'unknown'}`,
+      progress,
+      message,
+      _meta: { tool: 'analyze_prompt', sessionId: extra.sessionId },
+    },
+  });
+}
+
+function buildAnalysisPrompt(prompt: string): string {
+  return `${ANALYSIS_SYSTEM_PROMPT}\n\nPROMPT TO ANALYZE:\n${prompt}`;
+}
+
+async function runAnalysis(
+  analysisPrompt: string,
+  signal?: AbortSignal
+): Promise<AnalysisResponse> {
+  return executeLLMWithJsonResponse<AnalysisResponse>(
+    analysisPrompt,
+    (value) => AnalysisResponseSchema.parse(value),
+    ErrorCode.E_LLM_FAILED,
+    'analyze_prompt',
+    {
+      maxTokens: ANALYSIS_MAX_TOKENS,
+      timeoutMs: ANALYSIS_TIMEOUT_MS,
+      signal,
+    }
+  );
+}
+
+function buildAnalysisResponse(
+  analysisResult: AnalysisResponse
+): ReturnType<typeof createSuccessResponse> {
+  const output = formatAnalysisOutput(analysisResult);
+  return createSuccessResponse(output, {
+    ok: true,
+    ...analysisResult.characteristics,
+    suggestions: analysisResult.suggestions,
+    score: analysisResult.score,
+    characteristics: analysisResult.characteristics,
+  });
+}
+
+async function handleAnalyzePrompt(
+  input: AnalyzePromptInput,
+  extra: unknown
+): Promise<
+  | ReturnType<typeof createSuccessResponse>
+  | ReturnType<typeof createErrorResponse>
+> {
+  try {
+    const context = extra as AnalyzePromptExtra;
+    logger.info(
+      { sessionId: context.sessionId, promptLength: input.prompt.length },
+      'analyze_prompt called'
+    );
+
+    const validatedPrompt = validatePrompt(input.prompt);
+    await sendProgress(context, 'started', 0);
+
+    const analysisPrompt = buildAnalysisPrompt(validatedPrompt);
+    const analysisResult = await runAnalysis(analysisPrompt, context.signal);
+    return buildAnalysisResponse(analysisResult);
+  } catch (error) {
+    return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
+  }
 }
 
 export function registerAnalyzePromptTool(server: McpServer): void {
   server.registerTool(
     'analyze_prompt',
-    {
-      title: 'Analyze Prompt',
-      description:
-        'Score prompt quality (0-100) across 5 dimensions using AI analysis: clarity, specificity, completeness, structure, effectiveness. Returns actionable suggestions.',
-      inputSchema: AnalyzePromptInputSchema,
-      outputSchema: AnalyzePromptOutputSchema,
-      annotations: {
-        readOnlyHint: true,
-        idempotentHint: false,
-        openWorldHint: false,
-      },
-    },
-    async (
-      { prompt },
-      extra
-    ): Promise<
-      | ReturnType<typeof createSuccessResponse>
-      | ReturnType<typeof createErrorResponse>
-    > => {
-      try {
-        const { sessionId, signal, sendNotification } = extra;
-
-        logger.info(
-          {
-            sessionId,
-            promptLength: prompt.length,
-          },
-          'analyze_prompt called'
-        );
-        const validatedPrompt = validatePrompt(prompt);
-
-        if (typeof sendNotification === 'function') {
-          await (sendNotification as (params: unknown) => Promise<void>)({
-            method: 'notifications/progress',
-            params: {
-              progressToken: `analyze_prompt:${sessionId ?? 'unknown'}`,
-              progress: 0,
-              message: 'started',
-              _meta: { tool: 'analyze_prompt', sessionId },
-            },
-          });
-        }
-
-        const analysisPrompt = `${ANALYSIS_SYSTEM_PROMPT}\n\nPROMPT TO ANALYZE:\n${validatedPrompt}`;
-
-        const analysisResult =
-          await executeLLMWithJsonResponse<AnalysisResponse>(
-            analysisPrompt,
-            (value) => AnalysisResponseSchema.parse(value),
-            ErrorCode.E_LLM_FAILED,
-            'analyze_prompt',
-            {
-              maxTokens: ANALYSIS_MAX_TOKENS,
-              timeoutMs: ANALYSIS_TIMEOUT_MS,
-              signal,
-            }
-          );
-
-        const output = formatAnalysisOutput(analysisResult);
-
-        return createSuccessResponse(output, {
-          ok: true,
-          ...analysisResult.characteristics,
-          suggestions: analysisResult.suggestions,
-          score: analysisResult.score,
-          characteristics: analysisResult.characteristics,
-        });
-      } catch (error) {
-        return createErrorResponse(error, ErrorCode.E_LLM_FAILED, prompt);
-      }
-    }
+    ANALYZE_PROMPT_TOOL,
+    handleAnalyzePrompt
   );
 }

@@ -2,24 +2,56 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { z } from 'zod';
 
-export function registerQuickWorkflowPrompts(server: McpServer): void {
-  // Quick Optimize - single technique, fast
-  server.registerPrompt(
-    'quick-optimize',
-    {
-      title: 'Quick Optimize',
-      description: 'Fast prompt improvement with grammar and clarity fixes.',
-      argsSchema: {
-        prompt: z.string().min(1).describe('The prompt to optimize'),
+interface QuickWorkflowArgs {
+  prompt: string;
+  taskType?: string;
+}
+
+interface QuickWorkflowDefinition {
+  name: string;
+  title: string;
+  description: string;
+  argsSchema: Record<string, z.ZodTypeAny>;
+  buildText: (args: QuickWorkflowArgs) => string;
+}
+
+function buildPromptMessage(text: string): {
+  messages: {
+    role: 'user';
+    content: { type: 'text'; text: string };
+  }[];
+} {
+  return {
+    messages: [
+      {
+        role: 'user',
+        content: {
+          type: 'text',
+          text,
+        },
       },
-    },
-    ({ prompt }) => ({
-      messages: [
-        {
-          role: 'user',
-          content: {
-            type: 'text',
-            text: `<task>
+    ],
+  };
+}
+
+function promptArg(description: string): { prompt: z.ZodString } {
+  return {
+    prompt: z.string().min(1).describe(description),
+  };
+}
+
+function renderTemplate(
+  template: string,
+  replacements: Record<string, string>
+): string {
+  let rendered = template;
+  for (const [key, value] of Object.entries(replacements)) {
+    rendered = rendered.replaceAll(`{{${key}}}`, value);
+  }
+  return rendered;
+}
+
+const TEMPLATE_QUICK_OPTIMIZE = `<task>
 Use refine_prompt with technique "basic" on this prompt.
 </task>
 
@@ -30,31 +62,10 @@ Use refine_prompt with technique "basic" on this prompt.
 </instructions>
 
 <prompt>
-${prompt}
-</prompt>`,
-          },
-        },
-      ],
-    })
-  );
+{{PROMPT}}
+</prompt>`;
 
-  // Deep Optimize - comprehensive, thorough
-  server.registerPrompt(
-    'deep-optimize',
-    {
-      title: 'Deep Optimize',
-      description: 'Comprehensive optimization with all techniques applied.',
-      argsSchema: {
-        prompt: z.string().min(1).describe('The prompt to optimize'),
-      },
-    },
-    ({ prompt }) => ({
-      messages: [
-        {
-          role: 'user',
-          content: {
-            type: 'text',
-            text: `<task>
+const TEMPLATE_DEEP_OPTIMIZE = `<task>
 Use optimize_prompt with techniques ["comprehensive"].
 </task>
 
@@ -66,31 +77,10 @@ Use optimize_prompt with techniques ["comprehensive"].
 </instructions>
 
 <prompt>
-${prompt}
-</prompt>`,
-          },
-        },
-      ],
-    })
-  );
+{{PROMPT}}
+</prompt>`;
 
-  // Full Analysis - scoring and recommendations
-  server.registerPrompt(
-    'analyze',
-    {
-      title: 'Analyze Prompt',
-      description: 'Score prompt quality and get improvement suggestions.',
-      argsSchema: {
-        prompt: z.string().min(1).describe('The prompt to analyze'),
-      },
-    },
-    ({ prompt }) => ({
-      messages: [
-        {
-          role: 'user',
-          content: {
-            type: 'text',
-            text: `<task>
+const TEMPLATE_ANALYZE = `<task>
 Analyze this prompt for quality and structure.
 </task>
 
@@ -101,31 +91,10 @@ Analyze this prompt for quality and structure.
 </instructions>
 
 <prompt>
-${prompt}
-</prompt>`,
-          },
-        },
-      ],
-    })
-  );
+{{PROMPT}}
+</prompt>`;
 
-  // Best Practices Review
-  server.registerPrompt(
-    'review',
-    {
-      title: 'Best Practices Review',
-      description: 'Check prompt against prompting best practices.',
-      argsSchema: {
-        prompt: z.string().min(1).describe('The prompt to review'),
-      },
-    },
-    ({ prompt }) => ({
-      messages: [
-        {
-          role: 'user',
-          content: {
-            type: 'text',
-            text: `<task>
+const TEMPLATE_REVIEW = `<task>
 Review this prompt against best practices.
 </task>
 
@@ -136,32 +105,10 @@ Review this prompt against best practices.
 </instructions>
 
 <prompt>
-${prompt}
-</prompt>`,
-          },
-        },
-      ],
-    })
-  );
+{{PROMPT}}
+</prompt>`;
 
-  // Iterative Refinement
-  server.registerPrompt(
-    'iterative-refine',
-    {
-      title: 'Iterative Refinement',
-      description:
-        'Identify top 3 weaknesses, explain each, and apply fixes iteratively.',
-      argsSchema: {
-        prompt: z.string().min(1).describe('The prompt to refine'),
-      },
-    },
-    ({ prompt }) => ({
-      messages: [
-        {
-          role: 'user',
-          content: {
-            type: 'text',
-            text: `<task>
+const TEMPLATE_ITERATIVE_REFINE = `<task>
 Perform iterative refinement on this prompt.
 </task>
 
@@ -177,51 +124,15 @@ Perform iterative refinement on this prompt.
 </instructions>
 
 <prompt>
-${prompt}
-</prompt>`,
-          },
-        },
-      ],
-    })
-  );
+{{PROMPT}}
+</prompt>`;
 
-  // Technique Recommendation
-  server.registerPrompt(
-    'recommend-techniques',
-    {
-      title: 'Recommend Techniques',
-      description:
-        'Recommend best optimization techniques based on prompt and task type.',
-      argsSchema: {
-        prompt: z.string().min(1).describe('The prompt to analyze'),
-        taskType: z
-          .enum([
-            'classification',
-            'analysis',
-            'generation',
-            'extraction',
-            'debugging',
-            'translation',
-            'summarization',
-            'other',
-          ])
-          .optional()
-          .default('other')
-          .describe('Type of task the prompt is for'),
-      },
-    },
-    ({ prompt, taskType }) => ({
-      messages: [
-        {
-          role: 'user',
-          content: {
-            type: 'text',
-            text: `<task>
+const TEMPLATE_RECOMMEND_TECHNIQUES = `<task>
 Recommend optimization techniques for this prompt.
 </task>
 
 <context>
-Task Type: ${taskType}
+Task Type: {{TASK_TYPE}}
 </context>
 
 <instructions>
@@ -242,32 +153,10 @@ Task Type: ${taskType}
 </instructions>
 
 <prompt>
-${prompt}
-</prompt>`,
-          },
-        },
-      ],
-    })
-  );
+{{PROMPT}}
+</prompt>`;
 
-  // Anti-Pattern Scanner
-  server.registerPrompt(
-    'scan-antipatterns',
-    {
-      title: 'Scan Anti-Patterns',
-      description:
-        'Detect common prompt anti-patterns and provide corrections.',
-      argsSchema: {
-        prompt: z.string().min(1).describe('The prompt to scan'),
-      },
-    },
-    ({ prompt }) => ({
-      messages: [
-        {
-          role: 'user',
-          content: {
-            type: 'text',
-            text: `<task>
+const TEMPLATE_SCAN_ANTIPATTERNS = `<task>
 Scan this prompt for common anti-patterns.
 </task>
 
@@ -306,11 +195,102 @@ Expected improvement in clarity, specificity, and effectiveness.
 </output_format>
 
 <prompt>
-${prompt}
-</prompt>`,
-          },
-        },
-      ],
-    })
-  );
+{{PROMPT}}
+</prompt>`;
+
+const QUICK_WORKFLOW_PROMPTS: QuickWorkflowDefinition[] = [
+  {
+    name: 'quick-optimize',
+    title: 'Quick Optimize',
+    description: 'Fast prompt improvement with grammar and clarity fixes.',
+    argsSchema: promptArg('The prompt to optimize'),
+    buildText: ({ prompt }) =>
+      renderTemplate(TEMPLATE_QUICK_OPTIMIZE, { PROMPT: prompt }),
+  },
+  {
+    name: 'deep-optimize',
+    title: 'Deep Optimize',
+    description: 'Comprehensive optimization with all techniques applied.',
+    argsSchema: promptArg('The prompt to optimize'),
+    buildText: ({ prompt }) =>
+      renderTemplate(TEMPLATE_DEEP_OPTIMIZE, { PROMPT: prompt }),
+  },
+  {
+    name: 'analyze',
+    title: 'Analyze Prompt',
+    description: 'Score prompt quality and get improvement suggestions.',
+    argsSchema: promptArg('The prompt to analyze'),
+    buildText: ({ prompt }) =>
+      renderTemplate(TEMPLATE_ANALYZE, { PROMPT: prompt }),
+  },
+  {
+    name: 'review',
+    title: 'Best Practices Review',
+    description: 'Check prompt against prompting best practices.',
+    argsSchema: promptArg('The prompt to review'),
+    buildText: ({ prompt }) =>
+      renderTemplate(TEMPLATE_REVIEW, { PROMPT: prompt }),
+  },
+  {
+    name: 'iterative-refine',
+    title: 'Iterative Refinement',
+    description:
+      'Identify top 3 weaknesses, explain each, and apply fixes iteratively.',
+    argsSchema: promptArg('The prompt to refine'),
+    buildText: ({ prompt }) =>
+      renderTemplate(TEMPLATE_ITERATIVE_REFINE, { PROMPT: prompt }),
+  },
+  {
+    name: 'recommend-techniques',
+    title: 'Recommend Techniques',
+    description:
+      'Recommend best optimization techniques based on prompt and task type.',
+    argsSchema: {
+      ...promptArg('The prompt to analyze'),
+      taskType: z
+        .enum([
+          'classification',
+          'analysis',
+          'generation',
+          'extraction',
+          'debugging',
+          'translation',
+          'summarization',
+          'other',
+        ])
+        .optional()
+        .default('other')
+        .describe('Type of task the prompt is for'),
+    },
+    buildText: ({ prompt, taskType }) =>
+      renderTemplate(TEMPLATE_RECOMMEND_TECHNIQUES, {
+        PROMPT: prompt,
+        TASK_TYPE: taskType ?? 'other',
+      }),
+  },
+  {
+    name: 'scan-antipatterns',
+    title: 'Scan Anti-Patterns',
+    description: 'Detect common prompt anti-patterns and provide corrections.',
+    argsSchema: promptArg('The prompt to scan'),
+    buildText: ({ prompt }) =>
+      renderTemplate(TEMPLATE_SCAN_ANTIPATTERNS, { PROMPT: prompt }),
+  },
+];
+
+export function registerQuickWorkflowPrompts(server: McpServer): void {
+  for (const workflow of QUICK_WORKFLOW_PROMPTS) {
+    server.registerPrompt(
+      workflow.name,
+      {
+        title: workflow.title,
+        description: workflow.description,
+        argsSchema: workflow.argsSchema,
+      },
+      (args) => {
+        const workflowArgs = args as QuickWorkflowArgs;
+        return buildPromptMessage(workflow.buildText(workflowArgs));
+      }
+    );
+  }
 }

@@ -64,52 +64,66 @@ Required JSON schema:
   "recommendation": string
 }`;
 
+interface DetectFormatInput {
+  prompt: string;
+}
+
+const DETECT_FORMAT_TOOL = {
+  title: 'Detect Format',
+  description:
+    'Identify if prompt targets Claude XML, GPT Markdown, or JSON schema using AI analysis. Returns confidence score and recommendations.',
+  inputSchema: DetectFormatInputSchema,
+  outputSchema: DetectFormatOutputSchema,
+  annotations: {
+    readOnlyHint: true,
+    idempotentHint: false,
+    openWorldHint: false,
+  },
+};
+
+function formatDetectionOutput(parsed: FormatDetectionResponse): string {
+  return [
+    '# Format Detection',
+    '',
+    `**Detected Format**: ${parsed.detectedFormat}`,
+    `**Confidence**: ${parsed.confidence}%`,
+    '',
+    '**Recommendation**:',
+    parsed.recommendation,
+  ].join('\n');
+}
+
+async function handleDetectFormat(
+  input: DetectFormatInput
+): Promise<
+  | ReturnType<typeof createSuccessResponse>
+  | ReturnType<typeof createErrorResponse>
+> {
+  try {
+    const validatedPrompt = validatePrompt(input.prompt);
+    const detectionPrompt = `${FORMAT_DETECTION_PROMPT}\n\nPROMPT TO ANALYZE:\n${validatedPrompt}`;
+
+    const parsed = await executeLLMWithJsonResponse<FormatDetectionResponse>(
+      detectionPrompt,
+      (value) => FormatDetectionResponseSchema.parse(value),
+      ErrorCode.E_LLM_FAILED,
+      'detect_format',
+      { maxTokens: 500 }
+    );
+
+    const output = formatDetectionOutput(parsed);
+    return createSuccessResponse(output, {
+      ok: true,
+      detectedFormat: parsed.detectedFormat,
+      confidence: parsed.confidence,
+      recommendation: parsed.recommendation,
+    });
+  } catch (error) {
+    return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
+  }
+}
+
 // Registers the detect_format tool with the MCP server
 export function registerDetectFormatTool(server: McpServer): void {
-  server.registerTool(
-    'detect_format',
-    {
-      title: 'Detect Format',
-      description:
-        'Identify if prompt targets Claude XML, GPT Markdown, or JSON schema using AI analysis. Returns confidence score and recommendations.',
-      inputSchema: DetectFormatInputSchema,
-      outputSchema: DetectFormatOutputSchema,
-      annotations: {
-        readOnlyHint: true,
-        idempotentHint: false,
-        openWorldHint: false,
-      },
-    },
-    async ({
-      prompt,
-    }): Promise<
-      | ReturnType<typeof createSuccessResponse>
-      | ReturnType<typeof createErrorResponse>
-    > => {
-      try {
-        const validatedPrompt = validatePrompt(prompt);
-        const detectionPrompt = `${FORMAT_DETECTION_PROMPT}\n\nPROMPT TO ANALYZE:\n${validatedPrompt}`;
-
-        const parsed =
-          await executeLLMWithJsonResponse<FormatDetectionResponse>(
-            detectionPrompt,
-            (value) => FormatDetectionResponseSchema.parse(value),
-            ErrorCode.E_LLM_FAILED,
-            'detect_format',
-            { maxTokens: 500 }
-          );
-
-        const output = `# Format Detection\n\n**Detected Format**: ${parsed.detectedFormat}\n**Confidence**: ${parsed.confidence}%\n\n**Recommendation**:\n${parsed.recommendation}`;
-
-        return createSuccessResponse(output, {
-          ok: true,
-          detectedFormat: parsed.detectedFormat,
-          confidence: parsed.confidence,
-          recommendation: parsed.recommendation,
-        });
-      } catch (error) {
-        return createErrorResponse(error, ErrorCode.E_LLM_FAILED, prompt);
-      }
-    }
-  );
+  server.registerTool('detect_format', DETECT_FORMAT_TOOL, handleDetectFormat);
 }

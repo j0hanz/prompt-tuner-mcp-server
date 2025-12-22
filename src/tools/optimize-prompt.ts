@@ -1,6 +1,10 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import type { OptimizeResponse } from '../config/types.js';
+import type {
+  OptimizationTechnique,
+  OptimizeResponse,
+  TargetFormat,
+} from '../config/types.js';
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -161,70 +165,119 @@ function formatOptimizeOutput(optimizationResult: OptimizeResponse): string {
   ].join('\n');
 }
 
+interface OptimizePromptInput {
+  prompt: string;
+  techniques?: string[];
+  targetFormat?: string;
+}
+
+interface ResolvedOptimizeInputs {
+  validatedPrompt: string;
+  validatedTechniques: OptimizationTechnique[];
+  resolvedFormat: TargetFormat;
+}
+
+const OPTIMIZE_PROMPT_TOOL = {
+  title: 'Optimize Prompt',
+  description:
+    'Apply multiple optimization techniques using AI (e.g., ["basic", "roleBased", "structured"]). Returns before/after scores and improvements.',
+  inputSchema: OptimizePromptInputSchema,
+  outputSchema: OptimizePromptOutputSchema,
+  annotations: {
+    readOnlyHint: true,
+    idempotentHint: false,
+    openWorldHint: false,
+  },
+};
+
+function buildOptimizePrompt(
+  prompt: string,
+  resolvedFormat: TargetFormat,
+  techniques: OptimizationTechnique[]
+): string {
+  return `${OPTIMIZE_SYSTEM_PROMPT}\n\nTarget Format: ${resolvedFormat}\nTechniques to apply: ${techniques.join(', ')}\n\nORIGINAL PROMPT:\n${prompt}`;
+}
+
+function appendScoreImprovement(result: OptimizeResponse): void {
+  const scoreDiff = result.afterScore.overall - result.beforeScore.overall;
+  if (scoreDiff > 0) {
+    result.improvements.push(`Overall score improved by ${scoreDiff} points`);
+  }
+}
+
+function resolveOptimizeInputs(
+  input: OptimizePromptInput
+): ResolvedOptimizeInputs {
+  const validatedPrompt = validatePrompt(input.prompt);
+  const techniques = input.techniques ?? ['basic'];
+  const targetFormat = input.targetFormat ?? 'auto';
+  const validatedTechniques = validateTechniques(techniques);
+  const validatedFormat = validateFormat(targetFormat);
+  const resolvedFormat = resolveFormat(validatedFormat, validatedPrompt);
+  return { validatedPrompt, validatedTechniques, resolvedFormat };
+}
+
+async function runOptimization(
+  optimizePrompt: string
+): Promise<OptimizeResponse> {
+  return executeLLMWithJsonResponse<OptimizeResponse>(
+    optimizePrompt,
+    (value) => OptimizeResponseSchema.parse(value),
+    ErrorCode.E_LLM_FAILED,
+    'optimize_prompt',
+    { maxTokens: 3000, timeoutMs: 60000 }
+  );
+}
+
+function buildOptimizeResponse(
+  result: OptimizeResponse,
+  original: string,
+  targetFormat: TargetFormat
+): ReturnType<typeof createSuccessResponse> {
+  const output = formatOptimizeOutput(result);
+  return createSuccessResponse(output, {
+    ok: true,
+    original,
+    optimized: result.optimized,
+    techniquesApplied: result.techniquesApplied,
+    targetFormat,
+    beforeScore: result.beforeScore,
+    afterScore: result.afterScore,
+    improvements: result.improvements,
+    usedFallback: false,
+  });
+}
+
+async function handleOptimizePrompt(
+  input: OptimizePromptInput
+): Promise<
+  | ReturnType<typeof createSuccessResponse>
+  | ReturnType<typeof createErrorResponse>
+> {
+  try {
+    const resolved = resolveOptimizeInputs(input);
+    const optimizePrompt = buildOptimizePrompt(
+      resolved.validatedPrompt,
+      resolved.resolvedFormat,
+      resolved.validatedTechniques
+    );
+    const optimizationResult = await runOptimization(optimizePrompt);
+
+    appendScoreImprovement(optimizationResult);
+    return buildOptimizeResponse(
+      optimizationResult,
+      resolved.validatedPrompt,
+      resolved.resolvedFormat
+    );
+  } catch (error) {
+    return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
+  }
+}
+
 export function registerOptimizePromptTool(server: McpServer): void {
   server.registerTool(
     'optimize_prompt',
-    {
-      title: 'Optimize Prompt',
-      description:
-        'Apply multiple optimization techniques using AI (e.g., ["basic", "roleBased", "structured"]). Returns before/after scores and improvements.',
-      inputSchema: OptimizePromptInputSchema,
-      outputSchema: OptimizePromptOutputSchema,
-      annotations: {
-        readOnlyHint: true,
-        idempotentHint: false,
-        openWorldHint: false,
-      },
-    },
-    async (
-      input
-    ): Promise<
-      | ReturnType<typeof createSuccessResponse>
-      | ReturnType<typeof createErrorResponse>
-    > => {
-      const { prompt, techniques, targetFormat } = input;
-      try {
-        const validatedPrompt = validatePrompt(prompt);
-        const validatedTechniques = validateTechniques(techniques);
-        const validatedFormat = validateFormat(targetFormat);
-        const resolvedFormat = resolveFormat(validatedFormat, validatedPrompt);
-
-        const optimizePrompt = `${OPTIMIZE_SYSTEM_PROMPT}\n\nTarget Format: ${resolvedFormat}\nTechniques to apply: ${validatedTechniques.join(', ')}\n\nORIGINAL PROMPT:\n${validatedPrompt}`;
-
-        const optimizationResult =
-          await executeLLMWithJsonResponse<OptimizeResponse>(
-            optimizePrompt,
-            (value) => OptimizeResponseSchema.parse(value),
-            ErrorCode.E_LLM_FAILED,
-            'optimize_prompt',
-            { maxTokens: 3000, timeoutMs: 60000 }
-          );
-
-        const scoreDiff =
-          optimizationResult.afterScore.overall -
-          optimizationResult.beforeScore.overall;
-        if (scoreDiff > 0) {
-          optimizationResult.improvements.push(
-            `Overall score improved by ${scoreDiff} points`
-          );
-        }
-
-        const output = formatOptimizeOutput(optimizationResult);
-
-        return createSuccessResponse(output, {
-          ok: true,
-          original: validatedPrompt,
-          optimized: optimizationResult.optimized,
-          techniquesApplied: optimizationResult.techniquesApplied,
-          targetFormat: resolvedFormat,
-          beforeScore: optimizationResult.beforeScore,
-          afterScore: optimizationResult.afterScore,
-          improvements: optimizationResult.improvements,
-          usedFallback: false,
-        });
-      } catch (error) {
-        return createErrorResponse(error, ErrorCode.E_LLM_FAILED, prompt);
-      }
-    }
+    OPTIMIZE_PROMPT_TOOL,
+    handleOptimizePrompt
   );
 }

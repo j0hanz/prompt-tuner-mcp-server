@@ -81,127 +81,186 @@ Example valid response:
 }
 </schema>`;
 
-// Formats comparison output as markdown report
+interface ComparePromptsInput {
+  promptA: string;
+  promptB: string;
+  labelA?: string;
+  labelB?: string;
+}
+
+const COMPARE_PROMPTS_TOOL = {
+  title: 'Compare Prompts',
+  description:
+    'Compare two prompt versions using AI analysis. Returns scores, winner, improvements/regressions, and recommendations.',
+  inputSchema: ComparePromptsInputSchema,
+  outputSchema: ComparePromptsOutputSchema,
+  annotations: {
+    readOnlyHint: true,
+    idempotentHint: false,
+    openWorldHint: false,
+  },
+};
+
+function formatScoreSection(
+  label: string,
+  score: ComparisonResponse['scoreA']
+): string[] {
+  return [
+    `## ${label}: Score ${score.overall}/100`,
+    `- Clarity: ${score.clarity}`,
+    `- Specificity: ${score.specificity}`,
+    `- Completeness: ${score.completeness}`,
+    `- Structure: ${score.structure}`,
+    `- Effectiveness: ${score.effectiveness}`,
+  ];
+}
+
+function formatListSection(title: string, items: string[]): string[] {
+  if (items.length === 0) return [title, '- None'];
+  return [title, items.map((item) => `- ${item}`).join('\n')];
+}
+
+function formatWinnerLabel(
+  parsed: ComparisonResponse,
+  labelA: string,
+  labelB: string
+): string {
+  if (parsed.winner === 'tie') return 'Tie';
+  return parsed.winner === 'A' ? labelA : labelB;
+}
+
 function formatComparisonOutput(
   labelA: string,
   labelB: string,
   parsed: ComparisonResponse
 ): string {
-  const winnerLabel =
-    parsed.winner === 'tie' ? 'Tie' : parsed.winner === 'A' ? labelA : labelB;
-
   const sections = [
-    `# Prompt Comparison`,
-    ``,
-    `## ${labelA}: Score ${parsed.scoreA.overall}/100`,
-    `- Clarity: ${parsed.scoreA.clarity}`,
-    `- Specificity: ${parsed.scoreA.specificity}`,
-    `- Completeness: ${parsed.scoreA.completeness}`,
-    `- Structure: ${parsed.scoreA.structure}`,
-    `- Effectiveness: ${parsed.scoreA.effectiveness}`,
-    ``,
-    `## ${labelB}: Score ${parsed.scoreB.overall}/100`,
-    `- Clarity: ${parsed.scoreB.clarity}`,
-    `- Specificity: ${parsed.scoreB.specificity}`,
-    `- Completeness: ${parsed.scoreB.completeness}`,
-    `- Structure: ${parsed.scoreB.structure}`,
-    `- Effectiveness: ${parsed.scoreB.effectiveness}`,
-    ``,
-    `## Winner: ${winnerLabel}`,
-    ``,
-    `## Improvements in ${labelB}`,
-    parsed.improvements.length > 0
-      ? parsed.improvements.map((i) => `- ${i}`).join('\n')
-      : '- None',
+    '# Prompt Comparison',
+    '',
+    ...formatScoreSection(labelA, parsed.scoreA),
+    '',
+    ...formatScoreSection(labelB, parsed.scoreB),
+    '',
+    `## Winner: ${formatWinnerLabel(parsed, labelA, labelB)}`,
+    '',
+    ...formatListSection(`## Improvements in ${labelB}`, parsed.improvements),
   ];
 
   if (parsed.regressions.length > 0) {
     sections.push(
-      ``,
-      `## Regressions in ${labelB}`,
-      parsed.regressions.map((r) => `- ${r}`).join('\n')
+      '',
+      ...formatListSection(`## Regressions in ${labelB}`, parsed.regressions)
     );
   }
 
-  sections.push(``, `## Recommendation`, parsed.recommendation);
-
+  sections.push('', '## Recommendation', parsed.recommendation);
   return sections.join('\n');
+}
+
+function buildScoreDelta(
+  parsed: ComparisonResponse
+): ComparisonResponse['scoreA'] {
+  return {
+    clarity: parsed.scoreB.clarity - parsed.scoreA.clarity,
+    specificity: parsed.scoreB.specificity - parsed.scoreA.specificity,
+    completeness: parsed.scoreB.completeness - parsed.scoreA.completeness,
+    structure: parsed.scoreB.structure - parsed.scoreA.structure,
+    effectiveness: parsed.scoreB.effectiveness - parsed.scoreA.effectiveness,
+    overall: parsed.scoreB.overall - parsed.scoreA.overall,
+  };
+}
+
+function resolveLabels(input: ComparePromptsInput): {
+  labelA: string;
+  labelB: string;
+} {
+  return {
+    labelA: input.labelA ?? 'Prompt A',
+    labelB: input.labelB ?? 'Prompt B',
+  };
+}
+
+function buildComparePrompt(
+  labelA: string,
+  labelB: string,
+  promptA: string,
+  promptB: string
+): string {
+  return `${COMPARE_SYSTEM_PROMPT}\n\n${labelA}:\n${promptA}\n\n${labelB}:\n${promptB}`;
+}
+
+async function runComparison(
+  comparePrompt: string
+): Promise<ComparisonResponse> {
+  return executeLLMWithJsonResponse<ComparisonResponse>(
+    comparePrompt,
+    (value: unknown) => ComparisonResponseSchema.parse(value),
+    ErrorCode.E_LLM_FAILED,
+    'compare_prompts',
+    { maxTokens: 1500 }
+  );
+}
+
+function buildCompareResponse(
+  parsed: ComparisonResponse,
+  validatedA: string,
+  validatedB: string,
+  labelA: string,
+  labelB: string
+): ReturnType<typeof createSuccessResponse> {
+  const output = formatComparisonOutput(labelA, labelB, parsed);
+  return createSuccessResponse(output, {
+    ok: true,
+    promptA: validatedA,
+    promptB: validatedB,
+    scoreA: parsed.scoreA,
+    scoreB: parsed.scoreB,
+    scoreDelta: buildScoreDelta(parsed),
+    winner: parsed.winner,
+    improvements: parsed.improvements,
+    regressions: parsed.regressions,
+    recommendation: parsed.recommendation,
+  });
+}
+
+async function handleComparePrompts(
+  input: ComparePromptsInput
+): Promise<
+  | ReturnType<typeof createSuccessResponse>
+  | ReturnType<typeof createErrorResponse>
+> {
+  try {
+    return await runCompareFlow(input);
+  } catch (error) {
+    return createErrorResponse(
+      error,
+      ErrorCode.E_LLM_FAILED,
+      `${input.promptA} | ${input.promptB}`
+    );
+  }
+}
+
+async function runCompareFlow(
+  input: ComparePromptsInput
+): Promise<ReturnType<typeof createSuccessResponse>> {
+  const validatedA = validatePrompt(input.promptA);
+  const validatedB = validatePrompt(input.promptB);
+  const { labelA, labelB } = resolveLabels(input);
+  const comparePrompt = buildComparePrompt(
+    labelA,
+    labelB,
+    validatedA,
+    validatedB
+  );
+  const parsed = await runComparison(comparePrompt);
+  return buildCompareResponse(parsed, validatedA, validatedB, labelA, labelB);
 }
 
 // Registers the compare_prompts tool with the MCP server
 export function registerComparePromptsTool(server: McpServer): void {
   server.registerTool(
     'compare_prompts',
-    {
-      title: 'Compare Prompts',
-      description:
-        'Compare two prompt versions using AI analysis. Returns scores, winner, improvements/regressions, and recommendations.',
-      inputSchema: ComparePromptsInputSchema,
-      outputSchema: ComparePromptsOutputSchema,
-      annotations: {
-        readOnlyHint: true,
-        idempotentHint: false,
-        openWorldHint: false,
-      },
-    },
-    async ({
-      promptA,
-      promptB,
-      labelA,
-      labelB,
-    }: {
-      promptA: string;
-      promptB: string;
-      labelA?: string;
-      labelB?: string;
-    }) => {
-      try {
-        const validatedA = validatePrompt(promptA);
-        const validatedB = validatePrompt(promptB);
-        const labelAFinal = labelA ?? 'Prompt A';
-        const labelBFinal = labelB ?? 'Prompt B';
-
-        const comparePrompt = `${COMPARE_SYSTEM_PROMPT}\n\n${labelAFinal}:\n${validatedA}\n\n${labelBFinal}:\n${validatedB}`;
-
-        const parsed = await executeLLMWithJsonResponse<ComparisonResponse>(
-          comparePrompt,
-          (value: unknown) => ComparisonResponseSchema.parse(value),
-          ErrorCode.E_LLM_FAILED,
-          'compare_prompts',
-          { maxTokens: 1500 }
-        );
-
-        const scoreDelta = {
-          clarity: parsed.scoreB.clarity - parsed.scoreA.clarity,
-          specificity: parsed.scoreB.specificity - parsed.scoreA.specificity,
-          completeness: parsed.scoreB.completeness - parsed.scoreA.completeness,
-          structure: parsed.scoreB.structure - parsed.scoreA.structure,
-          effectiveness:
-            parsed.scoreB.effectiveness - parsed.scoreA.effectiveness,
-          overall: parsed.scoreB.overall - parsed.scoreA.overall,
-        };
-
-        const output = formatComparisonOutput(labelAFinal, labelBFinal, parsed);
-
-        return createSuccessResponse(output, {
-          ok: true,
-          promptA: validatedA,
-          promptB: validatedB,
-          scoreA: parsed.scoreA,
-          scoreB: parsed.scoreB,
-          scoreDelta,
-          winner: parsed.winner,
-          improvements: parsed.improvements,
-          regressions: parsed.regressions,
-          recommendation: parsed.recommendation,
-        });
-      } catch (error) {
-        return createErrorResponse(
-          error,
-          ErrorCode.E_LLM_FAILED,
-          `${promptA} | ${promptB}`
-        );
-      }
-    }
+    COMPARE_PROMPTS_TOOL,
+    handleComparePrompts
   );
 }

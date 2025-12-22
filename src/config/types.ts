@@ -18,6 +18,7 @@ export interface ErrorResponse {
       message: string;
       context?: string;
       details?: Record<string, unknown>;
+      recoveryHint?: string;
     };
   };
   isError: true;

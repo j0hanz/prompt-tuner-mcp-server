@@ -34,31 +34,55 @@ const RETRYABLE_MCP_CODES = new Set<string>([
   ErrorCode.E_TIMEOUT,
 ]);
 
-function isRetryableError(error: unknown): boolean {
-  if (error instanceof McpError) {
-    if (NON_RETRYABLE_MCP_CODES.has(error.code)) return false;
-    if (RETRYABLE_MCP_CODES.has(error.code)) return true;
-  }
+interface AttemptSuccess<T> {
+  ok: true;
+  value: T;
+}
 
+interface AttemptFailure {
+  ok: false;
+  error: unknown;
+}
+
+type AttemptResult<T> = AttemptSuccess<T> | AttemptFailure;
+
+function getMcpRetryDecision(error: unknown): boolean | null {
+  if (!(error instanceof McpError)) return null;
+  if (NON_RETRYABLE_MCP_CODES.has(error.code)) return false;
+  if (RETRYABLE_MCP_CODES.has(error.code)) return true;
+  return null;
+}
+
+function getErrorCode(error: unknown): string | null {
   if (error instanceof Error && 'code' in error) {
-    const code = String(error.code);
-    if (RETRYABLE_ERROR_CODES.has(code)) return true;
+    return String(error.code);
   }
+  return null;
+}
 
-  const errorMessage =
-    error instanceof Error
-      ? error.message.toLowerCase()
-      : String(error).toLowerCase();
+function getErrorMessageLower(error: unknown): string {
+  return (error instanceof Error ? error.message : String(error)).toLowerCase();
+}
 
-  for (const code of RETRYABLE_ERROR_CODES) {
-    if (errorMessage.includes(code.toLowerCase())) return true;
+function containsAny(haystack: string, needles: Iterable<string>): boolean {
+  for (const needle of needles) {
+    if (haystack.includes(needle.toLowerCase())) return true;
   }
-
-  for (const httpCode of RETRYABLE_HTTP_CODES) {
-    if (errorMessage.includes(httpCode)) return true;
-  }
-
   return false;
+}
+
+function isRetryableError(error: unknown): boolean {
+  const mcpDecision = getMcpRetryDecision(error);
+  if (mcpDecision !== null) return mcpDecision;
+
+  const code = getErrorCode(error);
+  if (code && RETRYABLE_ERROR_CODES.has(code)) return true;
+
+  const errorMessage = getErrorMessageLower(error);
+  return (
+    containsAny(errorMessage, RETRYABLE_ERROR_CODES) ||
+    containsAny(errorMessage, RETRYABLE_HTTP_CODES)
+  );
 }
 
 function calculateDelay(
@@ -71,6 +95,109 @@ function calculateDelay(
   return Math.min(exponentialDelay + jitter, maxDelayMs);
 }
 
+function ensureWithinTotalTimeout(
+  startTime: number,
+  totalTimeoutMs: number
+): void {
+  if (Date.now() - startTime > totalTimeoutMs) {
+    throw new McpError(
+      ErrorCode.E_TIMEOUT,
+      `Total retry timeout exceeded (${totalTimeoutMs}ms)`
+    );
+  }
+}
+
+function wouldExceedTotalTimeout(
+  startTime: number,
+  totalTimeoutMs: number,
+  delayMs: number
+): boolean {
+  return Date.now() - startTime + delayMs > totalTimeoutMs;
+}
+
+function logNonRetryable(error: unknown): void {
+  logger.debug(
+    `Non-retryable error: ${
+      error instanceof Error ? error.message : String(error)
+    }`
+  );
+}
+
+function logRetryAttempt(
+  attempt: number,
+  maxRetries: number,
+  error: unknown,
+  delayMs: number
+): void {
+  logger.warn(
+    `Retry ${attempt + 1}/${maxRetries + 1} in ${Math.round(delayMs)}ms: ${
+      error instanceof Error ? error.message : String(error)
+    }`
+  );
+}
+
+async function attemptHandler<T>(
+  handler: () => Promise<T>,
+  startTime: number,
+  totalTimeoutMs: number
+): Promise<AttemptResult<T>> {
+  ensureWithinTotalTimeout(startTime, totalTimeoutMs);
+  try {
+    const value = await handler();
+    return { ok: true, value };
+  } catch (error) {
+    return { ok: false, error };
+  }
+}
+
+function resolveRetryDelay(
+  attempt: number,
+  options: Required<RetryOptions>,
+  startTime: number,
+  lastError: unknown
+): number | null {
+  if (attempt >= options.maxRetries) return null;
+  if (!isRetryableError(lastError)) {
+    logNonRetryable(lastError);
+    return null;
+  }
+
+  const delayMs = calculateDelay(
+    attempt,
+    options.baseDelayMs,
+    options.maxDelayMs
+  );
+  if (wouldExceedTotalTimeout(startTime, options.totalTimeoutMs, delayMs)) {
+    logger.warn('Retry loop would exceed total timeout, aborting');
+    return null;
+  }
+
+  return delayMs;
+}
+
+async function waitForRetry(
+  attempt: number,
+  options: Required<RetryOptions>,
+  lastError: unknown,
+  delayMs: number,
+  startTime: number
+): Promise<void> {
+  logRetryAttempt(attempt, options.maxRetries, lastError, delayMs);
+  await setTimeout(delayMs);
+  ensureWithinTotalTimeout(startTime, options.totalTimeoutMs);
+}
+
+function logRetriesExhausted(
+  options: Required<RetryOptions>,
+  lastError: unknown
+): void {
+  const message =
+    lastError instanceof Error ? lastError.message : String(lastError);
+  logger.warn(
+    `All ${options.maxRetries + 1} retry attempts exhausted: ${message}`
+  );
+}
+
 export async function withRetry<T>(
   handler: () => Promise<T>,
   options: RetryOptions = {}
@@ -80,57 +207,19 @@ export async function withRetry<T>(
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= opts.maxRetries; attempt++) {
-    if (Date.now() - startTime > opts.totalTimeoutMs) {
-      throw new McpError(
-        ErrorCode.E_TIMEOUT,
-        `Total retry timeout exceeded (${opts.totalTimeoutMs}ms)`
-      );
-    }
+    const result = await attemptHandler(
+      handler,
+      startTime,
+      opts.totalTimeoutMs
+    );
+    if (result.ok) return result.value;
+    lastError = result.error;
 
-    try {
-      return await handler();
-    } catch (error) {
-      lastError = error;
-
-      if (attempt >= opts.maxRetries) {
-        break;
-      }
-
-      if (!isRetryableError(error)) {
-        logger.debug(
-          `Non-retryable error: ${error instanceof Error ? error.message : String(error)}`
-        );
-        break;
-      }
-
-      const delayMs = calculateDelay(
-        attempt,
-        opts.baseDelayMs,
-        opts.maxDelayMs
-      );
-
-      if (Date.now() - startTime + delayMs > opts.totalTimeoutMs) {
-        logger.warn('Retry loop would exceed total timeout, aborting');
-        break;
-      }
-
-      logger.warn(
-        `Retry ${attempt + 1}/${opts.maxRetries + 1} in ${Math.round(delayMs)}ms: ${error instanceof Error ? error.message : String(error)}`
-      );
-
-      await setTimeout(delayMs);
-
-      if (Date.now() - startTime > opts.totalTimeoutMs) {
-        throw new McpError(
-          ErrorCode.E_TIMEOUT,
-          `Total retry timeout exceeded (${opts.totalTimeoutMs}ms)`
-        );
-      }
-    }
+    const delayMs = resolveRetryDelay(attempt, opts, startTime, lastError);
+    if (delayMs === null) break;
+    await waitForRetry(attempt, opts, lastError, delayMs, startTime);
   }
 
-  logger.warn(
-    `All ${opts.maxRetries + 1} retry attempts exhausted: ${lastError instanceof Error ? lastError.message : String(lastError)}`
-  );
+  logRetriesExhausted(opts, lastError);
   throw lastError;
 }

@@ -12,6 +12,10 @@ const CODE_BLOCK_START_RE = /^[\s\n]*```(?:json)?[\s\n]*/i;
 // Matches closing code block at end (with optional whitespace/newlines after)
 const CODE_BLOCK_END_RE = /[\s\n]*```[\s\n]*$/;
 
+type ParseAttempt<T> =
+  | { success: true; value: T }
+  | { success: false; error: unknown };
+
 // Strips code block markers from the start and end of a string
 function stripCodeBlockMarkers(text: string): string {
   let result = text;
@@ -31,6 +35,74 @@ function stripCodeBlockMarkers(text: string): string {
   return result.trim();
 }
 
+function enforceMaxInputLength(
+  llmResponseText: string,
+  maxInputLength: number,
+  errorCode: ErrorCodeType
+): void {
+  if (llmResponseText.length <= maxInputLength) return;
+
+  throw new McpError(
+    errorCode,
+    `LLM response too large: ${llmResponseText.length} chars (max: ${maxInputLength})`,
+    undefined,
+    { responseLength: llmResponseText.length, maxLength: maxInputLength }
+  );
+}
+
+function tryParseJson<T>(
+  jsonText: string,
+  parse: (value: unknown) => T,
+  debugLabel: string | undefined,
+  stageLabel: string
+): ParseAttempt<T> {
+  try {
+    const parsed: unknown = JSON.parse(jsonText);
+    const result = parse(parsed);
+    if (debugLabel) {
+      logger.debug(`${debugLabel}: parsed JSON successfully (${stageLabel})`);
+    }
+    return { success: true, value: result };
+  } catch (error) {
+    logger.debug(
+      `${debugLabel ?? 'JSON parse'}: ${stageLabel} parse failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return { success: false, error };
+  }
+}
+
+function logPreviewIfDebug(
+  llmResponseText: string,
+  maxPreviewChars: number,
+  contextLabel: string
+): void {
+  if (process.env.DEBUG !== 'true') return;
+  logger.debug(
+    { preview: llmResponseText.slice(0, maxPreviewChars) },
+    `${contextLabel}: raw response preview`
+  );
+}
+
+function throwParseFailure(
+  options: {
+    errorCode: ErrorCodeType;
+    debugLabel?: string;
+  },
+  llmResponseText: string,
+  maxPreviewChars: number
+): never {
+  const contextLabel = options.debugLabel ?? 'LLM response';
+  logPreviewIfDebug(llmResponseText, maxPreviewChars, contextLabel);
+  throw new McpError(
+    options.errorCode,
+    `Failed to parse ${contextLabel} as JSON`,
+    undefined,
+    { strategiesAttempted: ['raw', 'codeblock-stripped'] }
+  );
+}
+
 export function parseJsonFromLlmResponse<T>(
   llmResponseText: string,
   parse: (value: unknown) => T,
@@ -43,66 +115,23 @@ export function parseJsonFromLlmResponse<T>(
 ): T {
   // Input validation: prevent DoS attacks with excessively large responses
   const maxInputLength = options.maxInputLength ?? LLM_MAX_RESPONSE_LENGTH;
-
-  if (llmResponseText.length > maxInputLength) {
-    throw new McpError(
-      options.errorCode,
-      `LLM response too large: ${llmResponseText.length} chars (max: ${maxInputLength})`,
-      undefined,
-      { responseLength: llmResponseText.length, maxLength: maxInputLength }
-    );
-  }
+  enforceMaxInputLength(llmResponseText, maxInputLength, options.errorCode);
 
   const jsonStr = llmResponseText.trim();
   const maxPreviewChars = options.maxPreviewChars ?? LLM_ERROR_PREVIEW_CHARS;
 
   // Try raw parse first
-  try {
-    const parsed: unknown = JSON.parse(jsonStr);
-    const result = parse(parsed);
-    if (options.debugLabel) {
-      logger.debug(`${options.debugLabel}: parsed JSON successfully (raw)`);
-    }
-    return result;
-  } catch (error) {
-    logger.debug(
-      `${options.debugLabel ?? 'JSON parse'}: raw parse failed: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
+  const rawAttempt = tryParseJson(jsonStr, parse, options.debugLabel, 'raw');
+  if (rawAttempt.success) return rawAttempt.value;
 
   // Try with code block markers stripped
-  try {
-    const stripped = stripCodeBlockMarkers(jsonStr);
-    const parsed: unknown = JSON.parse(stripped);
-    const result = parse(parsed);
-    if (options.debugLabel) {
-      logger.debug(
-        `${options.debugLabel}: parsed JSON successfully (stripped markers)`
-      );
-    }
-    return result;
-  } catch (error) {
-    logger.debug(
-      `${options.debugLabel ?? 'JSON parse'}: stripped parse failed: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
-
-  // Both strategies failed - throw error with helpful context
-  const debugEnabled = process.env.DEBUG === 'true';
-  const contextLabel = options.debugLabel ?? 'LLM response';
-  if (debugEnabled) {
-    logger.debug(
-      { preview: llmResponseText.slice(0, maxPreviewChars) },
-      `${contextLabel}: raw response preview`
-    );
-  }
-
-  throw new McpError(
-    options.errorCode,
-    `Failed to parse ${contextLabel} as JSON`,
-    undefined,
-    {
-      strategiesAttempted: ['raw', 'codeblock-stripped'],
-    }
+  const stripped = stripCodeBlockMarkers(jsonStr);
+  const strippedAttempt = tryParseJson(
+    stripped,
+    parse,
+    options.debugLabel,
+    'stripped markers'
   );
+  if (strippedAttempt.success) return strippedAttempt.value;
+  return throwParseFailure(options, llmResponseText, maxPreviewChars);
 }

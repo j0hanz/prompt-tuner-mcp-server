@@ -97,32 +97,74 @@ function sanitizeErrorContext(context?: string): string | undefined {
   return sanitized;
 }
 
-export function createErrorResponse(
-  error: unknown,
-  fallbackCode: ErrorCodeType = ErrorCode.E_LLM_FAILED,
-  context?: string
-): ErrorResponse {
-  const code = error instanceof McpError ? error.code : fallbackCode;
-  const message = error instanceof Error ? error.message : 'Unknown error';
-  const details = error instanceof McpError ? error.details : undefined;
+function resolveMcpError(error: unknown): McpError | null {
+  return error instanceof McpError ? error : null;
+}
 
-  const includeContext = config.INCLUDE_ERROR_CONTEXT;
-  const safeContext = includeContext
+function resolveErrorCode(
+  mcpError: McpError | null,
+  fallbackCode: ErrorCodeType
+): ErrorCodeType {
+  return mcpError?.code ?? fallbackCode;
+}
+
+function resolveErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Unknown error';
+}
+
+function resolveErrorDetails(
+  mcpError: McpError | null
+): Record<string, unknown> | undefined {
+  return mcpError?.details;
+}
+
+function resolveRecoveryHint(mcpError: McpError | null): string | undefined {
+  return mcpError?.recoveryHint;
+}
+
+function resolveSafeContext(context?: string): string | undefined {
+  return config.INCLUDE_ERROR_CONTEXT
     ? sanitizeErrorContext(context)
     : undefined;
+}
 
-  const structuredError = {
+function buildStructuredError(
+  code: ErrorCodeType,
+  message: string,
+  safeContext: string | undefined,
+  details: Record<string, unknown> | undefined,
+  recoveryHint: string | undefined
+): ErrorResponse['structuredContent'] {
+  return {
     ok: false as const,
     error: {
       code,
       message,
       context: safeContext,
       ...(details && { details }),
-      ...(error instanceof McpError && error.recoveryHint
-        ? { recoveryHint: error.recoveryHint }
-        : {}),
+      ...(recoveryHint ? { recoveryHint } : {}),
     },
   };
+}
+
+export function createErrorResponse(
+  error: unknown,
+  fallbackCode: ErrorCodeType = ErrorCode.E_LLM_FAILED,
+  context?: string
+): ErrorResponse {
+  const mcpError = resolveMcpError(error);
+  const code = resolveErrorCode(mcpError, fallbackCode);
+  const message = resolveErrorMessage(error);
+  const details = resolveErrorDetails(mcpError);
+  const recoveryHint = resolveRecoveryHint(mcpError);
+  const safeContext = resolveSafeContext(context);
+  const structuredError = buildStructuredError(
+    code,
+    message,
+    safeContext,
+    details,
+    recoveryHint
+  );
 
   return {
     content: [{ type: 'text', text: `Error [${code}]: ${message}` }],
