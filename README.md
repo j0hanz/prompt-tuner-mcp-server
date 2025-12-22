@@ -82,15 +82,19 @@ npm run build
 
 PromptTuner requires an API key from an LLM provider to perform analysis and refinement.
 
-| Variable            | Default            | Description                                                       |
-| :------------------ | :----------------- | :---------------------------------------------------------------- |
-| `LLM_PROVIDER`      | `openai`           | Provider to use: `openai`, `anthropic`, or `google`.              |
-| `OPENAI_API_KEY`    | -                  | API key for OpenAI.                                               |
-| `ANTHROPIC_API_KEY` | -                  | API key for Anthropic.                                            |
-| `GOOGLE_API_KEY`    | -                  | API key for Google Gemini.                                        |
-| `LLM_MODEL`         | (provider default) | Override the default model (e.g., `gpt-4o`, `claude-3-5-sonnet`). |
-| `MAX_PROMPT_LENGTH` | `10000`            | Maximum characters allowed in a prompt.                           |
-| `LLM_TIMEOUT_MS`    | `60000`            | Timeout for LLM requests in milliseconds.                         |
+| Variable                 | Default            | Description                                                       |
+| :----------------------- | :----------------- | :---------------------------------------------------------------- |
+| `LLM_PROVIDER`           | `openai`           | Provider to use: `openai`, `anthropic`, or `google`.              |
+| `OPENAI_API_KEY`         | -                  | API key for OpenAI.                                               |
+| `ANTHROPIC_API_KEY`      | -                  | API key for Anthropic.                                            |
+| `GOOGLE_API_KEY`         | -                  | API key for Google Gemini.                                        |
+| `LLM_MODEL`              | (provider default) | Override the default model (e.g., `gpt-4o`, `claude-3-5-sonnet`). |
+| `MAX_PROMPT_LENGTH`      | `10000`            | Maximum characters allowed in a prompt.                           |
+| `LLM_TIMEOUT_MS`         | `60000`            | Timeout for LLM requests in milliseconds.                         |
+| `LLM_MAX_TOKENS`         | `8000`             | Maximum tokens for LLM response.                                  |
+| `GOOGLE_SAFETY_DISABLED` | `false`            | Disable Google Gemini safety filters (`true`/`false`).            |
+
+> For advanced configuration (retries, caching, logging), see [CONFIGURATION.md](CONFIGURATION.md).
 
 ## 🔧 Tools
 
