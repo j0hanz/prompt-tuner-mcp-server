@@ -6,24 +6,24 @@ All configuration is done through environment variables. Set them in your MCP cl
 
 ### Required Configuration
 
-| Variable            | Description             | Default           | Example                                                        |
-| ------------------- | ----------------------- | ----------------- | -------------------------------------------------------------- |
-| `LLM_PROVIDER`      | LLM provider to use     | `openai`          | `openai`, `anthropic`, `google`                                |
-| `OPENAI_API_KEY`    | OpenAI API key          | -                 | `sk-...`                                                       |
-| `ANTHROPIC_API_KEY` | Anthropic API key       | -                 | `sk-ant-...`                                                   |
-| `GOOGLE_API_KEY`    | Google Gemini API key   | -                 | `AIzaSy...`                                                    |
-| `LLM_MODEL`         | Model to use (optional) | Provider-specific | `gpt-4o`, `claude-3-5-sonnet-20241022`, `gemini-2.0-flash-exp` |
+| Variable            | Description             | Default           | Example                                                                              |
+| ------------------- | ----------------------- | ----------------- | ------------------------------------------------------------------------------------ |
+| `LLM_PROVIDER`      | LLM provider to use     | `openai`          | `openai`, `anthropic`, `google`                                                      |
+| `OPENAI_API_KEY`    | OpenAI API key          | -                 | `sk-...`                                                                             |
+| `ANTHROPIC_API_KEY` | Anthropic API key       | -                 | `sk-ant-...`                                                                         |
+| `GOOGLE_API_KEY`    | Google Gemini API key   | -                 | `AIzaSy...`                                                                          |
+| `LLM_MODEL`         | Model to use (optional) | Provider-specific | `gpt-4o`, `claude-3-5-sonnet-20241022`, `gemini-2.0-flash-exp`, `gemini-2.5-pro-exp` |
 
 **Note**: Only provide the API key for your chosen provider.
 
 ### Performance & Limits (Optional)
 
-| Variable            | Description               | Default         | Recommended Range |
-| ------------------- | ------------------------- | --------------- | ----------------- |
-| `LLM_TIMEOUT_MS`    | LLM request timeout (ms)  | `60000` (1 min) | 30000-120000      |
-| `LLM_MAX_TOKENS`    | Max tokens per response   | `2000`          | 1000-4000         |
-| `MAX_PROMPT_LENGTH` | Max prompt length (chars) | `10000`         | 5000-50000        |
-| `CACHE_MAX_SIZE`    | Max cached refinements    | `1000`          | 500-5000          |
+| Variable            | Description               | Default         | Recommended Range       |
+| ------------------- | ------------------------- | --------------- | ----------------------- |
+| `LLM_TIMEOUT_MS`    | LLM request timeout (ms)  | `60000` (1 min) | 30000-120000            |
+| `LLM_MAX_TOKENS`    | Max tokens per response   | `8000`          | 2000-16000 (pro: 8000+) |
+| `MAX_PROMPT_LENGTH` | Max prompt length (chars) | `10000`         | 5000-50000              |
+| `CACHE_MAX_SIZE`    | Max cached refinements    | `1000`          | 500-5000                |
 
 ### Retry Configuration (Optional)
 
@@ -79,9 +79,28 @@ All configuration is done through environment variables. Set them in your MCP cl
       "ANTHROPIC_API_KEY": "${input:anthropic-api-key}",
       "LLM_MODEL": "claude-3-5-sonnet-20241022",
       "LLM_TIMEOUT_MS": "90000",
-      "LLM_MAX_TOKENS": "3000",
+      "LLM_MAX_TOKENS": "8000",
       "CACHE_MAX_SIZE": "2000",
       "RETRY_MAX_ATTEMPTS": "5"
+    }
+  }
+}
+```
+
+### Pro Models (Gemini 2.5 Pro, GPT-4o)
+
+```json
+{
+  "prompttuner": {
+    "command": "node",
+    "args": ["/path/to/prompttuner-mcp/dist/index.js"],
+    "env": {
+      "LLM_PROVIDER": "google",
+      "GOOGLE_API_KEY": "${input:google-api-key}",
+      "LLM_MODEL": "gemini-2.5-pro-exp",
+      "LLM_TIMEOUT_MS": "120000",
+      "LLM_MAX_TOKENS": "16000",
+      "CACHE_MAX_SIZE": "3000"
     }
   }
 }

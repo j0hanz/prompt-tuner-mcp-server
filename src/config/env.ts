@@ -30,7 +30,7 @@ const envSchema = z.object({
     .default('openai'),
   LLM_MODEL: z.string().optional(),
   LLM_TIMEOUT_MS: numberString(60000, 1000),
-  LLM_MAX_TOKENS: numberString(2000, 1),
+  LLM_MAX_TOKENS: numberString(8000, 1),
   GOOGLE_SAFETY_DISABLED: z
     .enum(['true', 'false'])
     .optional()

@@ -1,3 +1,4 @@
+import packageJson from '../../package.json' with { type: 'json' };
 import { config } from './env.js';
 
 export { PATTERNS } from './patterns.js';
@@ -13,7 +14,7 @@ export const SCORING_WEIGHTS = {
 } as const;
 
 export const SERVER_NAME = 'prompttuner-mcp';
-export const SERVER_VERSION = '1.0.0';
+export const SERVER_VERSION = packageJson.version;
 
 // Configurable via environment variables
 const {
@@ -28,7 +29,7 @@ export const MIN_PROMPT_LENGTH = 1;
 export const LLM_TIMEOUT_MS = ENV_LLM_TIMEOUT_MS;
 export const LLM_MAX_TOKENS = ENV_LLM_MAX_TOKENS;
 
-export const ANALYSIS_MAX_TOKENS = 1500;
+export const ANALYSIS_MAX_TOKENS = 4000;
 export const ANALYSIS_TIMEOUT_MS = 60000;
 
 export const LLM_MAX_RESPONSE_LENGTH = 500_000;
