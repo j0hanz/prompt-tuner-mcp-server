@@ -21,40 +21,61 @@ import {
 import { FormatDetectionResponseSchema } from '../schemas/llm-responses.js';
 
 const FORMAT_DETECTION_PROMPT = `<role>
-You are an expert at detecting AI prompt formats.
+You are an expert at detecting and classifying AI prompt formats.
 </role>
 
 <task>
-Analyze the prompt and determine its target format.
+Analyze the prompt and determine its target format with a confidence score.
 </task>
 
 <formats>
-1. Claude XML: Uses tags such as <context>, <task>, <requirements>, <output_format>
-2. GPT Markdown: Uses Markdown headings, emphasis, and bullet lists
-3. JSON: Structured schema or key-value patterns
-4. Auto: No dominant format detected
+1. **Claude XML**: Uses semantic XML tags for structure
+2. **GPT Markdown**: Uses Markdown headings and formatting
+3. **JSON**: Structured schema or key-value patterns
+4. **Auto**: No dominant format detected or multiple formats mixed
 </formats>
 
 <detection_criteria>
-Claude XML indicators:
-- XML tags for semantic sections
-- Angle-bracketed structure
+**Claude XML indicators (weight each 20%):**
+- Semantic XML tags: <context>, <task>, <requirements>, <output_format>, <role>
+- Angle-bracketed structure for organization
+- Nested tag hierarchy
+- XML-style attribute usage
 
-GPT Markdown indicators:
-- Markdown heading structure
-- Emphasis markers
-- Bullet or numbered lists
+**GPT Markdown indicators (weight each 20%):**
+- Markdown headings: # for main sections, ## for subsections
+- Emphasis markers: **bold**, *italic*, \`code\`
+- Bullet lists (- or *) or numbered lists (1. 2. 3.)
+- Horizontal rules (---)
 
-JSON indicators:
-- Explicit schema or key-value structures
-- Curly braces with quoted keys
+**JSON indicators (weight each 20%):**
+- Explicit JSON schema definition
+- Curly braces with quoted keys: {"key": "value"}
+- Request for JSON output format
+- Schema validation language ("must be", "required fields")
 </detection_criteria>
 
-<decision_rules>
-- If multiple formats appear, choose the dominant one.
-- If ambiguous, return "auto" with confidence 60 or lower.
-- Provide a single-sentence recommendation to improve format clarity.
-</decision_rules>
+<confidence_scale>
+| Confidence | Meaning                                        |
+|------------|------------------------------------------------|
+| 90-100     | Single clear format, no ambiguity              |
+| 70-89      | Dominant format with minor mixed elements      |
+| 50-69      | Multiple formats present, one slightly dominant|
+| 0-49       | No clear format or heavily mixed (return auto) |
+</confidence_scale>
+
+<rules>
+ALWAYS:
+- Return a single detected format (the dominant one)
+- Provide confidence as an integer (0-100)
+- Give a specific, actionable recommendation
+- Default to "auto" when confidence would be below 50
+
+NEVER:
+- Return multiple formats in detectedFormat field
+- Give confidence above 90 if any mixed formatting is present
+- Recommend mixing XML and Markdown
+</rules>
 
 <output_rules>
 Return valid JSON only. No markdown, no code fences, no extra text.

@@ -52,13 +52,13 @@ function renderTemplate(
 }
 
 const TEMPLATE_QUICK_OPTIMIZE = `<task>
-Use refine_prompt with technique "basic" on this prompt.
+Use refine_prompt with technique "basic" to quickly improve this prompt.
 </task>
 
 <instructions>
-1. Apply basic refinement (grammar, clarity, vague words).
-2. Show the improved version.
-3. Briefly note key changes.
+1. Apply basic refinement (fix grammar, improve clarity, replace vague words).
+2. Show the improved version in a code block.
+3. List 2-3 specific changes made (e.g., "Fixed typo: 'recieve' → 'receive'").
 </instructions>
 
 <prompt>
@@ -66,18 +66,18 @@ Use refine_prompt with technique "basic" on this prompt.
 </prompt>
 
 <final_reminder>
-Use refine_prompt output for the improved version. Do not invent changes.
+Use refine_prompt output for the improved version. List only changes that were actually made.
 </final_reminder>`;
 
 const TEMPLATE_DEEP_OPTIMIZE = `<task>
-Use optimize_prompt with techniques ["comprehensive"].
+Use optimize_prompt with techniques ["comprehensive"] to maximize prompt effectiveness.
 </task>
 
 <instructions>
-1. Apply comprehensive optimization.
-2. Show before/after scores.
-3. List all improvements made.
-4. Show the final optimized prompt.
+1. Apply comprehensive optimization (all applicable techniques).
+2. Show before/after scores with the score delta.
+3. List all improvements made, grouped by technique.
+4. Present the final optimized prompt in a code block.
 </instructions>
 
 <prompt>
@@ -85,17 +85,20 @@ Use optimize_prompt with techniques ["comprehensive"].
 </prompt>
 
 <final_reminder>
-Use optimize_prompt output for scores and the final prompt.
+Use optimize_prompt output for scores and the final prompt. Report actual improvements only.
 </final_reminder>`;
 
 const TEMPLATE_ANALYZE = `<task>
-Analyze this prompt for quality and structure.
+Analyze this prompt for quality, structure, and format.
 </task>
 
 <instructions>
-1. Use analyze_prompt for scores (clarity, specificity, completeness, structure, effectiveness).
-2. Use detect_format to identify target format.
-3. Summarize: overall score, strengths, top 3 recommendations.
+1. Use analyze_prompt to get scores across 5 dimensions (clarity, specificity, completeness, structure, effectiveness).
+2. Use detect_format to identify the target format (Claude XML, GPT Markdown, JSON, or auto).
+3. Summarize findings:
+   - Overall score with rating (Excellent 80+, Good 60-79, Fair 40-59, Needs Work <40)
+   - Top 2 strengths
+   - Top 3 prioritized recommendations for improvement
 </instructions>
 
 <prompt>
@@ -103,7 +106,7 @@ Analyze this prompt for quality and structure.
 </prompt>
 
 <final_reminder>
-Base your summary on tool outputs only.
+Base your summary on tool outputs only. Use the score interpretation guide for ratings.
 </final_reminder>`;
 
 const TEMPLATE_REVIEW = `<task>
@@ -128,13 +131,22 @@ const TEMPLATE_ITERATIVE_REFINE = `<task>
 Perform iterative refinement on this prompt.
 </task>
 
+<severity_guide>
+| Severity | Criteria                                                    |
+|----------|-------------------------------------------------------------|
+| Critical | Breaks functionality, security risk, or completely unclear |
+| High     | Significantly reduces effectiveness, major ambiguity        |
+| Medium   | Noticeable quality impact, missing best practices           |
+| Low      | Minor improvement opportunity, polish                       |
+</severity_guide>
+
 <instructions>
 1. Use analyze_prompt to identify issues.
-2. Rank the top 3 weaknesses by severity.
+2. Rank the top 3 weaknesses by severity (Critical > High > Medium > Low).
 3. For each weakness:
-   - What's wrong (specific issue)
-   - Why it matters (impact on AI understanding)
-   - Specific fix (concrete improvement)
+   - **Issue**: Specific problem (quote the problematic text if possible)
+   - **Impact**: Why it matters for AI understanding
+   - **Fix**: Concrete improvement with example
 4. Use optimize_prompt with appropriate techniques to apply all fixes.
 5. Show the final improved prompt with a summary of changes.
 </instructions>
@@ -144,7 +156,7 @@ Perform iterative refinement on this prompt.
 </prompt>
 
 <final_reminder>
-Ensure the final prompt reflects the fixes you described.
+Ensure the final prompt reflects the fixes you described. Use severity to prioritize.
 </final_reminder>`;
 
 const TEMPLATE_RECOMMEND_TECHNIQUES = `<task>
@@ -181,41 +193,56 @@ Recommend only techniques that add concrete value for this prompt.
 </final_reminder>`;
 
 const TEMPLATE_SCAN_ANTIPATTERNS = `<task>
-Scan this prompt for common anti-patterns.
+Scan this prompt for common anti-patterns and provide corrections.
 </task>
 
+<severity_definitions>
+| Severity | Impact on Prompt Effectiveness                              |
+|----------|-------------------------------------------------------------|
+| High     | Causes misunderstanding, wrong outputs, or failure          |
+| Medium   | Reduces quality or consistency of responses                 |
+| Low      | Minor clarity issue, still functional                       |
+</severity_definitions>
+
+<anti_patterns_to_detect>
+1. Vague language: "something", "stuff", "things", "etc.", "various"
+2. Missing role/persona context: No expert identity defined
+3. Unclear output format: No specification of expected response structure
+4. No constraints: Missing ALWAYS/NEVER rules or boundaries
+5. Lack of examples: Complex tasks without demonstrations
+6. Run-on sentences: >30 words without punctuation
+7. Ambiguous pronouns: "it", "this", "that" without clear referent
+8. Undefined jargon: Technical terms without explanation
+9. No success criteria: No way to evaluate if output is correct
+10. Conflicting instructions: Contradictory requirements
+</anti_patterns_to_detect>
+
 <instructions>
-1. Use analyze_prompt to check for issues.
-2. Detect these anti-patterns:
-   - Vague language (something, stuff, things)
-   - Missing role/persona context
-   - Unclear or missing output format specification
-   - No constraints or boundaries (ALWAYS/NEVER rules)
-   - Lack of examples for complex/ambiguous tasks
-   - Overly long run-on sentences (>30 words)
-   - Ambiguous pronouns (it, this, that without clear referent)
-   - Missing context for technical or domain-specific terms
-   - No success criteria or quality indicators
-   - Conflicting or contradictory instructions
-
+1. Use analyze_prompt to assess current state.
+2. Identify anti-patterns from the list above.
 3. For each anti-pattern found:
-   - Quote the problematic text
-   - Explain why it's problematic
-   - Provide a corrected version
-   - Note the severity (high/medium/low impact)
-
-4. Use refine_prompt with technique "comprehensive" to show a fully corrected version.
+   - **Quote**: The exact problematic text
+   - **Problem**: Why it's an issue
+   - **Fix**: Corrected version
+   - **Severity**: High/Medium/Low
+4. Use refine_prompt with technique "comprehensive" to generate a corrected version.
 </instructions>
 
 <output_format>
-Anti-Patterns Detected: X
-- [Severity] [Issue] - [Quote] - [Fix]
+## Anti-Patterns Detected: X
 
-Corrected Prompt:
+### [Severity] [Issue Type]
+- **Quote**: "[exact text]"
+- **Problem**: [explanation]
+- **Fix**: "[corrected text]"
+
+## Corrected Prompt
+\`\`\`
 [Show improved version]
+\`\`\`
 
-Impact:
-Expected improvement in clarity, specificity, and effectiveness.
+## Expected Improvement
+[Summary of clarity, specificity, and effectiveness gains]
 </output_format>
 
 <prompt>
@@ -223,7 +250,7 @@ Expected improvement in clarity, specificity, and effectiveness.
 </prompt>
 
 <final_reminder>
-Quote the problematic text exactly and keep fixes concise.
+Quote problematic text exactly. Keep fixes concise and actionable.
 </final_reminder>`;
 
 const QUICK_WORKFLOW_PROMPTS: QuickWorkflowDefinition[] = [

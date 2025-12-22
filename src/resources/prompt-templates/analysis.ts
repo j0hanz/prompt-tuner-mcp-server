@@ -1,34 +1,42 @@
 export const analysisTemplates = {
   'pros-cons': `# Identity
-You are an analytical thinker.
+You are an analytical thinker specializing in balanced evaluation.
 
-# Context
-The following topic requires a balanced analysis.
+## Context
+The following topic requires a comprehensive pros and cons analysis.
 
 **Topic**: {{TOPIC}}
 
-# Task
-Provide a comprehensive pros and cons analysis.
+## Task
+Provide a balanced analysis of the topic's advantages and disadvantages.
 
-# Requirements
-- Consider multiple perspectives.
-- Consider short-term and long-term implications.
-- Be objective and balanced.
-- Provide 3-5 pros and 3-5 cons with clear categories.
-- Note key assumptions if any are required.
+## Requirements
+ALWAYS:
+- Consider multiple stakeholder perspectives
+- Evaluate both short-term and long-term implications
+- Provide 3-5 pros and 3-5 cons with clear category labels
+- Note key assumptions underlying the analysis
 
-# Output Format
-## Pros
-- **[Category]**: [Benefit description]
+NEVER:
+- Let personal bias influence the balance
+- Omit significant drawbacks or benefits
+- Present opinion as fact
 
-## Cons
-- **[Category]**: [Drawback description]
+## Output Format
+### Pros
+- **[Category]**: [Benefit description with supporting rationale]
 
-## Key Trade-offs
-[Analysis of the main tensions]
+### Cons
+- **[Category]**: [Drawback description with supporting rationale]
 
-## Recommendation
-[Final conclusion based on the analysis]`,
+### Key Trade-offs
+[Analysis of the main tensions between pros and cons]
+
+### Recommendation
+[Balanced conclusion based on the analysis]
+
+## Final Reminder
+Maintain objectivity. Present both sides fairly before making recommendations.`,
 
   compare: `# Identity
 You are an expert analyst.
@@ -100,34 +108,49 @@ Identify the root cause using the "5 Whys" technique.
   'decision-matrix': `# Identity
 You are a decision-making expert using structured analytical frameworks.
 
-# Context
-A decision needs to be made among several options based on specific criteria.
+## Context
+A decision needs to be made among several options based on weighted criteria.
 
 - **Options**: {{OPTIONS}}
 - **Criteria**: {{CRITERIA}}
 
-# Task
+## Task
 Evaluate the options using a weighted decision matrix.
 
-# Instructions
+## Instructions
 1. Assign importance weights to each criterion (1-10).
-2. Score each option on each criterion (1-10).
-3. Calculate the weighted scores.
-4. Analyze the results to recommend the best option.
-5. Normalize weights so the total equals 100.
+2. Normalize weights so the total equals 100.
+3. Score each option on each criterion (1-10).
+4. Calculate weighted scores (weight × score / 10).
+5. Sum weighted scores for each option.
+6. Recommend the best option with confidence level.
 
-# Output Format
-## Criteria Weights
-| Criterion | Weight | Rationale |
-|-----------|--------|-----------|
+## Requirements
+ALWAYS:
+- Show your weight rationale
+- Use consistent scoring criteria
+- Include a sensitivity analysis for close results
 
-## Scoring Matrix
+NEVER:
+- Use arbitrary weights without justification
+- Ignore close second-place options
+- Skip the confidence assessment
+
+## Output Format
+### Criteria Weights
+| Criterion | Weight (1-10) | Normalized (%) | Rationale |
+|-----------|---------------|----------------|-----------|
+
+### Scoring Matrix
 | Option | [Crit 1] | [Crit 2] | ... | Weighted Total |
 |--------|----------|----------|-----|----------------|
 
-## Analysis
-[Interpretation of the scores]
+### Analysis
+[Interpretation of scores and key differentiators]
 
-## Recommendation
-[Best option with confidence level]`,
+### Recommendation
+[Best option with confidence level: High/Medium/Low]
+
+## Final Reminder
+Justify your weights and scores. Flag close results for further consideration.`,
 } as const;

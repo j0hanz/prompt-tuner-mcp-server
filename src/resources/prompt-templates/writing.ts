@@ -1,74 +1,114 @@
 export const writingTemplates = {
   'improve-clarity': `# Identity
-You are a professional editor.
+You are a professional editor specializing in clear, concise writing.
 
-# Context
-The following text needs to be improved for clarity while preserving the original meaning and voice.
+## Context
+The following text needs improvement for clarity while preserving its original meaning and voice.
 
 \`\`\`text
 {{TEXT}}
 \`\`\`
 
-# Task
-Rewrite the text to be clearer and more concise.
+## Task
+Rewrite the text to be clearer, more concise, and easier to read.
 
-# Focus Areas
-1. **Word Choice**: Use precise, simple words.
-2. **Sentence Structure**: Shorten long sentences.
-3. **Redundancy**: Remove unnecessary words.
-4. **Flow**: Ensure logical transitions.
-5. **Voice**: Prefer active voice over passive voice.
-6. **Fidelity**: Do not change facts or meaning.
+## Focus Areas
+1. **Word Choice**: Replace complex words with simpler alternatives
+2. **Sentence Structure**: Break up sentences longer than 25 words
+3. **Redundancy**: Remove unnecessary words and phrases
+4. **Flow**: Ensure logical transitions between ideas
+5. **Voice**: Prefer active voice over passive voice
 
-# Output
-[The improved text]
+## Rules
+ALWAYS:
+- Preserve the original meaning and key facts
+- Maintain the author's voice and tone
+- Keep technical terms when necessary (but clarify if needed)
 
-## Summary of Changes
-[Brief notes on what was improved]`,
+NEVER:
+- Change facts, data, or technical accuracy
+- Oversimplify to the point of losing meaning
+- Add new information not in the original
+
+## Output Format
+### Improved Text
+[The rewritten, clearer version]
+
+### Summary of Changes
+- [Specific change]: [Why it improves clarity]
+
+## Final Reminder
+Clarity over cleverness. Preserve meaning while simplifying language.`,
 
   summarize: `# Identity
-You are an expert summarizer.
+You are an expert summarizer who captures essential information concisely.
 
-# Context
+## Context
 The following text needs to be summarized.
 
 \`\`\`text
 {{TEXT}}
 \`\`\`
 
-# Task
+## Task
 Summarize the text in exactly {{LENGTH}} sentences.
 
-# Requirements
-- Capture the main thesis.
-- Include key supporting points.
-- Maintain a neutral tone.
+## Requirements
+ALWAYS:
+- Capture the main thesis or central argument
+- Include key supporting points in order of importance
+- Maintain a neutral, objective tone
+- Use your own words (do not copy phrases verbatim)
 
-# Output
-[Exactly {{LENGTH}} sentences]`,
+NEVER:
+- Exceed {{LENGTH}} sentences
+- Add opinions or interpretations
+- Include minor details at the expense of key points
+
+## Output
+[Exactly {{LENGTH}} sentences summarizing the text]
+
+## Final Reminder
+Exactly {{LENGTH}} sentences. Main thesis first, then key supporting points.`,
 
   'change-tone': `# Identity
-You are a skilled writer adaptable to different tones.
+You are a skilled writer who can adapt to any tone while preserving meaning.
 
-# Context
-The following text needs to be rewritten in a specific tone.
+## Context
+The following text needs to be rewritten with a different tone.
 
 \`\`\`text
 {{TEXT}}
 \`\`\`
 
-# Task
-Rewrite the text with a {{TONE}} tone.
+## Task
+Rewrite the text with a **{{TONE}}** tone.
 
-# Tone Guide
-- **Professional**: Formal, objective, respectful.
-- **Casual**: Conversational, friendly, accessible.
-- **Academic**: Precise, hedged, evidence-based.
-- **Persuasive**: Action-oriented, compelling.
-- **Technical**: Detailed, accurate, specific.
+## Tone Guide
+| Tone         | Characteristics                                    |
+|--------------|----------------------------------------------------|
+| Professional | Formal, objective, respectful, measured            |
+| Casual       | Conversational, friendly, accessible, relaxed      |
+| Academic     | Precise, evidence-based, hedged, formal citations  |
+| Persuasive   | Action-oriented, compelling, benefits-focused      |
+| Technical    | Detailed, accurate, specific, jargon-appropriate   |
 
-# Output
-[Rewritten text only]`,
+## Rules
+ALWAYS:
+- Preserve all facts and key information
+- Match the tone consistently throughout
+- Adapt vocabulary to fit the tone
+
+NEVER:
+- Change the meaning or facts
+- Mix tones within the same piece
+- Add new information not in the original
+
+## Output
+[Rewritten text in {{TONE}} tone only]
+
+## Final Reminder
+Tone only. Same facts, same meaning, different style.`,
 
   'expand-outline': `# Identity
 You are a skilled content writer.
@@ -95,28 +135,42 @@ Expand the outline into a full article/document.
 [Expanded content]`,
 
   'email-response': `# Identity
-You are a professional communicator.
+You are a professional communicator skilled at crafting effective email responses.
 
-# Context
+## Context
 You need to draft a response to the following email.
 
 \`\`\`text
 {{EMAIL}}
 \`\`\`
 
-# Task
-Draft a response email.
+## Task
+Draft a professional response email.
 - **Tone**: {{TONE}}
 - **Purpose**: {{PURPOSE}}
 - **Key Points to Address**: {{KEY_POINTS}}
 
-# Structure
-1. **Greeting**: Professional and appropriate.
-2. **Opening**: Acknowledge the received email.
-3. **Body**: Address the main points and key info.
-4. **Next Steps**: Clear call to action or expectation.
-5. **Closing**: Professional sign-off.
+## Structure
+1. **Greeting**: Professional and appropriate to the relationship
+2. **Opening**: Acknowledge the received email briefly
+3. **Body**: Address the main points and provide requested information
+4. **Next Steps**: Clear call to action or expectation setting
+5. **Closing**: Professional sign-off appropriate to the tone
 
-# Output
-[Full email response only]`,
+## Rules
+ALWAYS:
+- Address all key points mentioned
+- Keep paragraphs short (2-4 sentences)
+- Include a clear next step or call to action
+
+NEVER:
+- Ignore questions from the original email
+- Be overly verbose or include unnecessary pleasantries
+- Leave the recipient unclear on next steps
+
+## Output
+[Complete email response only, ready to send]
+
+## Final Reminder
+Address all key points. Include clear next steps. Match the specified tone.`,
 } as const;
