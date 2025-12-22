@@ -73,6 +73,10 @@ export const OptimizePromptOutputSchema = {
   targetFormat: z.enum(TARGET_FORMATS).optional(),
   beforeScore: ScoreSchema.optional(),
   afterScore: ScoreSchema.optional(),
+  scoreDelta: z
+    .number()
+    .describe('Difference between after and before overall scores')
+    .optional(),
   improvements: z.array(z.string()).optional(),
   usedFallback: z.boolean().optional(),
   error: ErrorSchema.optional(),

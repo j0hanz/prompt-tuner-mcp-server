@@ -261,7 +261,7 @@ async function handleAnalyzePrompt(
   | ReturnType<typeof createErrorResponse>
 > {
   try {
-    const context = extra as AnalyzePromptExtra;
+    const context = (extra ?? {}) as AnalyzePromptExtra;
     logger.info(
       { sessionId: context.sessionId, promptLength: input.prompt.length },
       'analyze_prompt called'

@@ -144,13 +144,32 @@ function formatScoreSection(
   ].join('\n');
 }
 
-function formatOptimizeOutput(optimizationResult: OptimizeResponse): string {
+function buildScoreDeltaSection(scoreDelta: number): string[] {
+  if (scoreDelta === 0) {
+    return ['## Score Delta', '- Overall score unchanged'];
+  }
+
+  const direction = scoreDelta > 0 ? 'improved' : 'decreased';
+  return [
+    '## Score Delta',
+    `- Overall score ${direction} by ${Math.abs(scoreDelta)} point${
+      Math.abs(scoreDelta) === 1 ? '' : 's'
+    }`,
+  ];
+}
+
+function formatOptimizeOutput(
+  optimizationResult: OptimizeResponse,
+  scoreDelta: number
+): string {
   return [
     `# Optimization Results`,
     ``,
     formatScoreSection('Before Score', optimizationResult.beforeScore),
     ``,
     formatScoreSection('After Score', optimizationResult.afterScore),
+    ``,
+    ...buildScoreDeltaSection(scoreDelta),
     ``,
     `## Techniques Applied`,
     optimizationResult.techniquesApplied
@@ -204,13 +223,6 @@ function buildOptimizePrompt(
   )}\n\n<original_prompt>\n${prompt}\n</original_prompt>`;
 }
 
-function appendScoreImprovement(result: OptimizeResponse): void {
-  const scoreDiff = result.afterScore.overall - result.beforeScore.overall;
-  if (scoreDiff > 0) {
-    result.improvements.push(`Overall score improved by ${scoreDiff} points`);
-  }
-}
-
 function resolveOptimizeInputs(
   input: OptimizePromptInput
 ): ResolvedOptimizeInputs {
@@ -240,7 +252,8 @@ function buildOptimizeResponse(
   original: string,
   targetFormat: TargetFormat
 ): ReturnType<typeof createSuccessResponse> {
-  const output = formatOptimizeOutput(result);
+  const scoreDelta = result.afterScore.overall - result.beforeScore.overall;
+  const output = formatOptimizeOutput(result, scoreDelta);
   return createSuccessResponse(output, {
     ok: true,
     original,
@@ -251,6 +264,7 @@ function buildOptimizeResponse(
     afterScore: result.afterScore,
     improvements: result.improvements,
     usedFallback: false,
+    scoreDelta,
   });
 }
 
@@ -269,8 +283,6 @@ async function handleOptimizePrompt(
       resolved.validatedTechniques
     );
     const optimizationResult = await runOptimization(optimizePrompt);
-
-    appendScoreImprovement(optimizationResult);
     return buildOptimizeResponse(
       optimizationResult,
       resolved.validatedPrompt,

@@ -66,6 +66,14 @@ Requirements:
 Return JSON only. No markdown. No code fences. No extra text.
 </final_reminder>`;
 
+const INJECTION_KEYWORDS = [
+  'injection',
+  'prompt injection',
+  'malicious',
+  'payload',
+  'exploit',
+];
+
 // Formats a validation issue as markdown
 function formatIssue(issue: ValidationIssue): string {
   return `- ${issue.message}\n  💡 ${issue.suggestion ?? 'N/A'}`;
@@ -135,10 +143,13 @@ function formatValidationOutput(
   return sections.join('\n');
 }
 
-function hasInjectionError(parsed: ValidationResponse): boolean {
-  return parsed.issues
-    .filter((issue) => issue.type === 'error')
-    .some((issue) => issue.message.includes('injection'));
+function issueMentionsInjection(issue: ValidationIssue): boolean {
+  const text = `${issue.message} ${issue.suggestion ?? ''}`.toLowerCase();
+  return INJECTION_KEYWORDS.some((keyword) => text.includes(keyword));
+}
+
+function hasInjectionIssue(parsed: ValidationResponse): boolean {
+  return parsed.issues.some(issueMentionsInjection);
 }
 
 function resolveTargetModel(input: ValidatePromptInput): string {
@@ -163,7 +174,7 @@ function buildSecurityFlags(
   parsed: ValidationResponse,
   checkInjection: boolean
 ): string[] {
-  return checkInjection && hasInjectionError(parsed)
+  return checkInjection && hasInjectionIssue(parsed)
     ? ['injection_detected']
     : [];
 }
