@@ -7,7 +7,7 @@ import {
   ErrorCode,
 } from '../lib/errors.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
-import { validatePrompt } from '../lib/validation.js';
+import { escapePromptForXml, validatePrompt } from '../lib/validation.js';
 import {
   DetectFormatInputSchema,
   DetectFormatOutputSchema,
@@ -116,7 +116,8 @@ async function handleDetectFormat(
 > {
   try {
     const validatedPrompt = validatePrompt(input.prompt);
-    const detectionPrompt = `${FORMAT_DETECTION_PROMPT}\n\n<prompt_to_analyze>\n${validatedPrompt}\n</prompt_to_analyze>`;
+    const safePrompt = escapePromptForXml(validatedPrompt);
+    const detectionPrompt = `${FORMAT_DETECTION_PROMPT}\n\n<prompt_to_analyze>\n${safePrompt}\n</prompt_to_analyze>`;
 
     const parsed = await executeLLMWithJsonResponse<FormatDetectionResponse>(
       detectionPrompt,

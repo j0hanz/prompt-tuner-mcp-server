@@ -7,7 +7,7 @@ import {
   ErrorCode,
 } from '../lib/errors.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
-import { validatePrompt } from '../lib/validation.js';
+import { escapePromptForXml, validatePrompt } from '../lib/validation.js';
 import {
   ComparePromptsInputSchema,
   ComparePromptsOutputSchema,
@@ -257,12 +257,9 @@ async function runCompareFlow(
   const validatedA = validatePrompt(input.promptA);
   const validatedB = validatePrompt(input.promptB);
   const { labelA, labelB } = resolveLabels(input);
-  const comparePrompt = buildComparePrompt(
-    labelA,
-    labelB,
-    validatedA,
-    validatedB
-  );
+  const safeA = escapePromptForXml(validatedA);
+  const safeB = escapePromptForXml(validatedB);
+  const comparePrompt = buildComparePrompt(labelA, labelB, safeA, safeB);
   const parsed = await runComparison(comparePrompt);
   return buildCompareResponse(parsed, validatedA, validatedB, labelA, labelB);
 }

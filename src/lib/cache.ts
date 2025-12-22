@@ -6,11 +6,10 @@ import { LRUCache } from 'lru-cache';
 import { config } from '../config/env.js';
 import { debugCache } from './errors.js';
 
-const MAX_CACHE_SIZE = config.CACHE_MAX_SIZE;
+const MAX_CACHE_ENTRIES = config.CACHE_MAX_SIZE;
 const CACHE_ENTRY_TTL_MS = 15 * 60 * 1000; // 15 minutes
 const refinementCache = new LRUCache<string, string>({
-  maxSize: MAX_CACHE_SIZE,
-  sizeCalculation: (value) => Buffer.byteLength(value, 'utf8'),
+  max: MAX_CACHE_ENTRIES,
   ttl: CACHE_ENTRY_TTL_MS,
 });
 

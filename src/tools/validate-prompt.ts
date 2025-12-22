@@ -8,7 +8,7 @@ import {
   ErrorCode,
 } from '../lib/errors.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
-import { validatePrompt } from '../lib/validation.js';
+import { escapePromptForXml, validatePrompt } from '../lib/validation.js';
 import {
   ValidatePromptInputSchema,
   ValidatePromptOutputSchema,
@@ -200,8 +200,9 @@ async function handleValidatePrompt(
 
   const targetModel = resolveTargetModel(input);
   const checkInjection = resolveCheckInjection(input);
+  const safePrompt = escapePromptForXml(validatedPrompt);
   const validationPrompt = buildValidationPrompt(
-    validatedPrompt,
+    safePrompt,
     targetModel,
     checkInjection
   );

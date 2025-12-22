@@ -12,7 +12,7 @@ import {
   logger,
 } from '../lib/errors.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
-import { validatePrompt } from '../lib/validation.js';
+import { escapePromptForXml, validatePrompt } from '../lib/validation.js';
 import {
   AnalyzePromptInputSchema,
   AnalyzePromptOutputSchema,
@@ -270,7 +270,8 @@ async function handleAnalyzePrompt(
     const validatedPrompt = validatePrompt(input.prompt);
     await sendProgress(context, 'started', 0);
 
-    const analysisPrompt = buildAnalysisPrompt(validatedPrompt);
+    const safePrompt = escapePromptForXml(validatedPrompt);
+    const analysisPrompt = buildAnalysisPrompt(safePrompt);
     const analysisResult = await runAnalysis(analysisPrompt, context.signal);
     return buildAnalysisResponse(analysisResult);
   } catch (error) {

@@ -13,6 +13,7 @@ import {
 import { resolveFormat } from '../lib/prompt-analysis.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
 import {
+  escapePromptForXml,
   validateFormat,
   validatePrompt,
   validateTechniques,
@@ -261,8 +262,9 @@ async function handleOptimizePrompt(
 > {
   try {
     const resolved = resolveOptimizeInputs(input);
+    const safePrompt = escapePromptForXml(resolved.validatedPrompt);
     const optimizePrompt = buildOptimizePrompt(
-      resolved.validatedPrompt,
+      safePrompt,
       resolved.resolvedFormat,
       resolved.validatedTechniques
     );
