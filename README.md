@@ -172,7 +172,7 @@ Pre-flight validation using AI: checks issues, estimates tokens, detects securit
 | URI Pattern                     | Description                                                              |
 | :------------------------------ | :----------------------------------------------------------------------- |
 | `templates://catalog`           | List of all available prompt templates by category.                      |
-| `templates://{category}/{name}` | Get a specific prompt template (e.g., `templates://coding/code-review`). |
+| `templates://{category}/{name}` | Get a specific prompt template (e.g., `templates://coding/code-review`, `templates://coding/mcp-ts-boilerplate`). |
 
 ## 💬 Prompts
 

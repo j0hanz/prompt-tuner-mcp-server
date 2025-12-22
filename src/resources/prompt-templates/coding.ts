@@ -1,4 +1,82 @@
 export const codingTemplates = {
+  'mcp-ts-boilerplate': `# Model Context Protocol TypeScript Server Boilerplate
+
+You are a world-class TypeScript architect with deep expertise in the Model Context Protocol (MCP). Your task is to generate a robust and production-ready TypeScript boilerplate for an MCP server. This server will utilize \`@modelcontextprotocol/sdk\` and \`zod\` for type-safe tool definitions and communication.
+
+First, let's outline the key architectural and implementation details to ensure a solid foundation:
+
+1.  **Architecture:** We will leverage \`McpServer\` in conjunction with \`StdioServerTransport\` to facilitate seamless local communication between the server and its clients. This combination offers a straightforward approach for setting up the communication channel.
+2.  **Bug Prevention (CRITICAL):** When defining tools using \`server.tool()\`, you MUST define your Zod schema separately and then pass its \`.shape\` property to the tool definition. Direct instantiation of the \`z.object({...})\` within the \`server.tool\` call triggers a known SDK normalization bug that causes argument stripping. This practice is non-negotiable for maintaining correct tool functionality.
+3.  **Logging:** We'll implement a custom \`Logger\` class. This logger will exclusively write to \`process.stderr\`. It is vital to include a comment explaining that writing to \`stdout\` corrupts the underlying JSON-RPC protocol that MCP relies on.
+4.  **Error Handling:** The core server connection logic MUST be encapsulated within an asynchronous \`main\` function. This \`main\` function must include a global \`try/catch\` block to intercept any fatal, unhandled errors. Upon encountering such an error, the logger must record the error, and the process must exit with code 1. This ensures that failures are properly logged and propagated.
+5.  **Example Tool (add):** Implement a basic \`add\` tool. This tool should accept two numeric inputs (\`a\` and \`b\`) and return their sum. This serves as a clear demonstration of the correct Zod schema shape usage for avoiding the argument stripping bug.
+
+Now, consider these examples to guide your implementation:
+
+**Example 1: Simple Tool (add)**
+
+\`\`\`typescript
+import { McpServer } from '@modelcontextprotocol/sdk';
+
+import { z } from 'zod';
+
+const AddToolSchema = z.object({
+  a: z.number(),
+  b: z.number(),
+});
+
+// Assume 'server' is an instance of McpServer
+server.tool({
+  name: 'add',
+  description: 'Adds two numbers',
+  schema: AddToolSchema.shape,
+  fn: async (args: z.infer<typeof AddToolSchema>) => {
+    return args.a + args.b;
+  },
+});
+\`\`\`
+
+**Example 2: Logger Implementation**
+
+\`\`\`typescript
+class Logger {
+  log(message: string) {
+    // Important: Writing to stdout breaks the JSON-RPC protocol
+    process.stderr.write(\`\${message}\\n\`);
+  }
+
+  error(message: string) {
+    process.stderr.write(\`ERROR: \${message}\\n\`);
+  }
+}
+
+const logger = new Logger();
+\`\`\`
+
+**Example 3: Main function with error handling**
+
+\`\`\`typescript
+import { McpServer, StdioServerTransport } from '@modelcontextprotocol/sdk';
+
+async function main() {
+  const transport = new StdioServerTransport(process.stdin, process.stdout);
+  const server = new McpServer(transport);
+  const logger = new Logger();
+
+  // Tool definitions would go here
+
+  try {
+    await server.connect();
+    console.log('Server connected');
+  } catch (error: any) {
+    logger.error(\`Fatal error: \${error.message}\`);
+    process.exit(1);
+  }
+}
+
+main();
+\`\`\``,
+
   'code-review': `# Identity
 You are a senior software engineer conducting a code review.
 
