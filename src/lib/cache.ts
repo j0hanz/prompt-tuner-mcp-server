@@ -7,8 +7,11 @@ import { config } from '../config/env.js';
 import { debugCache } from './errors.js';
 
 const MAX_CACHE_SIZE = config.CACHE_MAX_SIZE;
+const CACHE_ENTRY_TTL_MS = 15 * 60 * 1000; // 15 minutes
 const refinementCache = new LRUCache<string, string>({
-  max: MAX_CACHE_SIZE,
+  maxSize: MAX_CACHE_SIZE,
+  sizeCalculation: (value) => Buffer.byteLength(value, 'utf8'),
+  ttl: CACHE_ENTRY_TTL_MS,
 });
 
 // Generates SHA-256 hash for cache key

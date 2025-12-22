@@ -22,13 +22,6 @@ function checkAborted(signal?: AbortSignal): void {
 function trimText(value: string | null | undefined): string {
   return value?.trim() ?? '';
 }
-function resolveEffectiveSignal(
-  options?: LLMRequestOptions
-): AbortSignal | undefined {
-  if (options?.signal) return options.signal;
-  if (options?.timeoutMs) return AbortSignal.timeout(options.timeoutMs);
-  return undefined;
-}
 function buildTimeoutOptions(options?: LLMRequestOptions): {
   timeout: number;
   signal?: AbortSignal;
@@ -232,11 +225,17 @@ class GoogleClient implements LLMClient {
     maxTokens: number,
     options?: LLMRequestOptions
   ): Promise<string> {
-    const effectiveSignal = resolveEffectiveSignal(options);
-    checkAborted(effectiveSignal);
+    const timeoutSignal = AbortSignal.timeout(
+      options?.timeoutMs ?? DEFAULT_TIMEOUT_MS
+    );
+    const combinedSignal = options?.signal
+      ? AbortSignal.any([options.signal, timeoutSignal])
+      : timeoutSignal;
+
+    checkAborted(combinedSignal);
     const response = await this.executeRequest(prompt, maxTokens, {
       ...options,
-      signal: effectiveSignal,
+      signal: combinedSignal,
     });
     return response.trim();
   }
@@ -271,14 +270,28 @@ class GoogleClient implements LLMClient {
       },
     });
 
-    if (options?.signal) {
+    const { signal } = options ?? {};
+
+    if (signal) {
       const abortPromise = new Promise<never>((_, reject) => {
-        options.signal?.addEventListener('abort', () => {
+        const onAbort = (): void => {
           reject(new Error('Request aborted'));
+        };
+        signal.addEventListener('abort', onAbort);
+        void generatePromise.finally(() => {
+          signal.removeEventListener('abort', onAbort);
         });
       });
-      const response = await Promise.race([generatePromise, abortPromise]);
-      return response.text ?? '';
+
+      try {
+        const response = await Promise.race([generatePromise, abortPromise]);
+        return response.text ?? '';
+      } catch (error) {
+        if (signal.aborted) {
+          void generatePromise.catch(() => {});
+        }
+        throw error;
+      }
     }
 
     const response = await generatePromise;

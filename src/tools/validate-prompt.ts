@@ -170,16 +170,22 @@ async function handleValidatePrompt(
   | ReturnType<typeof createSuccessResponse>
   | ReturnType<typeof createErrorResponse>
 > {
+  let validatedPrompt: string;
   try {
-    const validatedPrompt = validatePrompt(input.prompt);
-    const targetModel = resolveTargetModel(input);
-    const checkInjection = resolveCheckInjection(input);
-    const validationPrompt = buildValidationPrompt(
-      validatedPrompt,
-      targetModel,
-      checkInjection
-    );
+    validatedPrompt = validatePrompt(input.prompt);
+  } catch (error) {
+    return createErrorResponse(error, ErrorCode.E_INVALID_INPUT, input.prompt);
+  }
 
+  const targetModel = resolveTargetModel(input);
+  const checkInjection = resolveCheckInjection(input);
+  const validationPrompt = buildValidationPrompt(
+    validatedPrompt,
+    targetModel,
+    checkInjection
+  );
+
+  try {
     const parsed = await executeLLMWithJsonResponse<ValidationResponse>(
       validationPrompt,
       (value) => ValidationResponseSchema.parse(value),
@@ -190,7 +196,7 @@ async function handleValidatePrompt(
 
     return buildValidationResponse(parsed, targetModel, checkInjection);
   } catch (error) {
-    return createErrorResponse(error, ErrorCode.E_INVALID_INPUT, input.prompt);
+    return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
   }
 }
 
