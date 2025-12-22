@@ -118,8 +118,23 @@ function resolveErrorDetails(
   return mcpError?.details;
 }
 
+// Default recovery hints for common error codes
+const DEFAULT_RECOVERY_HINTS: Partial<Record<ErrorCodeType, string>> = {
+  E_INVALID_INPUT: 'Check the input parameters and try again.',
+  E_LLM_FAILED:
+    'Retry the request. If the issue persists, check LLM provider status.',
+  E_LLM_RATE_LIMITED:
+    'Wait a few seconds and retry. Consider reducing request frequency.',
+  E_LLM_AUTH_FAILED:
+    'Verify your API key is correct and has sufficient permissions.',
+  E_TIMEOUT:
+    'The request timed out. Try again with a shorter prompt or increase timeout.',
+};
+
 function resolveRecoveryHint(mcpError: McpError | null): string | undefined {
-  return mcpError?.recoveryHint;
+  if (mcpError?.recoveryHint) return mcpError.recoveryHint;
+  if (mcpError?.code) return DEFAULT_RECOVERY_HINTS[mcpError.code];
+  return undefined;
 }
 
 function resolveSafeContext(context?: string): string | undefined {

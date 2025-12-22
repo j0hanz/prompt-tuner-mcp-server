@@ -177,6 +177,14 @@ export const ErrorCode = {
 
 export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
 
+export const JSON_RPC_ERROR_CODES: Record<ErrorCodeType, number> = {
+  E_INVALID_INPUT: -32602, // Invalid params
+  E_LLM_FAILED: -32603, // Internal error
+  E_LLM_RATE_LIMITED: -32603, // Internal error (rate limit)
+  E_LLM_AUTH_FAILED: -32603, // Internal error (auth)
+  E_TIMEOUT: -32603, // Internal error (timeout)
+} as const;
+
 export interface OptimizeScore {
   clarity: number;
   specificity: number;
