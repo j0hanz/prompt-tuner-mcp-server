@@ -42,14 +42,17 @@ export const SCORING_CONFIG = {
   promptLengthMin: 100,
 };
 
-const WORD_BOUNDARY_RE = /\S+/g;
+const WORD_SEGMENTER = new Intl.Segmenter(undefined, { granularity: 'word' });
 const QUOTE_CHARS = ['"', "'", '`'] as const;
 const NEGATION_RE = /\b(not|no|never|don't|avoid)\b/i;
 
 // Counts words in a string
 function countWords(text: string): number {
-  const matches = text.match(WORD_BOUNDARY_RE);
-  return matches?.length ?? 0;
+  let count = 0;
+  for (const part of WORD_SEGMENTER.segment(text)) {
+    if (part.isWordLike) count++;
+  }
+  return count;
 }
 
 // Counts regex matches in a string

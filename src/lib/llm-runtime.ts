@@ -1,4 +1,5 @@
-import invariant from 'tiny-invariant';
+import assert from 'node:assert/strict';
+import { performance } from 'node:perf_hooks';
 
 import type {
   ErrorCodeType,
@@ -214,15 +215,15 @@ export async function runGeneration(
   requestFn: () => Promise<string>
 ): Promise<string> {
   return withRetry(async () => {
-    const start = process.hrtime.bigint();
+    const start = performance.now();
     try {
       const content = await requestFn();
-      invariant(
+      assert.ok(
         content,
         'LLM returned empty response (possibly blocked or filtered)'
       );
 
-      const durationMs = Number(process.hrtime.bigint() - start) / 1_000_000;
+      const durationMs = performance.now() - start;
       logger.debug(
         `LLM generation (${provider}) took ${durationMs.toFixed(2)}ms`
       );

@@ -15,9 +15,7 @@ import { runGeneration } from './llm-runtime.js';
 
 const DEFAULT_TIMEOUT_MS = 60000;
 function checkAborted(signal?: AbortSignal): void {
-  if (signal?.aborted) {
-    throw new Error('Request aborted before starting');
-  }
+  signal?.throwIfAborted();
 }
 function trimText(value: string | null | undefined): string {
   return value?.trim() ?? '';

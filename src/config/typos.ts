@@ -108,14 +108,10 @@ export function fixTyposBatch(text: string): {
 }
 
 // Export precompiled typo patterns for tests and faster per-pattern matching.
-function escapeForRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&');
-}
-
 export const TYPO_PATTERNS = TYPO_WORDS.map((typo) => ({
   typo,
   correction: TYPO_MAP.get(typo) ?? '',
-  regex: new RegExp(`\\b(${escapeForRegex(typo)})\\b`, 'gi'),
+  regex: new RegExp(`\\b(${RegExp.escape(typo)})\\b`, 'gi'),
 }));
 
 // Legacy per-pattern export removed (dead code). Use `fixTyposBatch()` instead for typo corrections.
