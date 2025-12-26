@@ -24,15 +24,8 @@ export const logger = pino(
   stderrDestination
 );
 
-// Re-export debug loggers as sub-loggers if needed, or just use logger.debug
-export const debugLLM = (msg: string, ...args: unknown[]): void => {
-  logger.debug({ module: 'llm' }, msg, ...args);
-};
 export const debugCache = (msg: string, ...args: unknown[]): void => {
   logger.debug({ module: 'cache' }, msg, ...args);
-};
-export const debugRetry = (msg: string, ...args: unknown[]): void => {
-  logger.debug({ module: 'retry' }, msg, ...args);
 };
 
 export class McpError extends Error {

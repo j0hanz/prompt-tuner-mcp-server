@@ -2,12 +2,6 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 export type ToolRegistrar = (server: McpServer) => void;
 
-export interface RefinedPrompt {
-  original: string;
-  refined: string;
-  corrections: string[];
-}
-
 export interface ErrorResponse {
   [key: string]: unknown;
   content: { type: 'text'; text: string }[];
@@ -82,11 +76,6 @@ export interface SuggestionContext {
 }
 
 export type SuggestionGenerator = (ctx: SuggestionContext) => string | null;
-
-export interface ScoreRule {
-  condition: boolean;
-  bonus: number;
-}
 
 export interface PatternCache {
   hasClaudePatterns: boolean;
@@ -176,14 +165,6 @@ export const ErrorCode = {
 } as const;
 
 export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
-
-export const JSON_RPC_ERROR_CODES: Record<ErrorCodeType, number> = {
-  E_INVALID_INPUT: -32602, // Invalid params
-  E_LLM_FAILED: -32603, // Internal error
-  E_LLM_RATE_LIMITED: -32603, // Internal error (rate limit)
-  E_LLM_AUTH_FAILED: -32603, // Internal error (auth)
-  E_TIMEOUT: -32603, // Internal error (timeout)
-} as const;
 
 export interface OptimizeScore {
   clarity: number;

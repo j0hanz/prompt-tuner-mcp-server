@@ -50,8 +50,3 @@ export function setCachedRefinement(
     refinementCache.size
   );
 }
-
-// Clears the refinement cache
-export function clearCache(): void {
-  refinementCache.clear();
-}

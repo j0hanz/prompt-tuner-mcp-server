@@ -3,7 +3,6 @@ import { config } from './env.js';
 
 export { PATTERNS } from './patterns.js';
 export { SERVER_INSTRUCTIONS } from './instructions.js';
-export { TYPO_PATTERNS } from './typos.js';
 
 export const SCORING_WEIGHTS = {
   clarity: 0.25,

@@ -114,14 +114,6 @@ export function validateFormat(format: string): TargetFormat {
   return format;
 }
 
-// Sanitizes user input to prevent prompt injection attacks
-export function sanitizePromptInput(input: string): string {
-  return input
-    .replace(/(<\/?script[^>]*>|<\/?iframe[^>]*>)/gi, '')
-    .replace(/(javascript:|data:text\/html|vbscript:)/gi, '')
-    .replace(/on\w+\s*=/gi, ''); // Remove event handlers
-}
-
 export function validateLLMOutput(
   output: string,
   maxLength = LLM_MAX_RESPONSE_LENGTH
