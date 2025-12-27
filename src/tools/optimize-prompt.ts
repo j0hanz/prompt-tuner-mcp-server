@@ -5,7 +5,11 @@ import type {
   ServerRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { LLM_TIMEOUT_MS, OPTIMIZE_MAX_TOKENS } from '../config/constants.js';
+import {
+  LLM_TIMEOUT_MS,
+  OPTIMIZE_MAX_TOKENS,
+  PATTERNS,
+} from '../config/constants.js';
 import type {
   ErrorResponse,
   OptimizationTechnique,
@@ -21,6 +25,7 @@ import {
 import { getProviderInfo } from '../lib/llm-client.js';
 import { normalizeScore } from '../lib/output-normalization.js';
 import {
+  containsOutputScaffolding,
   normalizePromptText,
   validateTechniqueOutput,
 } from '../lib/output-validation.js';
@@ -105,6 +110,31 @@ const TOOL_NAME = 'optimize_prompt' as const;
 const STRICT_OPTIMIZE_RULES =
   '\nSTRICT RULES: Return JSON only. Ensure the optimized prompt actually follows each technique listed in techniquesApplied. If structured, include the proper XML/Markdown structure; if chainOfThought, include exactly one reasoning trigger; if fewShot, include 2-3 Input/Output examples; if roleBased, include a clear "You are a/an/the ..." role statement.';
 
+type ConcreteTechnique = Exclude<OptimizationTechnique, 'comprehensive'>;
+
+function isConcreteTechnique(
+  technique: OptimizationTechnique
+): technique is ConcreteTechnique {
+  return technique !== 'comprehensive';
+}
+
+const DEEP_OPTIMIZE_RULES = `
+DEEP OPTIMIZATION RULES:
+- Apply multiple concrete techniques (not just "comprehensive").
+- Always include structured formatting aligned to the target format.
+- If the prompt lacks a clear role, add a concise role statement.
+- Include an explicit output format section.
+- Do not return the original prompt unchanged.
+- In techniquesApplied, list the specific techniques used (do not list "comprehensive").`;
+
+const COMPREHENSIVE_TECHNIQUE_ORDER: ConcreteTechnique[] = [
+  'basic',
+  'roleBased',
+  'structured',
+  'fewShot',
+  'chainOfThought',
+];
+
 function formatScoreLines(
   before: OptimizeResponse['beforeScore'],
   after: OptimizeResponse['afterScore']
@@ -157,8 +187,12 @@ interface OptimizePromptInput {
 
 interface ResolvedOptimizeInputs {
   validatedPrompt: string;
-  validatedTechniques: OptimizationTechnique[];
+  effectiveTechniques: ConcreteTechnique[];
   resolvedFormat: TargetFormat;
+  deepOptimization: boolean;
+  requireMeaningfulChange: boolean;
+  requiredTechniques: ConcreteTechnique[];
+  fallbackTechniques: ConcreteTechnique[];
 }
 
 const OPTIMIZE_PROMPT_TOOL = {
@@ -187,16 +221,129 @@ function buildOptimizePrompt(
   )}\n</original_prompt>`;
 }
 
+function safeTest(pattern: RegExp, text: string): boolean {
+  pattern.lastIndex = 0;
+  return pattern.test(text);
+}
+
+interface PromptSignals {
+  hasRole: boolean;
+  hasStructure: boolean;
+  hasConstraints: boolean;
+  hasOutputSpec: boolean;
+  hasExamples: boolean;
+  needsReasoning: boolean;
+}
+
+function detectPromptSignals(
+  prompt: string,
+  targetFormat: TargetFormat
+): PromptSignals {
+  const hasStructure =
+    safeTest(PATTERNS.xmlStructure, prompt) ||
+    safeTest(PATTERNS.markdownStructure, prompt) ||
+    safeTest(PATTERNS.jsonStructure, prompt);
+  const hasOutputSpec =
+    safeTest(PATTERNS.outputSpecPatterns, prompt) ||
+    (targetFormat === 'json' && hasStructure);
+
+  return {
+    hasRole: safeTest(PATTERNS.hasRole, prompt),
+    hasStructure,
+    hasConstraints: safeTest(PATTERNS.constraintPatterns, prompt),
+    hasOutputSpec,
+    hasExamples:
+      safeTest(PATTERNS.exampleIndicators, prompt) ||
+      safeTest(PATTERNS.fewShotStructure, prompt),
+    needsReasoning: safeTest(PATTERNS.needsReasoning, prompt),
+  };
+}
+
+function needsDeepUpgrade(signals: PromptSignals): boolean {
+  return !signals.hasStructure || !signals.hasOutputSpec;
+}
+
+function normalizeForComparison(text: string): string {
+  const { normalized } = normalizePromptText(text);
+  return normalized.replace(/\s+/g, ' ').trim();
+}
+
+function buildComprehensiveTechniques(
+  prompt: string,
+  requested: OptimizationTechnique[],
+  targetFormat: TargetFormat
+): ConcreteTechnique[] {
+  const base = requested.filter(isConcreteTechnique);
+  const signals = detectPromptSignals(prompt, targetFormat);
+  const techniques = new Set<ConcreteTechnique>(base);
+
+  techniques.add('basic');
+  techniques.add('structured');
+
+  if (!signals.hasRole) {
+    techniques.add('roleBased');
+  }
+
+  if (signals.needsReasoning) {
+    techniques.add('chainOfThought');
+  }
+
+  if (signals.hasExamples) {
+    techniques.add('fewShot');
+  }
+
+  return COMPREHENSIVE_TECHNIQUE_ORDER.filter((technique) =>
+    techniques.has(technique)
+  );
+}
+
+function buildFallbackTechniques(
+  prompt: string,
+  targetFormat: TargetFormat
+): ConcreteTechnique[] {
+  const signals = detectPromptSignals(prompt, targetFormat);
+  const techniques: ConcreteTechnique[] = ['basic', 'structured'];
+  if (!signals.hasRole) {
+    techniques.push('roleBased');
+  }
+  return techniques;
+}
+
 function resolveOptimizeInputs(
   input: OptimizePromptInput
 ): ResolvedOptimizeInputs {
   const validatedPrompt = validatePrompt(input.prompt);
   const techniques = input.techniques ?? ['basic'];
   const targetFormat = input.targetFormat ?? 'auto';
-  const validatedTechniques = validateTechniques(techniques);
+  const requestedTechniques = validateTechniques(techniques);
   const validatedFormat = validateFormat(targetFormat);
   const resolvedFormat = resolveFormat(validatedFormat, validatedPrompt);
-  return { validatedPrompt, validatedTechniques, resolvedFormat };
+  const deepOptimization = requestedTechniques.includes('comprehensive');
+  const effectiveTechniques = deepOptimization
+    ? buildComprehensiveTechniques(
+        validatedPrompt,
+        requestedTechniques,
+        resolvedFormat
+      )
+    : requestedTechniques.filter(isConcreteTechnique);
+  const signals = detectPromptSignals(validatedPrompt, resolvedFormat);
+  const requireMeaningfulChange = deepOptimization && needsDeepUpgrade(signals);
+  const requiredTechniques: ConcreteTechnique[] = deepOptimization
+    ? ['structured']
+    : [];
+  const fallbackTechniques = deepOptimization
+    ? buildFallbackTechniques(validatedPrompt, resolvedFormat)
+    : (['basic'] as ConcreteTechnique[]);
+
+  return {
+    validatedPrompt,
+    effectiveTechniques,
+    resolvedFormat,
+    deepOptimization,
+    requireMeaningfulChange,
+    requiredTechniques,
+    fallbackTechniques,
+  };
 }
 
 async function runOptimization(
@@ -225,16 +372,38 @@ function normalizeTechniques(
   return Array.from(new Set(techniques));
 }
 
+interface OptimizeValidationConfig {
+  allowedTechniques: ConcreteTechnique[];
+  requiredTechniques: ConcreteTechnique[];
+  minAppliedTechniques: number;
+  targetFormat: TargetFormat;
+  originalPrompt: string;
+  requireMeaningfulChange: boolean;
+  deepOptimization: boolean;
+}
+
 function validateOptimizeResult(
   result: OptimizeResponse,
-  requested: OptimizationTechnique[],
-  targetFormat: TargetFormat
+  config: OptimizeValidationConfig
 ): { ok: boolean; result: OptimizeResponse; reason?: string } {
   const { normalized } = normalizePromptText(result.optimized);
   const techniquesApplied = normalizeTechniques(result.techniquesApplied);
-  const requestedSet = new Set(requested);
+  const allowedSet = new Set(config.allowedTechniques);
+  const appliedTechniques = techniquesApplied.filter(isConcreteTechnique);
 
-  if (techniquesApplied.some((technique) => !requestedSet.has(technique))) {
+  if (containsOutputScaffolding(normalized)) {
+    return {
+      ok: false,
+      result: { ...result, optimized: normalized, techniquesApplied },
+      reason: 'Output contains optimization scaffolding',
+    };
+  }
+
+  if (
+    techniquesApplied.some(
+      (technique) => technique !== 'comprehensive' && !allowedSet.has(technique)
+    )
+  ) {
     return {
       ok: false,
       result: { ...result, optimized: normalized, techniquesApplied },
@@ -242,7 +411,7 @@ function validateOptimizeResult(
     };
   }
 
-  if (!techniquesApplied.length) {
+  if (!appliedTechniques.length) {
     return {
       ok: false,
       result: { ...result, optimized: normalized, techniquesApplied },
@@ -250,17 +419,68 @@ function validateOptimizeResult(
     };
   }
 
-  for (const technique of techniquesApplied) {
+  if (appliedTechniques.length < config.minAppliedTechniques) {
+    return {
+      ok: false,
+      result: { ...result, optimized: normalized, techniquesApplied },
+      reason: 'Insufficient techniques applied',
+    };
+  }
+
+  for (const required of config.requiredTechniques) {
+    if (!appliedTechniques.includes(required)) {
+      return {
+        ok: false,
+        result: { ...result, optimized: normalized, techniquesApplied },
+        reason: `Required technique missing: ${required}`,
+      };
+    }
+  }
+
+  for (const technique of appliedTechniques) {
     const validation = validateTechniqueOutput(
       normalized,
       technique,
-      targetFormat
+      config.targetFormat
     );
     if (!validation.ok) {
       return {
         ok: false,
         result: { ...result, optimized: normalized, techniquesApplied },
         reason: validation.reason,
+      };
+    }
+  }
+
+  if (config.requireMeaningfulChange) {
+    const normalizedOriginal = normalizeForComparison(config.originalPrompt);
+    const normalizedOptimized = normalizeForComparison(normalized);
+    if (normalizedOriginal === normalizedOptimized) {
+      return {
+        ok: false,
+        result: { ...result, optimized: normalized, techniquesApplied },
+        reason: 'Optimized prompt unchanged',
+      };
+    }
+  }
+
+  if (config.deepOptimization) {
+    const originalSignals = detectPromptSignals(
+      config.originalPrompt,
+      config.targetFormat
+    );
+    const optimizedSignals = detectPromptSignals(
+      normalized,
+      config.targetFormat
+    );
+    if (
+      needsDeepUpgrade(originalSignals) &&
+      (!optimizedSignals.hasStructure || !optimizedSignals.hasOutputSpec)
+    ) {
+      return {
+        ok: false,
+        result: { ...result, optimized: normalized, techniquesApplied },
+        reason: 'Missing required deep-optimization structure or output format',
       };
     }
   }
@@ -314,27 +534,46 @@ async function handleOptimizePrompt(
 
   try {
     const resolved = resolveOptimizeInputs(input);
+    const baseRules = resolved.deepOptimization
+      ? DEEP_OPTIMIZE_RULES
+      : undefined;
     const optimizePrompt = buildOptimizePrompt(
       resolved.validatedPrompt,
       resolved.resolvedFormat,
-      resolved.validatedTechniques
+      resolved.effectiveTechniques,
+      baseRules
     );
     let { result: optimizationResult, usedFallback } = await runOptimization(
       optimizePrompt,
       context.request.signal
     );
+    const buildValidationConfig = (
+      techniques: ConcreteTechnique[]
+    ): OptimizeValidationConfig => ({
+      allowedTechniques: techniques,
+      requiredTechniques: resolved.requiredTechniques.filter((technique) =>
+        techniques.includes(technique)
+      ),
+      minAppliedTechniques: resolved.deepOptimization
+        ? Math.min(2, techniques.length)
+        : 1,
+      targetFormat: resolved.resolvedFormat,
+      originalPrompt: resolved.validatedPrompt,
+      requireMeaningfulChange: resolved.requireMeaningfulChange,
+      deepOptimization: resolved.deepOptimization,
+    });
+
     let validation = validateOptimizeResult(
       optimizationResult,
-      resolved.validatedTechniques,
-      resolved.resolvedFormat
+      buildValidationConfig(resolved.effectiveTechniques)
     );
 
     if (!validation.ok) {
       const retryPrompt = buildOptimizePrompt(
         resolved.validatedPrompt,
         resolved.resolvedFormat,
-        resolved.validatedTechniques,
-        STRICT_OPTIMIZE_RULES
+        resolved.effectiveTechniques,
+        `${baseRules ?? ''}${STRICT_OPTIMIZE_RULES}`
       );
       const retryResult = await runOptimization(
         retryPrompt,
@@ -344,8 +583,7 @@ async function handleOptimizePrompt(
       optimizationResult = retryResult.result;
       validation = validateOptimizeResult(
         optimizationResult,
-        resolved.validatedTechniques,
-        resolved.resolvedFormat
+        buildValidationConfig(resolved.effectiveTechniques)
       );
     }
 
@@ -353,8 +591,8 @@ async function handleOptimizePrompt(
       const fallbackPrompt = buildOptimizePrompt(
         resolved.validatedPrompt,
         resolved.resolvedFormat,
-        ['basic'],
-        STRICT_OPTIMIZE_RULES
+        resolved.fallbackTechniques,
+        `${baseRules ?? ''}${STRICT_OPTIMIZE_RULES}`
       );
       const fallbackResult = await runOptimization(
         fallbackPrompt,
@@ -364,8 +602,7 @@ async function handleOptimizePrompt(
       optimizationResult = fallbackResult.result;
       validation = validateOptimizeResult(
         optimizationResult,
-        ['basic'],
-        resolved.resolvedFormat
+        buildValidationConfig(resolved.fallbackTechniques)
       );
     }
 
