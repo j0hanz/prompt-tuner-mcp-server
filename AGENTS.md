@@ -2,38 +2,38 @@
 
 ## Project Structure & Module Organization
 
-- `src/` contains TypeScript source. Key entry points: `src/index.ts` and `src/server.ts`. Feature areas include `src/tools/`, `src/resources/`, `src/prompts/`, `src/schemas/`, `src/config/`, and `src/lib/`.
-- `tests/` holds Vitest suites (for example, `tests/integration.test.ts`).
-- `docs/` contains documentation and assets such as `docs/logo.png`.
-- `dist/` is generated build output; do not edit directly.
+- `src/` holds TypeScript source. `src/index.ts` is the entry point and `src/server.ts` wires the MCP server. Subfolders include `config/`, `lib/`, `tools/`, `resources/`, `prompts/`, `schemas/`, and `types/`.
+- `tests/` contains Vitest suites; test files use the `*.test.ts` naming pattern.
+- `dist/` is generated build output (do not edit by hand).
+- `docs/` stores static assets. `CONFIGURATION.md` documents runtime environment variables.
 
 ## Build, Test, and Development Commands
 
-- `npm run build`: compile TypeScript to `dist/` and mark `dist/index.js` executable.
-- `npm run dev` / `npm run dev:http`: run the server from `src/` in watch mode (stdio or HTTP).
+- `npm run dev` / `npm run dev:http`: run from source with tsx watch (HTTP variant adds `--http`).
+- `npm run build`: compile TypeScript into `dist/` and set executable permissions.
 - `npm run start` / `npm run start:http`: run the compiled server from `dist/`.
-- `npm run test`: run Vitest once; `npm run test:watch` for watch mode.
-- `npm run lint`: ESLint checks; `npm run format`: Prettier formatting; `npm run type-check`: TypeScript without emit.
-- `npm run inspector`: launch the MCP inspector against `dist/`.
+- `npm run test` / `npm run test:watch`: run Vitest once or in watch mode.
+- `npm run lint` and `npm run format`: ESLint checks and Prettier formatting.
+- `npm run type-check`: `tsc --noEmit` for strict type validation.
 
 ## Coding Style & Naming Conventions
 
-- Formatting is enforced by Prettier: 2-space indentation, single quotes, semicolons, 80-char print width.
-- ESLint with typescript-eslint is strict: no unused imports, no `any`, prefer type-only imports, explicit return types.
-- Naming: camelCase for variables/functions, PascalCase for types/classes, UPPER_CASE for constants. Leading underscores are allowed for intentionally unused args.
+- TypeScript, ES modules, Node >= 20.
+- Prettier rules: 2-space indentation, single quotes, trailing commas, 80-char line width, sorted imports.
+- ESLint is strict; avoid `any`, unused imports, and floating promises; prefer `type` imports.
+- Naming: `camelCase` for variables/functions, `PascalCase` for types, `UPPER_CASE` for constants; leading `_` is allowed for unused args.
 
 ## Testing Guidelines
 
-- Tests use Vitest and live in `tests/` using `*.test.ts` filenames.
-- Integration tests require an API key (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GOOGLE_API_KEY`) and a built `dist/` (`npm run build`). If no key is set, integration tests are skipped.
-- Keep unit tests fast; add integration coverage for new tools/resources when behavior depends on the running server.
+- Use Vitest in the Node environment; keep tests in `tests/` and name `*.test.ts`.
+- Favor deterministic tests and keep individual tests under the 15s timeout.
 
 ## Commit & Pull Request Guidelines
 
-- Commit subjects in this repo are short, descriptive, imperative sentences (for example, "Refactor cache configuration..."). Version bumps may be bare tags like `1.0.4`.
-- Before opening a PR, run `npm run lint`, `npm run type-check`, and `npm run test`.
-- PRs should describe the change, include test commands run, and update `README.md` or `CONFIGURATION.md` when behavior or env vars change.
+- History favors short, imperative summaries; common pattern is `refactor: ...`, plus plain `Add ...` and version bumps like `1.0.5`.
+- PRs should include a brief summary, tests run (for example, `npm run test`), and note any config or environment changes. Link related issues when applicable.
 
-## Security & Configuration
+## Security & Configuration Tips
 
-- Runtime configuration is via environment variables documented in `CONFIGURATION.md`. Never commit API keys; prefer MCP client config or a local `.env` file.
+- Runtime behavior is driven by environment variables; see `CONFIGURATION.md` for required keys and limits.
+- Never commit API keys. Be cautious with `INCLUDE_ERROR_CONTEXT=true` in production.
