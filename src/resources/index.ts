@@ -1,7 +1,3 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-
-import { registerPromptTemplateResources } from './prompt-templates.js';
-
-export function registerAllResources(server: McpServer): void {
-  registerPromptTemplateResources(server);
+export function registerAllResources(): void {
+  // Lean mode: no MCP resources registered.
 }

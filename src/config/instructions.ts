@@ -1,6 +1,6 @@
 export const SERVER_INSTRUCTIONS = `# PromptTuner MCP
 
-A prompt engineering toolkit for refining, analyzing, and validating prompts using modern best practices.
+A lean prompt optimization toolkit for refining, analyzing, and validating prompts.
 
 ## Quick Start
 
@@ -9,9 +9,7 @@ A prompt engineering toolkit for refining, analyzing, and validating prompts usi
 | Quick fix | \`refine_prompt\` | Fix typos and clarity issues |
 | Deep optimization | \`optimize_prompt\` | Apply multiple techniques |
 | Quality check | \`analyze_prompt\` | Get scores and suggestions |
-| Format detection | \`detect_format\` | Check Claude/GPT/JSON format |
 | Safety check | \`validate_prompt\` | Find issues and estimate tokens |
-| A/B comparison | \`compare_prompts\` | Compare two prompt versions |
 
 ## Tools
 
@@ -42,14 +40,8 @@ Chains multiple techniques for maximum improvement and returns before/after scor
 { "prompt": "write code", "techniques": ["basic", "roleBased", "structured"] }
 \`\`\`
 
-### detect_format
-Identifies the target format (Claude XML, GPT Markdown, or JSON) with confidence and recommendation.
-
 ### validate_prompt
 Checks for prompt issues, estimates token usage, and optionally detects injection risks.
-
-### compare_prompts
-Compares two prompt versions with scores, winner, and recommendations.
 
 ## Target Formats
 
@@ -58,7 +50,7 @@ Compares two prompt versions with scores, winner, and recommendations.
 | \`claude\` | Anthropic Claude | XML tags: \`<context>\`, \`<task>\`, \`<requirements>\` |
 | \`gpt\` | OpenAI GPT | Markdown: \`## Context\`, \`## Task\`, \`**bold**\` |
 | \`json\` | Structured output | JSON schema specification |
-| \`auto\` | Auto-detect | Analyzes prompt to determine best format |
+| \`auto\` | Auto-detect | Uses prompt heuristics to pick format |
 
 ## Technique Selection Guide
 
@@ -71,20 +63,10 @@ Compares two prompt versions with scores, winner, and recommendations.
 | Creative writing | \`roleBased\` + \`fewShot\` |
 | Maximum quality | \`comprehensive\` |
 
-## Resources
-- \`templates://catalog\` - Browse all template categories
-- \`templates://{category}/{name}\` - Get specific templates
-
-**Categories:** coding, writing, analysis, system-prompts, data-extraction
-
 ## Workflow Prompts
 - \`quick-optimize\` - Single-step refinement
 - \`deep-optimize\` - Comprehensive optimization
-- \`analyze\` - Quality analysis + format detection
-- \`review\` - Best-practices review
-- \`iterative-refine\` - Iterative improvement cycle
-- \`recommend-techniques\` - Technique recommendations
-- \`scan-antipatterns\` - Anti-pattern audit
+- \`analyze\` - Quality analysis
 
 ## Modern Best Practices (2024-2025)
 

@@ -15,17 +15,13 @@ An MCP server that helps you write better prompts for AI assistants. It analyzes
 | 🔧 **Refine Prompts**  | Fix grammar, improve clarity, and apply optimization techniques like Chain-of-Thought.     |
 | 📊 **Analyze Quality** | Score prompts (0-100) on clarity, specificity, completeness, structure, and effectiveness. |
 | 🚀 **Optimize**        | Apply multiple techniques sequentially for comprehensive improvement.                      |
-| 🔍 **Detect Format**   | Identify if a prompt targets Claude XML, GPT Markdown, or JSON.                            |
-| ⚖️ **Compare**         | A/B test two prompt versions with side-by-side scoring and diffs.                          |
 | ✅ **Validate**        | Pre-flight checks for anti-patterns, token limits, and security risks.                     |
-| 📚 **Templates**       | Access a library of best-practice prompt templates for coding, writing, and analysis.      |
 
 ## 🎯 When to Use
 
 - **Before sending a prompt**: Use `refine_prompt` to fix typos and vague language.
 - **When results are poor**: Use `analyze_prompt` to understand why the AI is struggling.
 - **For complex tasks**: Use `optimize_prompt` with "comprehensive" techniques.
-- **For A/B testing**: Use `compare_prompts` to choose the best version.
 - **For security**: Use `validate_prompt` to check for injection risks.
 
 ## 🚀 Quick Start
@@ -132,29 +128,6 @@ Apply multiple optimization techniques using AI (e.g., `["basic", "roleBased", "
 
 **Returns:** Optimized prompt, before/after scores, and list of improvements.
 
-### `detect_format`
-
-Identify if prompt targets Claude XML, GPT Markdown, or JSON schema using AI analysis. Returns confidence score and recommendations.
-
-| Parameter | Type   | Required | Default | Description             |
-| :-------- | :----- | :------- | :------ | :---------------------- |
-| `prompt`  | string | ✅       | -       | Prompt text to analyze. |
-
-**Returns:** Detected format (`claude`, `gpt`, `json`, `auto`), confidence score, and recommendation.
-
-### `compare_prompts`
-
-Compare two prompt versions using AI analysis. Returns scores, winner, improvements/regressions, and recommendations.
-
-| Parameter | Type   | Required | Default      | Description               |
-| :-------- | :----- | :------- | :----------- | :------------------------ |
-| `promptA` | string | ✅       | -            | First prompt to compare.  |
-| `promptB` | string | ✅       | -            | Second prompt to compare. |
-| `labelA`  | string | ❌       | `"Prompt A"` | Label for first prompt.   |
-| `labelB`  | string | ❌       | `"Prompt B"` | Label for second prompt.  |
-
-**Returns:** Comparison report with scores, winner, and detailed analysis.
-
 ### `validate_prompt`
 
 Pre-flight validation using AI: checks issues, estimates tokens, detects security risks. Returns isValid boolean and categorized issues.
@@ -167,24 +140,13 @@ Pre-flight validation using AI: checks issues, estimates tokens, detects securit
 
 **Returns:** Validation status, token estimate, and list of issues (errors, warnings, info).
 
-## 📚 Resources
-
-| URI Pattern                     | Description                                                                                                       |
-| :------------------------------ | :---------------------------------------------------------------------------------------------------------------- |
-| `templates://catalog`           | List of all available prompt templates by category.                                                               |
-| `templates://{category}/{name}` | Get a specific prompt template (e.g., `templates://coding/code-review`, `templates://coding/mcp-ts-boilerplate`). |
-
 ## 💬 Prompts
 
-| Name                   | Description                                                           |
-| :--------------------- | :-------------------------------------------------------------------- |
-| `quick-optimize`       | Fast prompt improvement with grammar and clarity fixes.               |
-| `deep-optimize`        | Comprehensive optimization with all techniques applied.               |
-| `analyze`              | Score prompt quality and get improvement suggestions.                 |
-| `review`               | Check prompt against prompting best practices.                        |
-| `iterative-refine`     | Identify top 3 weaknesses and fix them iteratively.                   |
-| `recommend-techniques` | Recommend best optimization techniques based on prompt and task type. |
-| `scan-antipatterns`    | Detect common prompt anti-patterns and provide corrections.           |
+| Name             | Description                                             |
+| :--------------- | :------------------------------------------------------ |
+| `quick-optimize` | Fast prompt improvement with grammar and clarity fixes. |
+| `deep-optimize`  | Comprehensive optimization with all techniques applied. |
+| `analyze`        | Score prompt quality and get improvement suggestions.   |
 
 ## 🔌 Client Configuration
 

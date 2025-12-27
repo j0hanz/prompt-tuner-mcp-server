@@ -56,25 +56,6 @@ export const OptimizePromptInputSchema = z.object({
     .describe('auto | claude | gpt | json'),
 });
 
-export const DetectFormatInputSchema = z.object({
-  prompt: promptSchema,
-});
-
-export const ComparePromptsInputSchema = z.object({
-  promptA: promptSchema.describe('First prompt to compare'),
-  promptB: promptSchema.describe('Second prompt to compare'),
-  labelA: z
-    .string()
-    .optional()
-    .default('Prompt A')
-    .describe('Label for first prompt'),
-  labelB: z
-    .string()
-    .optional()
-    .default('Prompt B')
-    .describe('Label for second prompt'),
-});
-
 export const ValidatePromptInputSchema = z.object({
   prompt: promptSchema.describe('Prompt to validate'),
   targetModel: z

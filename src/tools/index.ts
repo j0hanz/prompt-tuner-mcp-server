@@ -2,8 +2,6 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import type { ToolRegistrar } from '../config/types.js';
 import { registerAnalyzePromptTool } from './analyze-prompt.js';
-import { registerComparePromptsTool } from './compare-prompts.js';
-import { registerDetectFormatTool } from './detect-format.js';
 import { registerOptimizePromptTool } from './optimize-prompt.js';
 import { registerRefinePromptTool } from './refine-prompt.js';
 import { registerValidatePromptTool } from './validate-prompt.js';
@@ -13,8 +11,6 @@ const TOOL_REGISTRARS: readonly ToolRegistrar[] = [
   registerRefinePromptTool,
   registerAnalyzePromptTool,
   registerOptimizePromptTool,
-  registerDetectFormatTool,
-  registerComparePromptsTool,
   registerValidatePromptTool,
 ] as const;
 

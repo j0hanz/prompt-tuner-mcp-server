@@ -6,8 +6,6 @@ import { OPTIMIZATION_TECHNIQUES } from '../config/types.js';
 export type {
   AnalysisCharacteristics,
   AnalysisResponse,
-  ComparisonResponse,
-  FormatDetectionResponse,
   OptimizeResponse,
   OptimizeScore,
   ValidationIssue,
@@ -60,16 +58,6 @@ export const AnalysisResponseSchema = z.object({
   suggestions: z.array(z.string()).describe('Improvement suggestions'),
 });
 
-// Schema for comparison response
-export const ComparisonResponseSchema = z.object({
-  winner: z.enum(['A', 'B', 'tie']),
-  scoreA: OptimizeScoreSchema,
-  scoreB: OptimizeScoreSchema,
-  improvements: z.array(z.string()),
-  regressions: z.array(z.string()),
-  recommendation: z.string(),
-});
-
 // Schema for validation issue
 export const ValidationIssueSchema = z.object({
   type: z.enum(['error', 'warning', 'info']),
@@ -82,11 +70,4 @@ export const ValidationResponseSchema = z.object({
   isValid: z.boolean(),
   tokenEstimate: z.number().int().min(0),
   issues: z.array(ValidationIssueSchema),
-});
-
-// Schema for format detection response
-export const FormatDetectionResponseSchema = z.object({
-  detectedFormat: z.enum(['claude', 'gpt', 'json', 'auto']),
-  confidence: z.number().int().min(0).max(100),
-  recommendation: z.string(),
 });

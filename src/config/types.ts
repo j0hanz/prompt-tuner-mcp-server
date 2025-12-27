@@ -202,15 +202,6 @@ export interface AnalysisResponse {
   suggestions: string[];
 }
 
-export interface ComparisonResponse {
-  winner: 'A' | 'B' | 'tie';
-  scoreA: OptimizeScore;
-  scoreB: OptimizeScore;
-  improvements: string[];
-  regressions: string[];
-  recommendation: string;
-}
-
 export interface ValidationIssue {
   type: 'error' | 'warning' | 'info';
   message: string;
@@ -221,10 +212,4 @@ export interface ValidationResponse {
   isValid: boolean;
   tokenEstimate: number;
   issues: ValidationIssue[];
-}
-
-export interface FormatDetectionResponse {
-  detectedFormat: 'claude' | 'gpt' | 'json' | 'auto';
-  confidence: number;
-  recommendation: string;
 }

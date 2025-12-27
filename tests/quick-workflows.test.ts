@@ -27,39 +27,6 @@ describe('registerQuickWorkflowPrompts', () => {
     registerQuickWorkflowPrompts(server);
 
     const names = registered.map((entry) => entry.name);
-    expect(names).toEqual([
-      'quick-optimize',
-      'deep-optimize',
-      'analyze',
-      'review',
-      'iterative-refine',
-      'recommend-techniques',
-      'scan-antipatterns',
-    ]);
-  });
-
-  it('builds messages with task type context', () => {
-    const registered: RegisteredPrompt[] = [];
-    const server = {
-      registerPrompt: (
-        name: string,
-        _definition: unknown,
-        handler: RegisteredPrompt['handler']
-      ) => {
-        registered.push({ name, handler });
-      },
-    } as unknown as McpServer;
-
-    registerQuickWorkflowPrompts(server);
-
-    const recommend = registered.find(
-      (entry) => entry.name === 'recommend-techniques'
-    );
-    expect(recommend).toBeDefined();
-    const result = recommend?.handler({
-      prompt: 'Test prompt',
-      taskType: 'analysis',
-    });
-    expect(result?.messages[0]?.content.text).toContain('Task Type: analysis');
+    expect(names).toEqual(['quick-optimize', 'deep-optimize', 'analyze']);
   });
 });

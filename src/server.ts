@@ -13,7 +13,6 @@ import { config } from './config/env.js';
 import { ErrorCode, logger, McpError } from './lib/errors.js';
 import { getLLMClient } from './lib/llm-client.js';
 import { registerAllPrompts } from './prompts/index.js';
-import { registerAllResources } from './resources/index.js';
 import { registerAllTools } from './tools/index.js';
 
 const PROVIDER_ENV_KEYS = {
@@ -92,14 +91,12 @@ export function createServer(): McpServer {
       capabilities: {
         logging: {},
         tools: { listChanged: true },
-        resources: { subscribe: false, listChanged: true },
         prompts: { listChanged: true },
       },
     }
   );
 
   registerAllTools(server);
-  registerAllResources(server);
   registerAllPrompts(server);
 
   return server;

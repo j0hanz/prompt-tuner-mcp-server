@@ -38,29 +38,6 @@ const ScoreSchema = z
   })
   .describe('Score breakdown');
 
-const ScoreDeltaSchema = z
-  .object({
-    clarity: z.number().min(-100).max(100).describe('Delta clarity score'),
-    specificity: z
-      .number()
-      .min(-100)
-      .max(100)
-      .describe('Delta specificity score'),
-    completeness: z
-      .number()
-      .min(-100)
-      .max(100)
-      .describe('Delta completeness score'),
-    structure: z.number().min(-100).max(100).describe('Delta structure score'),
-    effectiveness: z
-      .number()
-      .min(-100)
-      .max(100)
-      .describe('Delta effectiveness score'),
-    overall: z.number().min(-100).max(100).describe('Delta overall score'),
-  })
-  .describe('Score deltas (B minus A)');
-
 const CharacteristicsSchema = z
   .object({
     detectedFormat: z.enum(TARGET_FORMATS).describe('Detected prompt format'),
@@ -153,49 +130,6 @@ export const OptimizePromptOutputSchema = z
     error: ErrorSchema.optional().describe('Error details when ok=false'),
   })
   .describe('Optimize prompt response');
-
-export const DetectFormatOutputSchema = z
-  .object({
-    ok: z.boolean().describe('True if detection succeeded'),
-    detectedFormat: z
-      .enum(TARGET_FORMATS)
-      .optional()
-      .describe('Detected format'),
-    confidence: z
-      .number()
-      .min(0)
-      .max(100)
-      .optional()
-      .describe('Confidence score'),
-    characteristics: CharacteristicsSchema.optional().describe(
-      'Detected characteristics'
-    ),
-    recommendation: z.string().optional().describe('Format recommendation'),
-    error: ErrorSchema.optional().describe('Error details when ok=false'),
-  })
-  .describe('Detect format response');
-
-export const ComparePromptsOutputSchema = z
-  .object({
-    ok: z.boolean().describe('True if comparison succeeded'),
-    promptA: z.string().optional().describe('Prompt A text'),
-    promptB: z.string().optional().describe('Prompt B text'),
-    scoreA: ScoreSchema.optional().describe('Scores for prompt A'),
-    scoreB: ScoreSchema.optional().describe('Scores for prompt B'),
-    scoreDelta: ScoreDeltaSchema.optional().describe('B minus A deltas'),
-    winner: z.enum(['A', 'B', 'tie']).optional().describe('Winner label'),
-    improvements: z
-      .array(z.string())
-      .optional()
-      .describe('Improvements in prompt B'),
-    regressions: z
-      .array(z.string())
-      .optional()
-      .describe('Regressions in prompt B'),
-    recommendation: z.string().optional().describe('Overall recommendation'),
-    error: ErrorSchema.optional().describe('Error details when ok=false'),
-  })
-  .describe('Compare prompts response');
 
 export const ValidatePromptOutputSchema = z
   .object({
