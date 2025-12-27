@@ -23,7 +23,11 @@ import {
 import { getProviderInfo } from '../lib/llm-client.js';
 import { wrapPromptData } from '../lib/prompt-policy.js';
 import { getToolContext } from '../lib/tool-context.js';
-import { asBulletList, buildOutput } from '../lib/tool-formatters.js';
+import {
+  asBulletList,
+  buildOutput,
+  formatProviderLine,
+} from '../lib/tool-formatters.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
 import { validatePrompt } from '../lib/validation.js';
 import {
@@ -33,7 +37,7 @@ import {
 import { ValidationResponseSchema } from '../schemas/llm-responses.js';
 import { VALIDATION_SYSTEM_PROMPT } from './validate-prompt/prompt.js';
 
-const INJECTION_KEYWORDS = [
+const INJECTION_TERMS = [
   'injection',
   'prompt injection',
   'malicious',
@@ -41,12 +45,17 @@ const INJECTION_KEYWORDS = [
   'exploit',
 ];
 
-const MODEL_LIMITS: Record<'claude' | 'gpt' | 'gemini' | 'generic', number> = {
+const TOKEN_LIMITS_BY_MODEL = {
   claude: 200000,
   gpt: 128000,
   gemini: 1000000,
   generic: 8000,
-};
+} as const;
+
+type ValidationModel = keyof typeof TOKEN_LIMITS_BY_MODEL;
+const DEFAULT_VALIDATION_MODEL: ValidationModel = 'generic';
+
+const TOOL_NAME = 'validate_prompt' as const;
 
 interface ValidatePromptInput {
   prompt: string;
@@ -77,13 +86,20 @@ function formatIssueLine(issue: ValidationIssue): string {
   return `${issue.message} | Suggestion: ${issue.suggestion}`;
 }
 
-function resolveTokenLimit(targetModel: string): number {
-  return MODEL_LIMITS[targetModel as keyof typeof MODEL_LIMITS];
+function normalizeTargetModel(model?: string): ValidationModel {
+  const normalized = model?.toLowerCase() ?? DEFAULT_VALIDATION_MODEL;
+  return normalized in TOKEN_LIMITS_BY_MODEL
+    ? (normalized as ValidationModel)
+    : DEFAULT_VALIDATION_MODEL;
+}
+
+function resolveModelTokenLimit(targetModel: ValidationModel): number {
+  return TOKEN_LIMITS_BY_MODEL[targetModel];
 }
 
 function buildSummaryLines(
   parsed: ValidationResponse,
-  targetModel: string,
+  targetModel: ValidationModel,
   tokenLimit: number
 ): string[] {
   const overLimit = parsed.tokenEstimate > tokenLimit;
@@ -118,7 +134,7 @@ function buildIssueSections(parsed: ValidationResponse): OutputSection[] {
 
 function formatValidationOutput(
   parsed: ValidationResponse,
-  targetModel: string,
+  targetModel: ValidationModel,
   tokenLimit: number,
   provider: { provider: string; model: string }
 ): string {
@@ -132,7 +148,7 @@ function formatValidationOutput(
 
   return buildOutput(
     'Prompt Validation',
-    [`Provider: ${provider.provider} (${provider.model})`],
+    [formatProviderLine(provider)],
     sections,
     [parsed.isValid ? 'Prompt is ready to use.' : 'Fix errors before use.']
   );
@@ -140,15 +156,15 @@ function formatValidationOutput(
 
 function issueMentionsInjection(issue: ValidationIssue): boolean {
   const text = `${issue.message} ${issue.suggestion ?? ''}`.toLowerCase();
-  return INJECTION_KEYWORDS.some((keyword) => text.includes(keyword));
+  return INJECTION_TERMS.some((keyword) => text.includes(keyword));
 }
 
 function hasInjectionIssue(parsed: ValidationResponse): boolean {
   return parsed.issues.some(issueMentionsInjection);
 }
 
-function resolveTargetModel(input: ValidatePromptInput): string {
-  return input.targetModel ?? 'generic';
+function resolveValidationModel(input: ValidatePromptInput): ValidationModel {
+  return normalizeTargetModel(input.targetModel);
 }
 
 function resolveCheckInjection(input: ValidatePromptInput): boolean {
@@ -159,11 +175,11 @@ function resolveValidationInputs(
   input: ValidatePromptInput,
   validatedPrompt: string
 ): {
-  targetModel: string;
+  targetModel: ValidationModel;
   checkInjection: boolean;
   validationPrompt: string;
 } {
-  const targetModel = resolveTargetModel(input);
+  const targetModel = resolveValidationModel(input);
   const checkInjection = resolveCheckInjection(input);
   const validationPrompt = buildValidationPrompt(
     validatedPrompt,
@@ -185,7 +201,7 @@ function resolveValidatedPrompt(
 
 function buildValidationPrompt(
   validatedPrompt: string,
-  targetModel: string,
+  targetModel: ValidationModel,
   checkInjection: boolean
 ): string {
   return `${VALIDATION_SYSTEM_PROMPT}\n\nTarget Model: ${targetModel}\nCheck Injection: ${String(
@@ -203,7 +219,7 @@ async function requestValidation(
     validationPrompt,
     (value) => ValidationResponseSchema.parse(value),
     ErrorCode.E_LLM_FAILED,
-    'validate_prompt',
+    TOOL_NAME,
     {
       maxTokens: VALIDATE_MAX_TOKENS,
       timeoutMs: VALIDATE_TIMEOUT_MS,
@@ -223,7 +239,7 @@ function buildSecurityFlags(
 
 function buildValidationResponse(
   parsed: ValidationResponse,
-  targetModel: string,
+  targetModel: ValidationModel,
   checkInjection: boolean,
   tokenLimit: number,
   provider: { provider: string; model: string }
@@ -272,7 +288,7 @@ async function handleValidatePrompt(
       validationPrompt,
       context.request.signal
     );
-    const tokenLimit = resolveTokenLimit(targetModel);
+    const tokenLimit = resolveModelTokenLimit(targetModel);
     const provider = await getProviderInfo();
     return buildValidationResponse(
       parsed,
@@ -288,9 +304,5 @@ async function handleValidatePrompt(
 
 // Registers the validate_prompt tool with the MCP server
 export function registerValidatePromptTool(server: McpServer): void {
-  server.registerTool(
-    'validate_prompt',
-    VALIDATE_PROMPT_TOOL,
-    handleValidatePrompt
-  );
+  server.registerTool(TOOL_NAME, VALIDATE_PROMPT_TOOL, handleValidatePrompt);
 }

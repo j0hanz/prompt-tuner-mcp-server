@@ -26,6 +26,7 @@ import {
   asBulletList,
   asNumberedList,
   buildOutput,
+  formatProviderLine,
 } from '../lib/tool-formatters.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
 import { validatePrompt } from '../lib/validation.js';
@@ -84,6 +85,8 @@ Return JSON only. No markdown, code fences, or extra text.
 }
 </schema>`;
 
+const TOOL_NAME = 'analyze_prompt' as const;
+
 interface AnalyzePromptInput {
   prompt: string;
 }
@@ -139,7 +142,7 @@ function formatAnalysisOutput(
 ): string {
   return buildOutput(
     'Prompt Analysis',
-    [`Provider: ${provider.provider} (${provider.model})`],
+    [formatProviderLine(provider)],
     [
       { title: 'Scores', lines: formatScoreLines(analysisResult.score) },
       {
@@ -162,19 +165,23 @@ async function sendProgress(
   const progressToken = context._meta?.progressToken;
   if (progressToken === undefined) return;
 
-  await context.sendNotification({
-    method: 'notifications/progress',
-    params: {
-      progressToken,
-      progress,
-      message,
-      _meta: {
-        tool: 'analyze_prompt',
-        requestId: context.requestId,
-        sessionId: context.sessionId,
+  try {
+    await context.sendNotification({
+      method: 'notifications/progress',
+      params: {
+        progressToken,
+        progress,
+        message,
+        _meta: {
+          tool: TOOL_NAME,
+          requestId: context.requestId,
+          sessionId: context.sessionId,
+        },
       },
-    },
-  });
+    });
+  } catch (error) {
+    logger.debug({ error }, 'analyze_prompt progress notification failed');
+  }
 }
 
 function buildAnalysisPrompt(prompt: string): string {
@@ -191,7 +198,7 @@ async function runAnalysis(
     analysisPrompt,
     (value) => AnalysisResponseSchema.parse(value),
     ErrorCode.E_LLM_FAILED,
-    'analyze_prompt',
+    TOOL_NAME,
     {
       maxTokens: ANALYSIS_MAX_TOKENS,
       timeoutMs: ANALYSIS_TIMEOUT_MS,
@@ -227,7 +234,7 @@ async function handleAnalyzePrompt(
   try {
     logger.info(
       { sessionId: context.sessionId, promptLength: input.prompt.length },
-      'analyze_prompt called'
+      `${TOOL_NAME} called`
     );
 
     const validatedPrompt = validatePrompt(input.prompt);
@@ -239,16 +246,14 @@ async function handleAnalyzePrompt(
       context.request.signal
     );
     const provider = await getProviderInfo();
-    return buildAnalysisResponse(analysisResult, provider);
+    const response = buildAnalysisResponse(analysisResult, provider);
+    await sendProgress(context, 'completed', 100);
+    return response;
   } catch (error) {
     return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
   }
 }
 
 export function registerAnalyzePromptTool(server: McpServer): void {
-  server.registerTool(
-    'analyze_prompt',
-    ANALYZE_PROMPT_TOOL,
-    handleAnalyzePrompt
-  );
+  server.registerTool(TOOL_NAME, ANALYZE_PROMPT_TOOL, handleAnalyzePrompt);
 }

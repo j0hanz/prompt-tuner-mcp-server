@@ -1,18 +1,9 @@
 import { LLM_MAX_TOKENS, LLM_TIMEOUT_MS } from '../config/constants.js';
 import type { OptimizationTechnique, TargetFormat } from '../config/types.js';
+import { buildAbortSignal } from './abort-signals.js';
 import { getLLMClient } from './llm-client.js';
 import { buildRefinementPrompt } from './technique-templates.js';
 import { validateLLMOutput } from './validation.js';
-
-// Creates an AbortSignal that automatically aborts after the specified timeout
-function createTimeoutSignal(timeoutMs: number): AbortSignal {
-  return AbortSignal.timeout(timeoutMs);
-}
-
-function combineSignals(timeoutMs: number, signal?: AbortSignal): AbortSignal {
-  const timeoutSignal = createTimeoutSignal(timeoutMs);
-  return signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
-}
 
 export async function refineLLM(
   prompt: string,
@@ -29,7 +20,7 @@ export async function refineLLM(
     targetFormat
   );
 
-  const combinedSignal = combineSignals(timeoutMs, signal);
+  const combinedSignal = buildAbortSignal(timeoutMs, signal);
   const refined = await client.generateText(refinementPrompt, maxTokens, {
     timeoutMs,
     signal: combinedSignal,

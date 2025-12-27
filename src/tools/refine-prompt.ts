@@ -24,6 +24,7 @@ import {
   asBulletList,
   asCodeBlock,
   buildOutput,
+  formatProviderLine,
 } from '../lib/tool-formatters.js';
 import { buildPromptResourceBlock } from '../lib/tool-resources.js';
 import {
@@ -61,6 +62,8 @@ const REFINE_PROMPT_TOOL = {
   },
 };
 
+const TOOL_NAME = 'refine_prompt' as const;
+
 function resolveInputs(input: RefinePromptInput): ResolvedRefineInputs {
   const validatedPrompt = validatePrompt(input.prompt);
   const technique = input.technique ?? 'basic';
@@ -90,7 +93,7 @@ function buildRefineOutput(
   provider: { provider: string; model: string }
 ): string {
   const meta = [
-    `Provider: ${provider.provider} (${provider.model})`,
+    formatProviderLine(provider),
     `Technique: ${input.validatedTechnique}`,
     `Target format: ${input.resolvedFormat}`,
   ];
@@ -165,5 +168,5 @@ async function handleRefinePrompt(
 }
 
 export function registerRefinePromptTool(server: McpServer): void {
-  server.registerTool('refine_prompt', REFINE_PROMPT_TOOL, handleRefinePrompt);
+  server.registerTool(TOOL_NAME, REFINE_PROMPT_TOOL, handleRefinePrompt);
 }

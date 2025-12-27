@@ -31,6 +31,7 @@ import {
   asBulletList,
   asCodeBlock,
   buildOutput,
+  formatProviderLine,
 } from '../lib/tool-formatters.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
 import { buildPromptResourceBlock } from '../lib/tool-resources.js';
@@ -97,6 +98,8 @@ Return JSON only. No markdown or extra text.
 }
 </schema>`;
 
+const TOOL_NAME = 'optimize_prompt' as const;
+
 function formatScoreLines(
   before: OptimizeResponse['beforeScore'],
   after: OptimizeResponse['afterScore']
@@ -116,10 +119,7 @@ function formatOptimizeOutput(
   targetFormat: TargetFormat,
   provider: { provider: string; model: string }
 ): string {
-  const meta = [
-    `Provider: ${provider.provider} (${provider.model})`,
-    `Target format: ${targetFormat}`,
-  ];
+  const meta = [formatProviderLine(provider), `Target format: ${targetFormat}`];
 
   return buildOutput('Prompt Optimization', meta, [
     {
@@ -199,7 +199,7 @@ async function runOptimization(
     optimizePrompt,
     (value) => OptimizeResponseSchema.parse(value),
     ErrorCode.E_LLM_FAILED,
-    'optimize_prompt',
+    TOOL_NAME,
     { maxTokens: OPTIMIZE_MAX_TOKENS, timeoutMs: OPTIMIZE_TIMEOUT_MS, signal }
   );
 }
@@ -266,9 +266,5 @@ async function handleOptimizePrompt(
 }
 
 export function registerOptimizePromptTool(server: McpServer): void {
-  server.registerTool(
-    'optimize_prompt',
-    OPTIMIZE_PROMPT_TOOL,
-    handleOptimizePrompt
-  );
+  server.registerTool(TOOL_NAME, OPTIMIZE_PROMPT_TOOL, handleOptimizePrompt);
 }

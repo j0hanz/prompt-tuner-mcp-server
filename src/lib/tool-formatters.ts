@@ -37,3 +37,10 @@ export function asNumberedList(items: string[]): string[] {
 export function asCodeBlock(text: string): string[] {
   return ['```', text, '```'];
 }
+
+export function formatProviderLine(provider: {
+  provider: string;
+  model: string;
+}): string {
+  return `Provider: ${provider.provider} (${provider.model})`;
+}

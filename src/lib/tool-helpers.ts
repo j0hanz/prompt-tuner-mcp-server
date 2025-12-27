@@ -1,4 +1,5 @@
 import type { ErrorCodeType, LLMToolOptions } from '../config/types.js';
+import { buildAbortSignal } from './abort-signals.js';
 import { getLLMClient } from './llm-client.js';
 import { parseJsonFromLlmResponse } from './llm-json.js';
 
@@ -15,11 +16,12 @@ export async function executeLLMWithJsonResponse<T>(
   options?: LLMToolOptions
 ): Promise<T> {
   const { maxTokens, timeoutMs } = { ...DEFAULT_LLM_OPTIONS, ...options };
+  const combinedSignal = buildAbortSignal(timeoutMs, options?.signal);
 
   const client = await getLLMClient();
   const response = await client.generateText(prompt, maxTokens, {
     timeoutMs,
-    signal: options?.signal,
+    signal: combinedSignal,
   });
 
   return parseJsonFromLlmResponse<T>(response, parseSchema, {
