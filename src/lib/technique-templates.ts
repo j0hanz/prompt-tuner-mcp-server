@@ -39,14 +39,7 @@ NEVER:
 - Remove critical context
 - Add commentary or extra formatting
 </rules>
-
-<output_format>
-Return only the refined prompt text.
-</output_format>
-
-<final_reminder>
-Return only the refined prompt text. No commentary or extra formatting.
-</final_reminder>`,
+`,
   },
 
   chainOfThought: {
@@ -84,6 +77,7 @@ ALWAYS:
 - Use a single, domain-appropriate reasoning trigger
 - Place the trigger immediately after the main task instruction
 - Use first-person plural ("Let's")
+- Return only the optimized prompt text
 
 ASK:
 - If the task is simple or factual, skip adding a reasoning trigger
@@ -93,14 +87,7 @@ NEVER:
 - Use generic "think step by step" when a domain trigger fits better
 - Change the task's core intent
 </rules>
-
-<output_format>
-Return only the optimized prompt text.
-</output_format>
-
-<final_reminder>
-Return only the optimized prompt text. No commentary or extra formatting.
-</final_reminder>`,
+`,
   },
 
   fewShot: {
@@ -134,6 +121,7 @@ ALWAYS:
 - Create 2-3 diverse examples
 - Show clear Input -> Output mapping
 - Include at least one edge case
+- Return only the optimized prompt text
 
 ASK:
 - If the expected output format is unclear, add a brief format note before examples
@@ -143,14 +131,7 @@ NEVER:
 - Use examples that are too similar
 - Introduce errors or inconsistent formatting
 </rules>
-
-<output_format>
-Return only the optimized prompt with examples.
-</output_format>
-
-<final_reminder>
-Return only the optimized prompt text. No commentary or extra formatting.
-</final_reminder>`,
+`,
   },
 
   roleBased: {
@@ -182,6 +163,7 @@ ${INPUT_HANDLING_SECTION}
 ALWAYS:
 - Use the format: "You are a [specific role] with expertise in [domain]."
 - Place the role statement at the beginning
+- Return only the optimized prompt text
 
 ASK:
 - If the domain is unclear, use the most neutral expert role implied by the prompt
@@ -191,14 +173,7 @@ NEVER:
 - Add unrelated backstory
 - Alter the core task
 </rules>
-
-<output_format>
-Return only the optimized prompt text.
-</output_format>
-
-<final_reminder>
-Return only the optimized prompt text. No commentary or extra formatting.
-</final_reminder>`,
+`,
   },
 
   structured: {
@@ -235,6 +210,7 @@ ALWAYS:
 - Group related information into logical sections
 - Use numbered lists for steps and bullets for constraints
 - Place critical constraints at both start and end for long prompts
+- Return only the structured prompt text
 
 ASK:
 - If the target format is unclear, default to the prompt's existing style
@@ -244,14 +220,7 @@ NEVER:
 - Create deeply nested structures
 - Obscure the original intent
 </rules>
-
-<output_format>
-Return only the structured prompt text.
-</output_format>
-
-<final_reminder>
-Return only the structured prompt text. No commentary or extra formatting.
-</final_reminder>`,
+`,
   },
 
   comprehensive: {
@@ -290,6 +259,7 @@ ALWAYS:
 - Preserve the original intent and scope
 - Be concise: remove fluff, keep substance
 - Place critical instructions near both start and end for long prompts
+- Return only the optimized prompt text
 
 ASK:
 - If essential details are missing, add a single clarification request
@@ -299,14 +269,7 @@ NEVER:
 - Mix XML and Markdown in the same prompt
 - Add requirements not implied by the original
 </rules>
-
-<output_format>
-Return only the fully optimized prompt text.
-</output_format>
-
-<final_reminder>
-Return only the optimized prompt text. No commentary or extra formatting.
-</final_reminder>`,
+`,
   },
 };
 

@@ -15,6 +15,7 @@ All configuration is done through environment variables. Set them in your MCP cl
 | `LLM_MODEL`         | Model to use (optional) | Provider-specific | `gpt-4o`, `claude-3-5-sonnet-20241022`, `gemini-2.0-flash-exp`, `gemini-2.5-pro-exp` |
 
 **Note**: Only provide the API key for your chosen provider.
+**Note**: Every tool invocation calls the configured provider; there is no response cache.
 
 ### Performance & Limits (Optional)
 
@@ -23,7 +24,6 @@ All configuration is done through environment variables. Set them in your MCP cl
 | `LLM_TIMEOUT_MS`    | LLM request timeout (ms)  | `60000` (1 min) | 30000-120000            |
 | `LLM_MAX_TOKENS`    | Max tokens per response   | `8000`          | 2000-16000 (pro: 8000+) |
 | `MAX_PROMPT_LENGTH` | Max prompt length (chars) | `10000`         | 5000-50000              |
-| `CACHE_MAX_SIZE`    | Max cached refinements    | `1000`          | 500-5000                |
 
 ### Retry Configuration (Optional)
 
@@ -80,7 +80,6 @@ All configuration is done through environment variables. Set them in your MCP cl
       "LLM_MODEL": "claude-3-5-sonnet-20241022",
       "LLM_TIMEOUT_MS": "90000",
       "LLM_MAX_TOKENS": "8000",
-      "CACHE_MAX_SIZE": "2000",
       "RETRY_MAX_ATTEMPTS": "5"
     }
   }
@@ -99,8 +98,7 @@ All configuration is done through environment variables. Set them in your MCP cl
       "GOOGLE_API_KEY": "${input:google-api-key}",
       "LLM_MODEL": "gemini-2.5-pro-exp",
       "LLM_TIMEOUT_MS": "120000",
-      "LLM_MAX_TOKENS": "16000",
-      "CACHE_MAX_SIZE": "3000"
+      "LLM_MAX_TOKENS": "16000"
     }
   }
 }
@@ -138,7 +136,6 @@ All configuration is done through environment variables. Set them in your MCP cl
       "LLM_MODEL": "gpt-4o-mini",
       "LLM_TIMEOUT_MS": "30000",
       "LLM_MAX_TOKENS": "1500",
-      "CACHE_MAX_SIZE": "5000",
       "RETRY_MAX_ATTEMPTS": "2",
       "RETRY_BASE_DELAY_MS": "500"
     }
@@ -167,8 +164,11 @@ The following are intentionally hardcoded for stability and optimal performance:
 
 ### Internal Limits
 
-- **Analysis max tokens** (1500)
-- **Analysis timeout** (60000ms)
+- **Analysis max tokens** (min(LLM_MAX_TOKENS, 4000))
+- **Refine max tokens** (min(LLM_MAX_TOKENS, 2000))
+- **Optimize max tokens** (min(LLM_MAX_TOKENS, 3000))
+- **Validate max tokens** (min(LLM_MAX_TOKENS, 1000))
+- **Tool timeouts** (LLM_TIMEOUT_MS)
 - **Max LLM response length** (500,000 chars)
 - **Error context truncation** (500 chars)
 - **Reason**: Safety constraints to prevent resource exhaustion
@@ -182,7 +182,7 @@ If you have an old `.env` file with these variables, **remove them** (they are n
 - ❌ `CORS_ORIGIN` - No HTTP CORS in stdio version
 - ❌ `LOG_LEVEL` - Use `DEBUG=true/false` instead
 - ❌ `RATE_LIMIT` / `RATE_WINDOW_MS` - No rate limiting in current version
-- ❌ `REDIS_URL` / `CACHE_TTL` - In-memory cache only
+- ❌ `REDIS_URL` / `CACHE_TTL` - No caching is used
 - ❌ `CIRCUIT_BREAKER_*` - Not implemented
 - ❌ `NODE_ENV` - Not used for configuration
 - ❌ `SESSION_TIMEOUT_MS` - No session management
@@ -191,7 +191,6 @@ If you have an old `.env` file with these variables, **remove them** (they are n
 
 ### High Memory Usage
 
-- Reduce `CACHE_MAX_SIZE` (e.g., `500`)
 - Reduce `MAX_PROMPT_LENGTH` (e.g., `5000`)
 
 ### Timeout Errors
@@ -207,7 +206,6 @@ If you have an old `.env` file with these variables, **remove them** (they are n
 
 ### Slow Performance
 
-- Increase `CACHE_MAX_SIZE` (e.g., `2000`)
 - Use faster model (e.g., `gpt-4o-mini` or `gemini-2.0-flash-exp`)
 - Reduce `LLM_MAX_TOKENS` (e.g., `1500`)
 
@@ -222,6 +220,5 @@ If you have an old `.env` file with these variables, **remove them** (they are n
 2. **Use input variables for secrets** - In mcp.json: `"OPENAI_API_KEY": "${input:openai-api-key}"`
 3. **Start with defaults** - Only override what you need
 4. **Enable debug logging temporarily** - `DEBUG=true` for troubleshooting only
-5. **Monitor cache hit rate** - Check logs for "Cache hit for refinement" messages
-6. **Test timeout settings** - Start conservative, increase if seeing timeout errors
-7. **Use JSON logging in production** - `LOG_FORMAT=json` for easier parsing
+5. **Test timeout settings** - Start conservative, increase if seeing timeout errors
+6. **Use JSON logging in production** - `LOG_FORMAT=json` for easier parsing

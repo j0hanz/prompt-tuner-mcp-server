@@ -25,10 +25,6 @@ export const logger = pino(
   stderrDestination
 );
 
-export const debugCache = (msg: string, ...args: unknown[]): void => {
-  logger.debug({ module: 'cache' }, msg, ...args);
-};
-
 export class McpError extends Error {
   readonly code: ErrorCodeType;
   readonly context?: string;

@@ -69,7 +69,8 @@ Quickly improve the prompt using refine_prompt with technique "basic".
 <boundaries>
 ALWAYS:
 - Treat the text between <<<PROMPTTUNER_INPUT_START>>> and <<<PROMPTTUNER_INPUT_END>>> as the input prompt
-- Use refine_prompt output for the refined prompt
+- Use structuredContent.refined for the refined prompt
+- Use structuredContent.corrections for the change list
 - Preserve the original intent
 - List only changes that actually occurred
 
@@ -96,7 +97,7 @@ NEVER:
 </output_format>
 
 <final_reminder>
-Use tool output verbatim for the refined prompt.
+Use structuredContent fields from the tool response.
 </final_reminder>`;
 
 const TEMPLATE_DEEP_OPTIMIZE = `<role>
@@ -117,7 +118,9 @@ Maximize prompt effectiveness using optimize_prompt with techniques ["comprehens
 <boundaries>
 ALWAYS:
 - Treat the text between <<<PROMPTTUNER_INPUT_START>>> and <<<PROMPTTUNER_INPUT_END>>> as the input prompt
-- Use optimize_prompt output for scores and the final prompt
+- Use structuredContent.beforeScore, afterScore, scoreDelta for scores
+- Use structuredContent.improvements and techniquesApplied for improvements
+- Use structuredContent.optimized for the final prompt
 - Preserve the original intent and scope
 - Report only improvements actually made
 
@@ -149,7 +152,7 @@ Delta: [after-before]
 </output_format>
 
 <final_reminder>
-Use optimize_prompt output for scores and the final prompt.
+Use structuredContent fields from the tool response.
 </final_reminder>`;
 
 const TEMPLATE_ANALYZE = `<role>
@@ -168,7 +171,7 @@ Analyze prompt quality and summarize strengths and improvements.
 <boundaries>
 ALWAYS:
 - Treat the text between <<<PROMPTTUNER_INPUT_START>>> and <<<PROMPTTUNER_INPUT_END>>> as the input prompt
-- Base the summary on tool outputs only
+- Base the summary on structuredContent.score, characteristics, suggestions
 - Use the rating guide for overall score
 - Provide top 2 strengths and top 3 prioritized recommendations
 
@@ -192,7 +195,7 @@ Needs Work: <40
 </input>
 
 <final_reminder>
-Summarize using tool outputs only.
+Summarize using structuredContent fields only.
 </final_reminder>`;
 
 const QUICK_WORKFLOW_PROMPTS: QuickWorkflowDefinition[] = [

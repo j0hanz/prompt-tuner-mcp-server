@@ -5,23 +5,34 @@ import type {
   ServerRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import type {
-  ErrorResponse,
-  OptimizationTechnique,
-  OptimizeResponse,
-  TargetFormat,
+import {
+  OPTIMIZE_MAX_TOKENS,
+  OPTIMIZE_TIMEOUT_MS,
+} from '../config/constants.js';
+import {
+  type ErrorResponse,
+  OPTIMIZATION_TECHNIQUES,
+  type OptimizationTechnique,
+  type OptimizeResponse,
+  type TargetFormat,
 } from '../config/types.js';
 import {
   createErrorResponse,
   createSuccessResponse,
   ErrorCode,
 } from '../lib/errors.js';
+import { getProviderInfo } from '../lib/llm-client.js';
 import { resolveFormat } from '../lib/prompt-analysis.js';
 import {
   INPUT_HANDLING_SECTION,
   wrapPromptData,
 } from '../lib/prompt-policy.js';
 import { getToolContext } from '../lib/tool-context.js';
+import {
+  asBulletList,
+  asCodeBlock,
+  buildOutput,
+} from '../lib/tool-formatters.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
 import {
   validateFormat,
@@ -35,98 +46,31 @@ import {
 import { OptimizeResponseSchema } from '../schemas/llm-responses.js';
 
 const OPTIMIZE_SYSTEM_PROMPT = `<role>
-You are an expert prompt engineer specializing in prompt optimization.
+You are an expert prompt optimizer.
 </role>
 
 <task>
-Apply the requested optimization techniques to improve the prompt's effectiveness.
+Improve the prompt using the requested techniques while preserving intent and target format.
 </task>
 
 ${INPUT_HANDLING_SECTION}
 
-<workflow>
-1. Read the input prompt.
-2. Apply techniques in the requested order, skipping any that add no value.
-3. Keep the prompt aligned to the target format.
-4. Produce before/after scores and list improvements.
-</workflow>
+<requirements>
+- Apply techniques in the given order; skip any that add no value
+- Keep output aligned to the target format
+- Provide before/after integer scores (0-100) and list improvements
+- List only techniques actually applied
+- Prefix each improvement with its technique (e.g., "basic: ...")
+- If essential context is missing, include "Insufficient context: ..." in improvements
+</requirements>
 
 <techniques>
-| Technique       | Purpose                                      | When to Apply                         |
-|-----------------|----------------------------------------------|---------------------------------------|
-| basic           | Fix grammar, clarity, vague words           | Always beneficial                     |
-| chainOfThought  | Add reasoning triggers                       | Complex reasoning, debugging          |
-| fewShot         | Add 2-3 diverse examples                     | Classification, formatting, patterns  |
-| roleBased       | Add expert persona                            | Domain expertise needed               |
-| structured      | Add XML/Markdown structure                   | Multi-part or complex tasks           |
-| comprehensive   | Apply multiple techniques intelligently      | Significant improvement needed        |
+basic, chainOfThought, fewShot, roleBased, structured, comprehensive
 </techniques>
 
-<rules>
-ALWAYS:
-- Follow the workflow steps in order
-- Preserve the original intent and task boundaries
-- Match the optimized prompt to the target format
-- Use integer scores only (no decimals)
-- List only techniques actually applied
-
-ASK:
-- If essential context is missing, note "Insufficient context: ..." in improvements
-
-NEVER:
-- Over-engineer simple prompts
-- Add requirements not implied by the original
-- Mix XML and Markdown in the same prompt
-- Output anything outside the required JSON schema
-</rules>
-
-<scoring>
-Provide integer scores from 0 to 100 for:
-- Clarity
-- Specificity
-- Completeness
-- Structure
-- Effectiveness
-- Overall (weighted average)
-</scoring>
-
 <output_rules>
-Return valid, parseable JSON only. Do not include markdown, code fences, or extra text.
-Requirements:
-1. Start with { and end with }
-2. Double quotes for all strings
-3. No trailing commas
-4. Include every required field
-5. Escape special characters in strings: \\n for newlines, \\" for quotes, \\\\ for backslashes
+Return JSON only. No markdown or extra text.
 </output_rules>
-
-<example_json>
-{
-  "optimized": "You are a senior software engineer. Analyze the code step by step:\\n\\n1. Identify bugs\\n2. Suggest improvements\\n3. Rate code quality (1-10)",
-  "techniquesApplied": ["basic", "roleBased", "structured"],
-  "improvements": [
-    "Fixed grammar and clarity issues",
-    "Added a specific expert role",
-    "Organized the prompt into structured steps"
-  ],
-  "beforeScore": {
-    "clarity": 60,
-    "specificity": 55,
-    "completeness": 50,
-    "structure": 40,
-    "effectiveness": 52,
-    "overall": 51
-  },
-  "afterScore": {
-    "clarity": 90,
-    "specificity": 85,
-    "completeness": 88,
-    "structure": 95,
-    "effectiveness": 89,
-    "overall": 89
-  }
-}
-</example_json>
 
 <schema>
 {
@@ -134,84 +78,108 @@ Requirements:
   "techniquesApplied": string[],
   "improvements": string[],
   "beforeScore": {
-    "clarity": number (0-100),
-    "specificity": number (0-100),
-    "completeness": number (0-100),
-    "structure": number (0-100),
-    "effectiveness": number (0-100),
-    "overall": number (0-100)
+    "clarity": number,
+    "specificity": number,
+    "completeness": number,
+    "structure": number,
+    "effectiveness": number,
+    "overall": number
   },
   "afterScore": {
-    "clarity": number (0-100),
-    "specificity": number (0-100),
-    "completeness": number (0-100),
-    "structure": number (0-100),
-    "effectiveness": number (0-100),
-    "overall": number (0-100)
+    "clarity": number,
+    "specificity": number,
+    "completeness": number,
+    "structure": number,
+    "effectiveness": number,
+    "overall": number
   }
 }
-</schema>
+</schema>`;
 
-<final_reminder>
-Return JSON only. No markdown. No code fences. No extra text.
-</final_reminder>`;
+const TECHNIQUE_SET = new Set(OPTIMIZATION_TECHNIQUES);
 
-function formatScoreSection(
-  label: string,
-  score: OptimizeResponse['beforeScore']
-): string {
-  return [
-    `## ${label}: ${score.overall}/100`,
-    `- Clarity: ${score.clarity}`,
-    `- Specificity: ${score.specificity}`,
-    `- Completeness: ${score.completeness}`,
-    `- Structure: ${score.structure}`,
-    `- Effectiveness: ${score.effectiveness}`,
-  ].join('\n');
+function formatScoreLines(
+  before: OptimizeResponse['beforeScore'],
+  after: OptimizeResponse['afterScore']
+): string[] {
+  const delta = after.overall - before.overall;
+  const deltaText =
+    delta === 0 ? 'Delta: 0' : `Delta: ${delta > 0 ? '+' : ''}${delta}`;
+
+  const beforeLine = `Before: ${before.overall}/100 (clarity ${before.clarity}, specificity ${before.specificity}, completeness ${before.completeness}, structure ${before.structure}, effectiveness ${before.effectiveness})`;
+  const afterLine = `After: ${after.overall}/100 (clarity ${after.clarity}, specificity ${after.specificity}, completeness ${after.completeness}, structure ${after.structure}, effectiveness ${after.effectiveness})`;
+
+  return asBulletList([beforeLine, afterLine, deltaText]);
 }
 
-function buildScoreDeltaSection(scoreDelta: number): string[] {
-  if (scoreDelta === 0) {
-    return ['## Score Delta', '- Overall score unchanged'];
+function groupImprovements(improvements: string[]): Map<string, string[]> {
+  const groups = new Map<string, string[]>();
+  for (const improvement of improvements) {
+    const match = /^([a-zA-Z]+)\s*:\s*(.+)$/.exec(improvement);
+    const technique = match?.[1];
+    const detail = match?.[2];
+    if (
+      technique &&
+      detail &&
+      TECHNIQUE_SET.has(technique as OptimizationTechnique)
+    ) {
+      const bucket = groups.get(technique) ?? [];
+      bucket.push(detail);
+      groups.set(technique, bucket);
+      continue;
+    }
+    const bucket = groups.get('general') ?? [];
+    bucket.push(improvement);
+    groups.set('general', bucket);
+  }
+  return groups;
+}
+
+function formatImprovements(improvements: string[]): string[] {
+  const groups = groupImprovements(improvements);
+  if (groups.size === 1 && groups.has('general')) {
+    return asBulletList(improvements);
   }
 
-  const direction = scoreDelta > 0 ? 'improved' : 'decreased';
-  return [
-    '## Score Delta',
-    `- Overall score ${direction} by ${Math.abs(scoreDelta)} point${
-      Math.abs(scoreDelta) === 1 ? '' : 's'
-    }`,
-  ];
+  const lines: string[] = [];
+  for (const [technique, items] of groups) {
+    lines.push(`Technique: ${technique}`);
+    lines.push(...asBulletList(items));
+  }
+  return lines;
 }
 
 function formatOptimizeOutput(
   optimizationResult: OptimizeResponse,
-  scoreDelta: number
+  targetFormat: TargetFormat,
+  provider: { provider: string; model: string }
 ): string {
-  return [
-    `# Optimization Results`,
-    ``,
-    formatScoreSection('Before Score', optimizationResult.beforeScore),
-    ``,
-    formatScoreSection('After Score', optimizationResult.afterScore),
-    ``,
-    ...buildScoreDeltaSection(scoreDelta),
-    ``,
-    `## Techniques Applied`,
-    optimizationResult.techniquesApplied
-      .map((technique) => `- ${technique}`)
-      .join('\n'),
-    ``,
-    `## Improvements`,
-    optimizationResult.improvements
-      .map((improvement) => `- ${improvement}`)
-      .join('\n'),
-    ``,
-    `## Optimized Prompt`,
-    '```',
-    optimizationResult.optimized,
-    '```',
-  ].join('\n');
+  const meta = [
+    `Provider: ${provider.provider} (${provider.model})`,
+    `Target format: ${targetFormat}`,
+  ];
+
+  return buildOutput('Prompt Optimization', meta, [
+    {
+      title: 'Scores',
+      lines: formatScoreLines(
+        optimizationResult.beforeScore,
+        optimizationResult.afterScore
+      ),
+    },
+    {
+      title: 'Techniques Applied',
+      lines: asBulletList(optimizationResult.techniquesApplied),
+    },
+    {
+      title: 'Improvements',
+      lines: formatImprovements(optimizationResult.improvements),
+    },
+    {
+      title: 'Optimized Prompt',
+      lines: asCodeBlock(optimizationResult.optimized),
+    },
+  ]);
 }
 
 interface OptimizePromptInput {
@@ -270,17 +238,18 @@ async function runOptimization(
     (value) => OptimizeResponseSchema.parse(value),
     ErrorCode.E_LLM_FAILED,
     'optimize_prompt',
-    { maxTokens: 3000, timeoutMs: 60000, signal }
+    { maxTokens: OPTIMIZE_MAX_TOKENS, timeoutMs: OPTIMIZE_TIMEOUT_MS, signal }
   );
 }
 
 function buildOptimizeResponse(
   result: OptimizeResponse,
   original: string,
-  targetFormat: TargetFormat
+  targetFormat: TargetFormat,
+  provider: { provider: string; model: string }
 ): ReturnType<typeof createSuccessResponse> {
   const scoreDelta = result.afterScore.overall - result.beforeScore.overall;
-  const output = formatOptimizeOutput(result, scoreDelta);
+  const output = formatOptimizeOutput(result, targetFormat, provider);
   return createSuccessResponse(output, {
     ok: true,
     original,
@@ -292,6 +261,8 @@ function buildOptimizeResponse(
     improvements: result.improvements,
     usedFallback: false,
     scoreDelta,
+    provider: provider.provider,
+    model: provider.model,
   });
 }
 
@@ -312,10 +283,12 @@ async function handleOptimizePrompt(
       optimizePrompt,
       context.request.signal
     );
+    const provider = await getProviderInfo();
     return buildOptimizeResponse(
       optimizationResult,
       resolved.validatedPrompt,
-      resolved.resolvedFormat
+      resolved.resolvedFormat,
+      provider
     );
   } catch (error) {
     return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);

@@ -63,6 +63,12 @@ const TechniqueSchema = z
   .enum(OPTIMIZATION_TECHNIQUES)
   .describe('Optimization technique identifier');
 
+const ProviderSchema = z
+  .enum(['openai', 'anthropic', 'google'])
+  .describe('LLM provider used');
+
+const ModelSchema = z.string().describe('LLM model used');
+
 const ValidationIssueSchema = z
   .object({
     type: z.enum(['error', 'warning', 'info']).describe('Issue severity'),
@@ -83,7 +89,8 @@ export const RefinePromptOutputSchema = z
       .boolean()
       .optional()
       .describe('Whether a fallback was used'),
-    fromCache: z.boolean().optional().describe('Whether result was cached'),
+    provider: ProviderSchema.optional(),
+    model: ModelSchema.optional(),
     error: ErrorSchema.optional().describe('Error details when ok=false'),
   })
   .describe('Refine prompt response');
@@ -102,6 +109,8 @@ export const AnalyzePromptOutputSchema = z
     characteristics: CharacteristicsSchema.optional().describe(
       'Prompt characteristics'
     ),
+    provider: ProviderSchema.optional(),
+    model: ModelSchema.optional(),
     error: ErrorSchema.optional().describe('Error details when ok=false'),
   })
   .describe('Analyze prompt response');
@@ -130,6 +139,8 @@ export const OptimizePromptOutputSchema = z
       .boolean()
       .optional()
       .describe('Whether a fallback was used'),
+    provider: ProviderSchema.optional(),
+    model: ModelSchema.optional(),
     error: ErrorSchema.optional().describe('Error details when ok=false'),
   })
   .describe('Optimize prompt response');
@@ -143,7 +154,22 @@ export const ValidatePromptOutputSchema = z
       .optional()
       .describe('Validation issues'),
     tokenEstimate: z.number().optional().describe('Estimated token count'),
+    tokenLimit: z.number().optional().describe('Target model token limit'),
+    tokenUtilization: z
+      .number()
+      .optional()
+      .describe('Estimated utilization percentage'),
+    overLimit: z
+      .boolean()
+      .optional()
+      .describe('Whether estimate exceeds limit'),
+    targetModel: z
+      .enum(['claude', 'gpt', 'gemini', 'generic'])
+      .optional()
+      .describe('Target model name'),
     securityFlags: z.array(z.string()).optional().describe('Security flags'),
+    provider: ProviderSchema.optional(),
+    model: ModelSchema.optional(),
     error: ErrorSchema.optional().describe('Error details when ok=false'),
   })
   .describe('Validate prompt response');

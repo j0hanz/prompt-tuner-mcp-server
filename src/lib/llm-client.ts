@@ -67,3 +67,11 @@ export async function getLLMClient(): Promise<LLMClient> {
 
   return llmClientPromise;
 }
+
+export async function getProviderInfo(): Promise<{
+  provider: LLMProvider;
+  model: string;
+}> {
+  const client = await getLLMClient();
+  return { provider: client.getProvider(), model: client.getModel() };
+}

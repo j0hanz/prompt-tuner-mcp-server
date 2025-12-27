@@ -45,9 +45,6 @@ const envSchema = z.object({
   // Constraints
   MAX_PROMPT_LENGTH: numberString(10000, 1),
 
-  // Cache
-  CACHE_MAX_SIZE: numberString(1000, 1),
-
   // Retry
   RETRY_MAX_ATTEMPTS: numberString(3, 0),
   RETRY_BASE_DELAY_MS: numberString(1000, 100),

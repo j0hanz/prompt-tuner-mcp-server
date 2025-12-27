@@ -94,6 +94,8 @@ PromptTuner requires an API key from an LLM provider to perform analysis and ref
 
 ## 🔧 Tools
 
+All tool responses include `provider` and `model` metadata in structuredContent.
+
 ### `refine_prompt`
 
 Fix grammar, improve clarity, and apply optimization techniques. Use when: user asks to fix/improve/optimize a prompt, prompt has typos, or prompt is vague.
@@ -138,7 +140,7 @@ Pre-flight validation using AI: checks issues, estimates tokens, detects securit
 | `targetModel`    | string  | ❌       | `"generic"` | Target AI model (`claude`, `gpt`, `gemini`, `generic`). |
 | `checkInjection` | boolean | ❌       | `true`      | Check for prompt injection patterns.                    |
 
-**Returns:** Validation status, token estimate, and list of issues (errors, warnings, info).
+**Returns:** Validation status, token estimate, token limit/utilization, and list of issues (errors, warnings, info).
 
 ## 💬 Prompts
 
@@ -222,6 +224,8 @@ Add to Cursor MCP settings:
 - **Input Validation**: All inputs are validated using Zod schemas to prevent injection and malformed data.
 - **Prompt Injection**: The `validate_prompt` tool specifically checks for prompt injection patterns.
 - **Sanitization**: User inputs reflected in error messages are sanitized.
+- **External Execution**: Every tool invocation calls the configured external provider (no cached tool outputs).
+- **Provider Metadata**: Structured tool outputs include the provider and model for traceability.
 
 ## 🛠️ Development
 
@@ -248,7 +252,7 @@ src/
 ├── index.ts          # Entry point
 ├── server.ts         # MCP server setup
 ├── config/           # Configuration and types
-├── lib/              # Shared utilities (LLM, cache, errors)
+├── lib/              # Shared utilities (LLM, errors)
 ├── tools/            # Tool implementations
 ├── resources/        # Resource implementations
 ├── prompts/          # Prompt implementations

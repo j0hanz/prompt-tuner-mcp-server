@@ -16,11 +16,17 @@ import {
   ErrorCode,
   logger,
 } from '../lib/errors.js';
+import { getProviderInfo } from '../lib/llm-client.js';
 import {
   INPUT_HANDLING_SECTION,
   wrapPromptData,
 } from '../lib/prompt-policy.js';
 import { getToolContext, type ToolContext } from '../lib/tool-context.js';
+import {
+  asBulletList,
+  asNumberedList,
+  buildOutput,
+} from '../lib/tool-formatters.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
 import { validatePrompt } from '../lib/validation.js';
 import {
@@ -30,114 +36,37 @@ import {
 import { AnalysisResponseSchema } from '../schemas/llm-responses.js';
 
 const ANALYSIS_SYSTEM_PROMPT = `<role>
-You are an expert prompt analyst focused on measurable quality assessment.
+You are an expert prompt analyst.
 </role>
 
 <task>
-Score the prompt across clarity, specificity, completeness, structure, and effectiveness.
+Score prompt quality and return structured JSON.
 </task>
 
 ${INPUT_HANDLING_SECTION}
 
-<workflow>
-1. Read the input prompt.
-2. Identify strengths, weaknesses, and missing context.
-3. Assign integer scores (0-100) and an overall score.
-4. Populate characteristics and 2-3 actionable suggestions.
-</workflow>
-
-<scoring>
-Each dimension uses an integer score from 0 to 100:
-- Clarity: clear language, minimal ambiguity
-- Specificity: concrete details and constraints
-- Completeness: context, output format, constraints
-- Structure: organized layout and flow
-- Effectiveness: likelihood of consistent, high-quality responses
-
-Score interpretation:
-| Range   | Rating     | Description                       |
-|---------|------------|-----------------------------------|
-| 80-100  | Excellent  | Production-ready, minimal changes |
-| 60-79   | Good       | Functional, minor improvements    |
-| 40-59   | Fair       | Needs work, several gaps          |
-| 0-39    | Poor       | Major revision required           |
-</scoring>
-
-<analysis_checks>
-- Vague language or ambiguous references
-- Missing role/context/output format/constraints/examples
-- Structure (sections, lists, logical order)
-- Typos or grammar issues
-- Format type (claude xml, gpt markdown, json, auto)
-</analysis_checks>
-
-<rules>
-ALWAYS:
-- Follow the workflow steps in order
-- Use only the provided input; do not invent details
-- Provide integer scores (no decimals)
-- Include 2-3 concise, actionable suggestions
+<requirements>
+- Use only the provided prompt
+- Provide integer scores (0-100) for clarity, specificity, completeness, structure, effectiveness, overall
+- Fill all characteristics fields and 2-3 actionable suggestions
 - Set missingContext true when essential context is absent
-- Detect format as claude, gpt, json, or auto
-
-ASK:
-- If the prompt is vague or incomplete, include "Insufficient context: ..." in suggestions
-
-NEVER:
-- Give a perfect 100 unless truly flawless
-- Suggest changes that alter the prompt's core intent
-- Output anything outside the required JSON schema
-</rules>
+- If essential context is missing, include a suggestion starting with "Insufficient context: ..."
+- Detect format as claude | gpt | json | auto
+</requirements>
 
 <output_rules>
-Return valid, parseable JSON only. Do not include markdown, code fences, or extra text.
-Requirements:
-1. Start with { and end with }
-2. Use double quotes for all strings
-3. No trailing commas
-4. Include every required field
-5. Use integers for all scores
+Return JSON only. No markdown, code fences, or extra text.
 </output_rules>
-
-<example_json>
-{
-  "score": {
-    "clarity": 85,
-    "specificity": 80,
-    "completeness": 75,
-    "structure": 90,
-    "effectiveness": 82,
-    "overall": 82
-  },
-  "characteristics": {
-    "hasTypos": false,
-    "isVague": true,
-    "missingContext": false,
-    "hasRoleContext": true,
-    "hasExamples": false,
-    "hasStructure": true,
-    "hasStepByStep": false,
-    "wordCount": 156,
-    "detectedFormat": "gpt",
-    "estimatedComplexity": "moderate"
-  },
-  "suggestions": [
-    "Replace vague terms with specific examples",
-    "Add explicit output format requirements",
-    "Include clear constraints or requirements"
-  ]
-}
-</example_json>
 
 <schema>
 {
   "score": {
-    "clarity": number (0-100),
-    "specificity": number (0-100),
-    "completeness": number (0-100),
-    "structure": number (0-100),
-    "effectiveness": number (0-100),
-    "overall": number (0-100)
+    "clarity": number,
+    "specificity": number,
+    "completeness": number,
+    "structure": number,
+    "effectiveness": number,
+    "overall": number
   },
   "characteristics": {
     "hasTypos": boolean,
@@ -153,11 +82,7 @@ Requirements:
   },
   "suggestions": string[]
 }
-</schema>
-
-<final_reminder>
-Return JSON only. No markdown. No code fences. No extra text.
-</final_reminder>`;
+</schema>`;
 
 interface AnalyzePromptInput {
   prompt: string;
@@ -176,59 +101,57 @@ const ANALYZE_PROMPT_TOOL = {
   },
 };
 
-function formatScoreLines(score: AnalysisResponse['score']): string[] {
-  return [
-    `## Quality Scores`,
-    `- **Clarity**: ${score.clarity}/100`,
-    `- **Specificity**: ${score.specificity}/100`,
-    `- **Completeness**: ${score.completeness}/100`,
-    `- **Structure**: ${score.structure}/100`,
-    `- **Effectiveness**: ${score.effectiveness}/100`,
-    `- **Overall**: ${score.overall}/100`,
-  ];
+function formatYesNo(label: string, value: boolean): string {
+  return `${label}: ${value ? 'Yes' : 'No'}`;
 }
 
-function formatYesNo(label: string, value: boolean): string {
-  return `- ${label}: ${value ? 'Yes' : 'No'}`;
+function formatScoreLines(score: AnalysisResponse['score']): string[] {
+  return asBulletList([
+    `Clarity: ${score.clarity}/100`,
+    `Specificity: ${score.specificity}/100`,
+    `Completeness: ${score.completeness}/100`,
+    `Structure: ${score.structure}/100`,
+    `Effectiveness: ${score.effectiveness}/100`,
+    `Overall: ${score.overall}/100`,
+  ]);
 }
 
 function formatCharacteristicLines(
   characteristics: AnalysisResponse['characteristics']
 ): string[] {
-  const yesNoEntries: [string, boolean][] = [
-    ['Typos detected', characteristics.hasTypos],
-    ['Vague language', characteristics.isVague],
-    ['Missing context', characteristics.missingContext],
-    ['Role defined', characteristics.hasRoleContext],
-    ['Examples present', characteristics.hasExamples],
-  ];
-
-  return [
-    `## Characteristics`,
-    ...yesNoEntries.map(([label, value]) => formatYesNo(label, value)),
-    `- Word count: ${characteristics.wordCount}`,
-  ];
+  return asBulletList([
+    formatYesNo('Typos detected', characteristics.hasTypos),
+    formatYesNo('Vague language', characteristics.isVague),
+    formatYesNo('Missing context', characteristics.missingContext),
+    formatYesNo('Role defined', characteristics.hasRoleContext),
+    formatYesNo('Examples present', characteristics.hasExamples),
+    formatYesNo('Structured sections', characteristics.hasStructure),
+    formatYesNo('Step-by-step guidance', characteristics.hasStepByStep),
+    `Detected format: ${characteristics.detectedFormat}`,
+    `Complexity: ${characteristics.estimatedComplexity}`,
+    `Word count: ${characteristics.wordCount}`,
+  ]);
 }
 
-function formatSuggestionLines(suggestions: string[]): string[] {
-  return [
-    `## Improvement Suggestions`,
-    suggestions
-      .map((suggestion, index) => `${index + 1}. ${suggestion}`)
-      .join('\n'),
-  ];
-}
-
-function formatAnalysisOutput(analysisResult: AnalysisResponse): string {
-  return [
-    '# Prompt Analysis',
-    '',
-    ...formatScoreLines(analysisResult.score),
-    '',
-    ...formatCharacteristicLines(analysisResult.characteristics),
-    '',
-    ...formatSuggestionLines(analysisResult.suggestions),
-  ].join('\n');
+function formatAnalysisOutput(
+  analysisResult: AnalysisResponse,
+  provider: { provider: string; model: string }
+): string {
+  return buildOutput(
+    'Prompt Analysis',
+    [`Provider: ${provider.provider} (${provider.model})`],
+    [
+      { title: 'Scores', lines: formatScoreLines(analysisResult.score) },
+      {
+        title: 'Characteristics',
+        lines: formatCharacteristicLines(analysisResult.characteristics),
+      },
+      {
+        title: 'Suggestions',
+        lines: asNumberedList(analysisResult.suggestions),
+      },
+    ]
+  );
 }
 
 async function sendProgress(
@@ -278,9 +201,10 @@ async function runAnalysis(
 }
 
 function buildAnalysisResponse(
-  analysisResult: AnalysisResponse
+  analysisResult: AnalysisResponse,
+  provider: { provider: string; model: string }
 ): ReturnType<typeof createSuccessResponse> {
-  const output = formatAnalysisOutput(analysisResult);
+  const output = formatAnalysisOutput(analysisResult, provider);
   return createSuccessResponse(output, {
     ok: true,
     hasTypos: analysisResult.characteristics.hasTypos,
@@ -289,6 +213,8 @@ function buildAnalysisResponse(
     suggestions: analysisResult.suggestions,
     score: analysisResult.score,
     characteristics: analysisResult.characteristics,
+    provider: provider.provider,
+    model: provider.model,
   });
 }
 
@@ -312,7 +238,8 @@ async function handleAnalyzePrompt(
       analysisPrompt,
       context.request.signal
     );
-    return buildAnalysisResponse(analysisResult);
+    const provider = await getProviderInfo();
+    return buildAnalysisResponse(analysisResult, provider);
   } catch (error) {
     return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
   }

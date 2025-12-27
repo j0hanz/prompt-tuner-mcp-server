@@ -5,21 +5,26 @@ import type {
   ServerRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 
+import { REFINE_MAX_TOKENS, REFINE_TIMEOUT_MS } from '../config/constants.js';
 import type {
   ErrorResponse,
   OptimizationTechnique,
   TargetFormat,
 } from '../config/types.js';
-import { getCachedRefinement, setCachedRefinement } from '../lib/cache.js';
 import {
   createErrorResponse,
   createSuccessResponse,
   ErrorCode,
-  logger,
 } from '../lib/errors.js';
+import { getProviderInfo } from '../lib/llm-client.js';
 import { refineLLM } from '../lib/llm.js';
 import { resolveFormat } from '../lib/prompt-analysis.js';
 import { getToolContext } from '../lib/tool-context.js';
+import {
+  asBulletList,
+  asCodeBlock,
+  buildOutput,
+} from '../lib/tool-formatters.js';
 import {
   validateFormat,
   validatePrompt,
@@ -65,29 +70,44 @@ function resolveInputs(input: RefinePromptInput): ResolvedRefineInputs {
   return { validatedPrompt, validatedTechnique, resolvedFormat };
 }
 
-function buildCacheHitResponse(
+function buildCorrections(original: string, refined: string): string[] {
+  if (refined === original) {
+    return ['No changes needed - prompt is already well-formed'];
+  }
+
+  const corrections = ['Applied LLM refinement'];
+  if (original.length !== refined.length) {
+    corrections.push(`Length: ${original.length} -> ${refined.length} chars`);
+  }
+  return corrections;
+}
+
+function buildRefineOutput(
   refined: string,
-  input: ResolvedRefineInputs
-): ReturnType<typeof createSuccessResponse> {
-  logger.debug('Cache hit for refinement');
-  return createSuccessResponse(refined, {
-    ok: true,
-    original: input.validatedPrompt,
-    refined,
-    corrections: ['Retrieved from cache'],
-    technique: input.validatedTechnique,
-    targetFormat: input.resolvedFormat,
-    usedFallback: false,
-    fromCache: true,
-  });
+  corrections: string[],
+  input: ResolvedRefineInputs,
+  provider: { provider: string; model: string }
+): string {
+  const meta = [
+    `Provider: ${provider.provider} (${provider.model})`,
+    `Technique: ${input.validatedTechnique}`,
+    `Target format: ${input.resolvedFormat}`,
+  ];
+
+  return buildOutput('Prompt Refinement', meta, [
+    { title: 'Refined Prompt', lines: asCodeBlock(refined) },
+    { title: 'Changes', lines: asBulletList(corrections) },
+  ]);
 }
 
 function buildRefineResponse(
   refined: string,
   corrections: string[],
-  input: ResolvedRefineInputs
+  input: ResolvedRefineInputs,
+  provider: { provider: string; model: string }
 ): ReturnType<typeof createSuccessResponse> {
-  return createSuccessResponse(refined, {
+  const output = buildRefineOutput(refined, corrections, input, provider);
+  return createSuccessResponse(output, {
     ok: true,
     original: input.validatedPrompt,
     refined,
@@ -95,11 +115,12 @@ function buildRefineResponse(
     technique: input.validatedTechnique,
     targetFormat: input.resolvedFormat,
     usedFallback: false,
-    fromCache: false,
+    provider: provider.provider,
+    model: provider.model,
   });
 }
 
-async function refineAndCache(
+async function refineWithLLM(
   input: ResolvedRefineInputs,
   signal: AbortSignal
 ): Promise<{ refined: string; corrections: string[] }> {
@@ -107,23 +128,11 @@ async function refineAndCache(
     input.validatedPrompt,
     input.validatedTechnique,
     input.resolvedFormat,
-    2000,
-    60000,
+    REFINE_MAX_TOKENS,
+    REFINE_TIMEOUT_MS,
     signal
   );
-  const corrections: string[] = [];
-  if (refined !== input.validatedPrompt) {
-    corrections.push('Applied LLM refinement');
-    corrections.push(`Technique: ${input.validatedTechnique}`);
-    setCachedRefinement(
-      input.validatedPrompt,
-      input.validatedTechnique,
-      input.resolvedFormat,
-      refined
-    );
-  } else {
-    corrections.push('No changes needed - prompt is already well-formed');
-  }
+  const corrections = buildCorrections(input.validatedPrompt, refined);
   return { refined, corrections };
 }
 
@@ -135,17 +144,12 @@ async function handleRefinePrompt(
 
   try {
     const resolved = resolveInputs(input);
-    const cached = getCachedRefinement(
-      resolved.validatedPrompt,
-      resolved.validatedTechnique,
-      resolved.resolvedFormat
-    );
-    if (cached) return buildCacheHitResponse(cached, resolved);
-    const { refined, corrections } = await refineAndCache(
+    const { refined, corrections } = await refineWithLLM(
       resolved,
       context.request.signal
     );
-    return buildRefineResponse(refined, corrections, resolved);
+    const provider = await getProviderInfo();
+    return buildRefineResponse(refined, corrections, resolved, provider);
   } catch (error) {
     return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
   }

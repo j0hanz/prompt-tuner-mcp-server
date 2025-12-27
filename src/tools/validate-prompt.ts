@@ -6,6 +6,10 @@ import type {
   ServerRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 
+import {
+  VALIDATE_MAX_TOKENS,
+  VALIDATE_TIMEOUT_MS,
+} from '../config/constants.js';
 import type {
   ErrorResponse,
   ValidationIssue,
@@ -16,11 +20,13 @@ import {
   createSuccessResponse,
   ErrorCode,
 } from '../lib/errors.js';
+import { getProviderInfo } from '../lib/llm-client.js';
 import {
   INPUT_HANDLING_SECTION,
   wrapPromptData,
 } from '../lib/prompt-policy.js';
 import { getToolContext } from '../lib/tool-context.js';
+import { asBulletList, buildOutput } from '../lib/tool-formatters.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
 import { validatePrompt } from '../lib/validation.js';
 import {
@@ -30,90 +36,32 @@ import {
 import { ValidationResponseSchema } from '../schemas/llm-responses.js';
 
 const VALIDATION_SYSTEM_PROMPT = `<role>
-You are an expert prompt validator specializing in quality assurance and security.
+You are an expert prompt validator focused on quality and security.
 </role>
 
 <task>
-Validate the prompt for issues, estimate token usage, and detect potential security risks.
+Validate the prompt, estimate tokens, and flag risks.
 </task>
 
 ${INPUT_HANDLING_SECTION}
 
-<workflow>
-1. Read the input prompt.
-2. Identify quality issues and anti-patterns.
-3. Estimate token count (1 token ~= 4 characters).
-4. If Check Injection is true, scan for injection/jailbreak patterns.
-5. Return issues with actionable suggestions.
-</workflow>
-
-<validation_checks>
-1. Anti-patterns:
-   - Vague language or ambiguous references
-   - Missing context or unclear background
-   - Overly long sentences (>30 words without punctuation)
-   - Conflicting or contradictory instructions
-
-2. Token estimation:
-   - Approximate tokens = characters / 4
-   - Flag likely overflows vs model limits
-
-3. Security risks (only if Check Injection is true):
-   - Prompt injection attempts ("ignore previous instructions")
-   - Script injection or hidden commands
-   - Jailbreak patterns or safety bypasses
-   - Data exfiltration requests (system prompt leaks)
-
-4. Quality checks:
-   - Role/persona defined (if helpful)
-   - Output format specified
-   - Clear constraints (ALWAYS/NEVER)
-   - Examples for complex tasks
-</validation_checks>
+<requirements>
+- Identify quality issues (vague language, missing context, poor structure)
+- Estimate tokens (characters / 4)
+- If Check Injection is true, detect injection/jailbreak/data-exfiltration patterns
+- Provide an actionable suggestion for each issue
+- Mark security risks as errors when Check Injection is true
+- Set isValid false if any errors exist
+- If Check Injection is false, do not report security issues
+- If no issues exist, return an empty issues array
+</requirements>
 
 <model_limits>
-| Model   | Token Limit | Notes                           |
-|---------|-------------|----------------------------------|
-| claude  | 200000      | Anthropic Claude 3+             |
-| gpt     | 128000      | OpenAI GPT-4 Turbo              |
-| gemini  | 1000000     | Google Gemini 1.5 Pro           |
-| generic | 8000        | Conservative default            |
+claude 200000 | gpt 128000 | gemini 1000000 | generic 8000
 </model_limits>
 
-<issue_severity>
-| Type    | Meaning                                         |
-|---------|-------------------------------------------------|
-| error   | Must fix before use (security, breaking issues) |
-| warning | Should fix for better results (quality issues)  |
-| info    | Optional improvement (nice-to-have)             |
-</issue_severity>
-
-<rules>
-ALWAYS:
-- Follow the workflow steps in order
-- Use only the provided input; do not invent details
-- Provide accurate token estimates
-- Include an actionable suggestion for each issue
-- If Check Injection is true, mark security risks as errors
-- Set isValid to false if any errors are present
-- If no issues exist, return an empty issues array
-
-ASK:
-- If essential context is missing, add a warning: "Insufficient context: ..."
-
-NEVER:
-- Report security issues if Check Injection is false
-- Flag issues that do not affect prompt quality or safety
-- Output anything outside the required JSON schema
-</rules>
-
 <output_rules>
-Return valid JSON only. Do not include markdown, code fences, or extra text.
-Requirements:
-1. Start with { and end with }
-2. Double quotes for all strings
-3. No trailing commas
-4. Include every required field
+Return JSON only. No markdown or extra text.
 </output_rules>
 
 <schema>
@@ -121,18 +69,10 @@ Requirements:
   "isValid": boolean,
   "tokenEstimate": number,
   "issues": [
-    {
-      "type": "error" | "warning" | "info",
-      "message": string,
-      "suggestion": string
-    }
+    { "type": "error" | "warning" | "info", "message": string, "suggestion": string }
   ]
 }
-</schema>
-
-<final_reminder>
-Return JSON only. No markdown. No code fences. No extra text.
-</final_reminder>`;
+</schema>`;
 
 const INJECTION_KEYWORDS = [
   'injection',
@@ -142,10 +82,12 @@ const INJECTION_KEYWORDS = [
   'exploit',
 ];
 
-// Formats a validation issue as markdown
-function formatIssue(issue: ValidationIssue): string {
-  return `- ${issue.message}\n  - Suggestion: ${issue.suggestion ?? 'N/A'}`;
-}
+const MODEL_LIMITS: Record<'claude' | 'gpt' | 'gemini' | 'generic', number> = {
+  claude: 200000,
+  gpt: 128000,
+  gemini: 1000000,
+  generic: 8000,
+};
 
 interface ValidatePromptInput {
   prompt: string;
@@ -166,49 +108,65 @@ const VALIDATE_PROMPT_TOOL = {
   },
 };
 
-function buildValidationHeader(
-  parsed: ValidationResponse,
-  targetModel: string
-): string[] {
-  return [
-    '# Prompt Validation',
-    '',
-    `**Status**: ${parsed.isValid ? 'Valid' : 'Invalid'}`,
-    `**Token Estimate**: ~${parsed.tokenEstimate} tokens`,
-    `**Target Model**: ${targetModel}`,
-    '',
-  ];
+function formatIssueLine(issue: ValidationIssue): string {
+  if (!issue.suggestion) return issue.message;
+  return `${issue.message} | Suggestion: ${issue.suggestion}`;
 }
 
-function appendIssueSection(
-  sections: string[],
-  title: string,
-  issues: ValidationIssue[]
-): void {
-  if (issues.length === 0) return;
-  sections.push(title, issues.map(formatIssue).join('\n'), '');
+function resolveTokenLimit(targetModel: string): number {
+  return MODEL_LIMITS[targetModel as keyof typeof MODEL_LIMITS];
 }
 
 function formatValidationOutput(
   parsed: ValidationResponse,
-  targetModel: string
+  targetModel: string,
+  tokenLimit: number,
+  provider: { provider: string; model: string }
 ): string {
   const errors = parsed.issues.filter((i) => i.type === 'error');
   const warnings = parsed.issues.filter((i) => i.type === 'warning');
   const infos = parsed.issues.filter((i) => i.type === 'info');
+  const overLimit = parsed.tokenEstimate > tokenLimit;
+  const utilization = Math.round((parsed.tokenEstimate / tokenLimit) * 100);
 
-  const sections = buildValidationHeader(parsed, targetModel);
-  appendIssueSection(sections, `## Errors (${errors.length})`, errors);
-  appendIssueSection(sections, `## Warnings (${warnings.length})`, warnings);
-  appendIssueSection(sections, `## Info (${infos.length})`, infos);
+  const sections = [
+    {
+      title: 'Summary',
+      lines: asBulletList([
+        `Status: ${parsed.isValid ? 'Valid' : 'Invalid'}`,
+        `Target model: ${targetModel}`,
+        `Token estimate: ~${parsed.tokenEstimate} (limit ${tokenLimit})`,
+        `Token utilization: ${utilization}%`,
+        `Over limit: ${overLimit ? 'Yes' : 'No'}`,
+      ]),
+    },
+  ];
 
-  sections.push(
-    '',
-    parsed.isValid
-      ? 'Prompt is ready to use.'
-      : 'Fix errors before using this prompt.'
+  if (errors.length) {
+    sections.push({
+      title: `Errors (${errors.length})`,
+      lines: asBulletList(errors.map(formatIssueLine)),
+    });
+  }
+  if (warnings.length) {
+    sections.push({
+      title: `Warnings (${warnings.length})`,
+      lines: asBulletList(warnings.map(formatIssueLine)),
+    });
+  }
+  if (infos.length) {
+    sections.push({
+      title: `Info (${infos.length})`,
+      lines: asBulletList(infos.map(formatIssueLine)),
+    });
+  }
+
+  return buildOutput(
+    'Prompt Validation',
+    [`Provider: ${provider.provider} (${provider.model})`],
+    sections,
+    [parsed.isValid ? 'Prompt is ready to use.' : 'Fix errors before use.']
   );
-  return sections.join('\n');
 }
 
 function issueMentionsInjection(issue: ValidationIssue): boolean {
@@ -252,17 +210,34 @@ function buildSecurityFlags(
 function buildValidationResponse(
   parsed: ValidationResponse,
   targetModel: string,
-  checkInjection: boolean
+  checkInjection: boolean,
+  tokenLimit: number,
+  provider: { provider: string; model: string }
 ): ReturnType<typeof createSuccessResponse> {
-  const output = formatValidationOutput(parsed, targetModel);
+  const output = formatValidationOutput(
+    parsed,
+    targetModel,
+    tokenLimit,
+    provider
+  );
   const securityFlags = buildSecurityFlags(parsed, checkInjection);
+  const tokenUtilization = Math.round(
+    (parsed.tokenEstimate / tokenLimit) * 100
+  );
+  const overLimit = parsed.tokenEstimate > tokenLimit;
 
   return createSuccessResponse(output, {
     ok: true,
     isValid: parsed.isValid,
     issues: parsed.issues,
     tokenEstimate: parsed.tokenEstimate,
+    tokenLimit,
+    tokenUtilization,
+    overLimit,
+    targetModel,
     securityFlags,
+    provider: provider.provider,
+    model: provider.model,
   });
 }
 
@@ -293,10 +268,21 @@ async function handleValidatePrompt(
       (value) => ValidationResponseSchema.parse(value),
       ErrorCode.E_LLM_FAILED,
       'validate_prompt',
-      { maxTokens: 1000, signal: context.request.signal }
+      {
+        maxTokens: VALIDATE_MAX_TOKENS,
+        timeoutMs: VALIDATE_TIMEOUT_MS,
+        signal: context.request.signal,
+      }
     );
-
-    return buildValidationResponse(parsed, targetModel, checkInjection);
+    const tokenLimit = resolveTokenLimit(targetModel);
+    const provider = await getProviderInfo();
+    return buildValidationResponse(
+      parsed,
+      targetModel,
+      checkInjection,
+      tokenLimit,
+      provider
+    );
   } catch (error) {
     return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
   }
