@@ -5,11 +5,42 @@ import { OPTIMIZATION_TECHNIQUES, TARGET_FORMATS } from '../config/types.js';
 
 const promptSchema = z
   .string()
-  .min(1, 'Prompt cannot be empty')
-  .max(
-    MAX_PROMPT_LENGTH,
-    `Prompt exceeds maximum length of ${MAX_PROMPT_LENGTH} characters`
-  )
+  .superRefine((value, ctx) => {
+    if (value.length > MAX_PROMPT_LENGTH * 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.too_big,
+        maximum: MAX_PROMPT_LENGTH * 2,
+        type: 'string',
+        inclusive: true,
+        message: `Prompt with excessive whitespace rejected (${value.length} characters). Maximum allowed: ${MAX_PROMPT_LENGTH * 2}`,
+      });
+      return;
+    }
+
+    const trimmed = value.trim();
+    if (trimmed.length < 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.too_small,
+        minimum: 1,
+        type: 'string',
+        inclusive: true,
+        message:
+          'Prompt is empty or contains only whitespace. Please provide a valid prompt.',
+      });
+      return;
+    }
+
+    if (trimmed.length > MAX_PROMPT_LENGTH) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.too_big,
+        maximum: MAX_PROMPT_LENGTH,
+        type: 'string',
+        inclusive: true,
+        message: `Prompt exceeds maximum length of ${MAX_PROMPT_LENGTH} characters (${trimmed.length} provided). Please shorten your prompt.`,
+      });
+    }
+  })
+  .transform((value) => value.trim())
   .describe('Prompt text to improve (plain text, Markdown, or XML)');
 
 const techniqueSchema = z

@@ -16,6 +16,7 @@ import {
   createErrorResponse,
   createSuccessResponse,
   ErrorCode,
+  McpError,
 } from '../lib/errors.js';
 import { getProviderInfo } from '../lib/llm-client.js';
 import { normalizeScore } from '../lib/output-normalization.js';
@@ -365,6 +366,15 @@ async function handleOptimizePrompt(
         optimizationResult,
         ['basic'],
         resolved.resolvedFormat
+      );
+    }
+
+    if (!validation.ok) {
+      throw new McpError(
+        ErrorCode.E_LLM_FAILED,
+        `Optimized prompt failed validation${
+          validation.reason ? `: ${validation.reason}` : ''
+        }`
       );
     }
 

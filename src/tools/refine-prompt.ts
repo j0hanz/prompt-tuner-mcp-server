@@ -15,6 +15,7 @@ import {
   createErrorResponse,
   createSuccessResponse,
   ErrorCode,
+  McpError,
 } from '../lib/errors.js';
 import { getProviderInfo } from '../lib/llm-client.js';
 import { refineLLM } from '../lib/llm.js';
@@ -174,30 +175,47 @@ async function refineWithLLM(
       extraInstructions
     );
 
-  const validateOutput = (output: string): boolean => {
-    if (containsOutputScaffolding(output)) return false;
+  const validateOutput = (output: string): { ok: boolean; reason?: string } => {
+    if (containsOutputScaffolding(output)) {
+      return { ok: false, reason: 'Output contains scaffolding or formatting' };
+    }
     const validation = validateTechniqueOutput(
       output,
       techniqueUsed,
       input.resolvedFormat
     );
-    return validation.ok;
+    return validation.ok
+      ? { ok: true }
+      : { ok: false, reason: validation.reason };
   };
 
   let refined = await attemptRefinement(techniqueUsed);
   refined = normalizePromptText(refined).normalized;
 
-  if (!validateOutput(refined)) {
+  let validation = validateOutput(refined);
+
+  if (!validation.ok) {
     refined = await attemptRefinement(techniqueUsed, STRICT_REFINEMENT_RULES);
     refined = normalizePromptText(refined).normalized;
     usedFallback = true;
+    validation = validateOutput(refined);
   }
 
-  if (!validateOutput(refined) && techniqueUsed !== 'basic') {
+  if (!validation.ok && techniqueUsed !== 'basic') {
     techniqueUsed = 'basic';
     refined = await attemptRefinement(techniqueUsed, STRICT_REFINEMENT_RULES);
     refined = normalizePromptText(refined).normalized;
     usedFallback = true;
+    validation = validateOutput(refined);
+  }
+
+  if (!validation.ok) {
+    throw new McpError(
+      ErrorCode.E_LLM_FAILED,
+      `Refined prompt failed validation${
+        validation.reason ? `: ${validation.reason}` : ''
+      }`
+    );
   }
 
   const corrections = buildCorrections(input.validatedPrompt, refined);
