@@ -11,9 +11,13 @@ import {
   createSuccessResponse,
   ErrorCode,
 } from '../lib/errors.js';
+import {
+  INPUT_HANDLING_SECTION,
+  wrapPromptData,
+} from '../lib/prompt-policy.js';
 import { getToolContext } from '../lib/tool-context.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
-import { escapePromptForXml, validatePrompt } from '../lib/validation.js';
+import { validatePrompt } from '../lib/validation.js';
 import {
   ComparePromptsInputSchema,
   ComparePromptsOutputSchema,
@@ -28,44 +32,52 @@ You are an expert prompt evaluator specializing in comparative analysis.
 Compare two prompts and determine which is more effective across five dimensions.
 </task>
 
+${INPUT_HANDLING_SECTION}
+
+<workflow>
+1. Read Prompt A and Prompt B.
+2. Score each prompt across the five dimensions.
+3. Decide a winner or a tie (<=2 overall points).
+4. List improvements/regressions and give a clear recommendation.
+</workflow>
+
 <criteria>
 Score each prompt from 0 to 100 for:
-1. Clarity - Clear, unambiguous language with no vague terms
-2. Specificity - Concrete details, explicit constraints, measurable requirements
-3. Completeness - Context, requirements, and output format all specified
-4. Structure - Organization, logical flow, appropriate formatting
-5. Effectiveness - Likelihood of producing high-quality, consistent responses
+- Clarity: unambiguous language, no vague terms
+- Specificity: concrete details and constraints
+- Completeness: context, requirements, output format
+- Structure: organization and logical flow
+- Effectiveness: likelihood of consistent, high-quality responses
 </criteria>
 
-<comparison_rules>
-- Use integer scores only (no decimals).
-- If overall scores differ by 2 points or less, declare a "tie".
-- "improvements" lists what Prompt B does BETTER than Prompt A.
-- "regressions" lists what Prompt B does WORSE than Prompt A.
-- Keep improvement/regression descriptions short and actionable (5-15 words).
-</comparison_rules>
-
 <edge_cases>
-- If prompts are identical: Both get same scores, winner is "tie", no improvements/regressions.
-- If one prompt is significantly longer: Length alone is not a factor; only quality matters.
-- If prompts have different goals: Score based on how well each achieves its own goal.
+- Identical prompts: same scores, winner "tie", no improvements/regressions
+- Different goals: score each prompt by how well it meets its own goal
+- Length differences: do not favor longer prompts
 </edge_cases>
 
 <rules>
 ALWAYS:
-- Compare prompts objectively based on the criteria
-- Provide specific, actionable recommendations
-- List at least one improvement or regression (unless identical)
-- Make the recommendation specific to the use case
+- Follow the workflow steps in order
+- Use only the provided inputs; do not invent details
+- Use integer scores only (no decimals)
+- If overall scores differ by 2 points or less, return "tie"
+- "improvements" lists what Prompt B does better than Prompt A
+- "regressions" lists what Prompt B does worse than Prompt A
+- List at least one improvement or regression unless prompts are identical
+- Keep improvements/regressions short and actionable (5-15 words)
+
+ASK:
+- If a prompt lacks essential context, note "Insufficient context: ..." in recommendation
 
 NEVER:
-- Let length bias the comparison (longer ≠ better)
-- Give identical scores without careful comparison
+- Let length bias the comparison
 - Provide vague recommendations like "make it better"
+- Output anything outside the required JSON schema
 </rules>
 
 <output_rules>
-Return valid JSON only. No markdown, no code fences, no extra text.
+Return valid JSON only. No markdown, no code fences, or extra text.
 Requirements:
 1. Start with { and end with }
 2. Double quotes for all strings
@@ -233,7 +245,11 @@ function buildComparePrompt(
 ): string {
   const safeLabelA = escapeXmlAttribute(labelA);
   const safeLabelB = escapeXmlAttribute(labelB);
-  return `${COMPARE_SYSTEM_PROMPT}\n\n<prompt_a label="${safeLabelA}">\n${promptA}\n</prompt_a>\n\n<prompt_b label="${safeLabelB}">\n${promptB}\n</prompt_b>`;
+  return `${COMPARE_SYSTEM_PROMPT}\n\n<prompt_a label="${safeLabelA}">\n${wrapPromptData(
+    promptA
+  )}\n</prompt_a>\n\n<prompt_b label="${safeLabelB}">\n${wrapPromptData(
+    promptB
+  )}\n</prompt_b>`;
 }
 
 async function runComparison(
@@ -295,9 +311,12 @@ async function runCompareFlow(
   const validatedA = validatePrompt(input.promptA);
   const validatedB = validatePrompt(input.promptB);
   const { labelA, labelB } = resolveLabels(input);
-  const safeA = escapePromptForXml(validatedA);
-  const safeB = escapePromptForXml(validatedB);
-  const comparePrompt = buildComparePrompt(labelA, labelB, safeA, safeB);
+  const comparePrompt = buildComparePrompt(
+    labelA,
+    labelB,
+    validatedA,
+    validatedB
+  );
   const parsed = await runComparison(comparePrompt, signal);
   return buildCompareResponse(parsed, validatedA, validatedB, labelA, labelB);
 }

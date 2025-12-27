@@ -14,9 +14,13 @@ import {
   createSuccessResponse,
   ErrorCode,
 } from '../lib/errors.js';
+import {
+  INPUT_HANDLING_SECTION,
+  wrapPromptData,
+} from '../lib/prompt-policy.js';
 import { getToolContext } from '../lib/tool-context.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
-import { escapePromptForXml, validatePrompt } from '../lib/validation.js';
+import { validatePrompt } from '../lib/validation.js';
 import {
   DetectFormatInputSchema,
   DetectFormatOutputSchema,
@@ -28,60 +32,70 @@ You are an expert at detecting and classifying AI prompt formats.
 </role>
 
 <task>
-Analyze the prompt and determine its target format with a confidence score.
+Identify the dominant prompt format and return a confidence score with a recommendation.
 </task>
 
+${INPUT_HANDLING_SECTION}
+
+<workflow>
+1. Read the input prompt.
+2. Check for format indicators.
+3. Choose the dominant format or "auto".
+4. Provide confidence (0-100) and a short recommendation.
+</workflow>
+
 <formats>
-1. **Claude XML**: Uses semantic XML tags for structure
-2. **GPT Markdown**: Uses Markdown headings and formatting
-3. **JSON**: Structured schema or key-value patterns
-4. **Auto**: No dominant format detected or multiple formats mixed
+- Claude XML: semantic XML tags
+- GPT Markdown: headings, lists, emphasis
+- JSON: schemas or explicit JSON output requests
+- Auto: mixed or no dominant format
 </formats>
 
 <detection_criteria>
-**Claude XML indicators (weight each 20%):**
-- Semantic XML tags: <context>, <task>, <requirements>, <output_format>, <role>
-- Angle-bracketed structure for organization
-- Nested tag hierarchy
-- XML-style attribute usage
+Claude XML indicators:
+- Semantic tags (<context>, <task>, <requirements>)
+- Nested tag structure
+- XML-style attributes
 
-**GPT Markdown indicators (weight each 20%):**
-- Markdown headings: # for main sections, ## for subsections
-- Emphasis markers: **bold**, *italic*, \`code\`
-- Bullet lists (- or *) or numbered lists (1. 2. 3.)
-- Horizontal rules (---)
+GPT Markdown indicators:
+- Headings (#, ##)
+- Lists or numbered steps
+- Emphasis (**bold**, \`code\`)
 
-**JSON indicators (weight each 20%):**
-- Explicit JSON schema definition
-- Curly braces with quoted keys: {"key": "value"}
-- Request for JSON output format
-- Schema validation language ("must be", "required fields")
+JSON indicators:
+- JSON schema or quoted keys with braces
+- Explicit "return JSON" instructions
 </detection_criteria>
 
 <confidence_scale>
-| Confidence | Meaning                                        |
-|------------|------------------------------------------------|
-| 90-100     | Single clear format, no ambiguity              |
-| 70-89      | Dominant format with minor mixed elements      |
-| 50-69      | Multiple formats present, one slightly dominant|
-| 0-49       | No clear format or heavily mixed (return auto) |
+| Confidence | Meaning                                  |
+|------------|------------------------------------------|
+| 90-100     | Single clear format, no ambiguity        |
+| 70-89      | Dominant format with minor mixed elements|
+| 50-69      | Mixed formats, one slightly dominant     |
+| 0-49       | No clear format (return auto)            |
 </confidence_scale>
 
 <rules>
 ALWAYS:
-- Return a single detected format (the dominant one)
+- Follow the workflow steps in order
+- Use only the provided input; do not invent details
+- Return a single detected format
 - Provide confidence as an integer (0-100)
-- Give a specific, actionable recommendation
 - Default to "auto" when confidence would be below 50
 
+ASK:
+- If mixed signals are strong, mention the ambiguity in the recommendation
+
 NEVER:
-- Return multiple formats in detectedFormat field
-- Give confidence above 90 if any mixed formatting is present
-- Recommend mixing XML and Markdown
+- Return multiple formats in detectedFormat
+- Give confidence above 90 if mixed formatting is present
+- Recommend mixing XML and Markdown in the same prompt
+- Output anything outside the required JSON schema
 </rules>
 
 <output_rules>
-Return valid JSON only. No markdown, no code fences, no extra text.
+Return valid JSON only. No markdown, no code fences, or extra text.
 Requirements:
 1. Start with { and end with }
 2. Double quotes for all strings
@@ -93,7 +107,7 @@ Requirements:
 {
   "detectedFormat": "gpt",
   "confidence": 85,
-  "recommendation": "The prompt uses Markdown-style headings and lists; add an explicit output section to strengthen GPT structure."
+  "recommendation": "The prompt uses Markdown headings and lists; add an explicit output section to strengthen GPT structure."
 }
 </example_json>
 
@@ -146,8 +160,9 @@ async function handleDetectFormat(
 
   try {
     const validatedPrompt = validatePrompt(input.prompt);
-    const safePrompt = escapePromptForXml(validatedPrompt);
-    const detectionPrompt = `${FORMAT_DETECTION_PROMPT}\n\n<prompt_to_analyze>\n${safePrompt}\n</prompt_to_analyze>`;
+    const detectionPrompt = `${FORMAT_DETECTION_PROMPT}\n\n<prompt_to_analyze>\n${wrapPromptData(
+      validatedPrompt
+    )}\n</prompt_to_analyze>`;
 
     const parsed = await executeLLMWithJsonResponse<FormatDetectionResponse>(
       detectionPrompt,

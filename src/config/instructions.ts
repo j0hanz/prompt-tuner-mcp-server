@@ -1,15 +1,17 @@
 export const SERVER_INSTRUCTIONS = `# PromptTuner MCP
 
-A professional prompt engineering toolkit that helps you write better prompts for AI assistants using modern best practices from Anthropic, OpenAI, and industry leaders.
+A prompt engineering toolkit for refining, analyzing, and validating prompts using modern best practices.
 
 ## Quick Start
 
 | Goal | Tool | When to Use |
 |------|------|-------------|
-| Quick fix | \`refine_prompt\` | Fix typos, improve clarity |
+| Quick fix | \`refine_prompt\` | Fix typos and clarity issues |
 | Deep optimization | \`optimize_prompt\` | Apply multiple techniques |
 | Quality check | \`analyze_prompt\` | Get scores and suggestions |
-| Format detection | \`detect_format\` | Check Claude/GPT compatibility |
+| Format detection | \`detect_format\` | Check Claude/GPT/JSON format |
+| Safety check | \`validate_prompt\` | Find issues and estimate tokens |
+| A/B comparison | \`compare_prompts\` | Compare two prompt versions |
 
 ## Tools
 
@@ -30,17 +32,10 @@ Improves a prompt using a single optimization technique.
 \`\`\`
 
 ### analyze_prompt
-Scores your prompt (0-100) across five dimensions:
-- **Clarity** - Is the intent clear and unambiguous?
-- **Specificity** - Are requirements well-defined?
-- **Completeness** - Is context and output format specified?
-- **Structure** - Is it well-organized?
-- **Effectiveness** - Will it produce good results?
-
-Returns actionable suggestions for improvement.
+Scores your prompt (0-100) across clarity, specificity, completeness, structure, and effectiveness.
 
 ### optimize_prompt
-Chains multiple techniques for maximum improvement. Shows before/after scores and a diff of changes.
+Chains multiple techniques for maximum improvement and returns before/after scores plus improvements.
 
 **Example:**
 \`\`\`json
@@ -48,7 +43,13 @@ Chains multiple techniques for maximum improvement. Shows before/after scores an
 \`\`\`
 
 ### detect_format
-Identifies the target format (Claude XML, GPT Markdown, or JSON) with confidence score and recommendation.
+Identifies the target format (Claude XML, GPT Markdown, or JSON) with confidence and recommendation.
+
+### validate_prompt
+Checks for prompt issues, estimates token usage, and optionally detects injection risks.
+
+### compare_prompts
+Compares two prompt versions with scores, winner, and recommendations.
 
 ## Target Formats
 
@@ -77,31 +78,26 @@ Identifies the target format (Claude XML, GPT Markdown, or JSON) with confidence
 **Categories:** coding, writing, analysis, system-prompts, data-extraction
 
 ## Workflow Prompts
-- \`quick-optimize\` - Single-step optimization
-- \`full-analysis\` - Comprehensive review with scoring
-- \`convert-format\` - Transform to target format
-- \`best-practices-review\` - Educational feedback
-- \`iterative-improve\` - Multi-technique enhancement
+- \`quick-optimize\` - Single-step refinement
+- \`deep-optimize\` - Comprehensive optimization
+- \`analyze\` - Quality analysis + format detection
+- \`review\` - Best-practices review
+- \`iterative-refine\` - Iterative improvement cycle
+- \`recommend-techniques\` - Technique recommendations
+- \`scan-antipatterns\` - Anti-pattern audit
 
 ## Modern Best Practices (2024-2025)
 
-### Core Principles
-1. **Be Specific** - Replace vague words ("something", "stuff", "etc.") with concrete terms
-2. **Add Role Context** - "You are a senior engineer with expertise in..." activates domain knowledge
-3. **Use Structure** - XML tags for Claude, Markdown for GPT (never mix)
-4. **Show Examples** - 2-3 diverse examples demonstrate desired format
-5. **Add Constraints** - Use ALWAYS/NEVER/MUST patterns for clear boundaries
-6. **Specify Output** - Define exactly what format and structure you expect
-7. **Enable Reasoning** - Use task-specific CoT triggers for complex tasks
+1. **Be Specific** - Replace vague words with concrete terms
+2. **Add Role Context** - Use specific expert personas
+3. **Use Structure** - XML for Claude, Markdown for GPT (never mix)
+4. **Show Examples** - 2-3 diverse examples for pattern tasks
+5. **Add Constraints** - Clear ALWAYS/NEVER rules
+6. **Specify Output** - Define the expected format explicitly
+7. **Enable Reasoning** - Add task-specific reasoning triggers when needed
+8. **Place Key Instructions Twice** - Start and end for long prompts
 
-### Advanced Techniques (from OpenAI & Anthropic Research)
-8. **Place Instructions Twice** - For long prompts, put key instructions at BOTH beginning AND end
-9. **Use Semantic Tags** - Claude: \`<context>\`, \`<task>\`, \`<requirements>\`, \`<output_format>\`
-10. **Be Literal** - Modern models follow instructions more literally; be precise
-11. **Add Quality Checks** - Include verification steps for important outputs
-12. **Avoid Generic Roles** - "Helpful assistant" provides no benefit; use specific expert roles
-
-### Prompt Architecture (Recommended Order)
+## Prompt Architecture (Recommended Order)
 \`\`\`
 1. Role/Identity (if applicable)
 2. Context/Background

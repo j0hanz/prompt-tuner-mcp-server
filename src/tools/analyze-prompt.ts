@@ -16,9 +16,13 @@ import {
   ErrorCode,
   logger,
 } from '../lib/errors.js';
+import {
+  INPUT_HANDLING_SECTION,
+  wrapPromptData,
+} from '../lib/prompt-policy.js';
 import { getToolContext, type ToolContext } from '../lib/tool-context.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
-import { escapePromptForXml, validatePrompt } from '../lib/validation.js';
+import { validatePrompt } from '../lib/validation.js';
 import {
   AnalyzePromptInputSchema,
   AnalyzePromptOutputSchema,
@@ -26,63 +30,63 @@ import {
 import { AnalysisResponseSchema } from '../schemas/llm-responses.js';
 
 const ANALYSIS_SYSTEM_PROMPT = `<role>
-You are an expert prompt engineering analyst specializing in prompt quality assessment.
+You are an expert prompt analyst focused on measurable quality assessment.
 </role>
 
 <task>
-Analyze the provided prompt and return quality scores across five dimensions.
+Score the prompt across clarity, specificity, completeness, structure, and effectiveness.
 </task>
+
+${INPUT_HANDLING_SECTION}
+
+<workflow>
+1. Read the input prompt.
+2. Identify strengths, weaknesses, and missing context.
+3. Assign integer scores (0-100) and an overall score.
+4. Populate characteristics and 2-3 actionable suggestions.
+</workflow>
 
 <scoring>
 Each dimension uses an integer score from 0 to 100:
-1. Clarity - Clear language, minimal ambiguity, no vague terms
-2. Specificity - Concrete details, measurable constraints, explicit requirements
-3. Completeness - Context provided, output format specified, constraints defined
-4. Structure - Organized layout, logical flow, appropriate formatting
-5. Effectiveness - Likelihood of producing high-quality, consistent AI responses
+- Clarity: clear language, minimal ambiguity
+- Specificity: concrete details and constraints
+- Completeness: context, output format, constraints
+- Structure: organized layout and flow
+- Effectiveness: likelihood of consistent, high-quality responses
 
 Score interpretation:
-| Range   | Rating     | Description                        |
-|---------|------------|------------------------------------|
-| 80-100  | Excellent  | Production-ready, minimal changes  |
-| 60-79   | Good       | Functional, minor improvements     |
-| 40-59   | Fair       | Needs work, several gaps           |
-| 0-39    | Poor       | Major revision required            |
+| Range   | Rating     | Description                       |
+|---------|------------|-----------------------------------|
+| 80-100  | Excellent  | Production-ready, minimal changes |
+| 60-79   | Good       | Functional, minor improvements    |
+| 40-59   | Fair       | Needs work, several gaps          |
+| 0-39    | Poor       | Major revision required           |
 </scoring>
 
 <analysis_checks>
-Check for these specific issues:
-
-**Vague language indicators:**
-- Generic terms: "something", "stuff", "things", "etc.", "various"
-- Ambiguous references: "it", "this", "that" without clear antecedents
-- Weak qualifiers: "maybe", "possibly", "might", "kind of"
-
-**Structure indicators:**
-- Role/persona definition present
-- Clear task statement
-- Explicit output format specification
-- ALWAYS/NEVER constraints
-- Examples or demonstrations
-- Reasoning guidance (for complex tasks)
-
-**Quality indicators:**
-- Typos and grammar issues
-- Word count and complexity level
-- Format type (XML, Markdown, plain text)
+- Vague language or ambiguous references
+- Missing role/context/output format/constraints/examples
+- Structure (sections, lists, logical order)
+- Typos or grammar issues
+- Format type (claude xml, gpt markdown, json, auto)
 </analysis_checks>
 
 <rules>
 ALWAYS:
+- Follow the workflow steps in order
+- Use only the provided input; do not invent details
 - Provide integer scores (no decimals)
-- Include at least 2-3 actionable suggestions
-- Detect the format type accurately (claude/gpt/json/auto)
-- Base scores on objective criteria, not personal preference
+- Include 2-3 concise, actionable suggestions
+- Set missingContext true when essential context is absent
+- Detect format as claude, gpt, json, or auto
+
+ASK:
+- If the prompt is vague or incomplete, include "Insufficient context: ..." in suggestions
 
 NEVER:
-- Give a perfect 100 score unless truly flawless
+- Give a perfect 100 unless truly flawless
 - Suggest changes that alter the prompt's core intent
-- Include suggestions that contradict each other
+- Output anything outside the required JSON schema
 </rules>
 
 <output_rules>
@@ -119,7 +123,7 @@ Requirements:
   },
   "suggestions": [
     "Replace vague terms with specific examples",
-    "Add concrete output format requirements",
+    "Add explicit output format requirements",
     "Include clear constraints or requirements"
   ]
 }
@@ -251,7 +255,9 @@ async function sendProgress(
 }
 
 function buildAnalysisPrompt(prompt: string): string {
-  return `${ANALYSIS_SYSTEM_PROMPT}\n\n<prompt_to_analyze>\n${prompt}\n</prompt_to_analyze>`;
+  return `${ANALYSIS_SYSTEM_PROMPT}\n\n<prompt_to_analyze>\n${wrapPromptData(
+    prompt
+  )}\n</prompt_to_analyze>`;
 }
 
 async function runAnalysis(
@@ -298,8 +304,7 @@ async function handleAnalyzePrompt(
     const validatedPrompt = validatePrompt(input.prompt);
     await sendProgress(context, 'started', 0);
 
-    const safePrompt = escapePromptForXml(validatedPrompt);
-    const analysisPrompt = buildAnalysisPrompt(safePrompt);
+    const analysisPrompt = buildAnalysisPrompt(validatedPrompt);
     const analysisResult = await runAnalysis(
       analysisPrompt,
       context.request.signal

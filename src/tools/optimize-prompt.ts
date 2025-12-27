@@ -17,10 +17,13 @@ import {
   ErrorCode,
 } from '../lib/errors.js';
 import { resolveFormat } from '../lib/prompt-analysis.js';
+import {
+  INPUT_HANDLING_SECTION,
+  wrapPromptData,
+} from '../lib/prompt-policy.js';
 import { getToolContext } from '../lib/tool-context.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
 import {
-  escapePromptForXml,
   validateFormat,
   validatePrompt,
   validateTechniques,
@@ -39,40 +42,52 @@ You are an expert prompt engineer specializing in prompt optimization.
 Apply the requested optimization techniques to improve the prompt's effectiveness.
 </task>
 
+${INPUT_HANDLING_SECTION}
+
+<workflow>
+1. Read the input prompt.
+2. Apply techniques in the requested order, skipping any that add no value.
+3. Keep the prompt aligned to the target format.
+4. Produce before/after scores and list improvements.
+</workflow>
+
 <techniques>
-| Technique       | What It Does                                    | When to Apply                          |
-|-----------------|-------------------------------------------------|----------------------------------------|
-| basic           | Fix grammar, spelling, clarity, vague words    | Always beneficial                      |
-| chainOfThought  | Add step-by-step reasoning triggers            | Complex reasoning, math, debugging     |
-| fewShot         | Add 2-3 diverse input/output examples          | Classification, formatting, patterns   |
-| roleBased       | Add expert persona with domain expertise       | Tasks requiring specialized knowledge  |
-| structured      | Add XML (Claude) or Markdown (GPT) structure   | Multi-part instructions, complex tasks |
-| comprehensive   | Apply all techniques intelligently             | Prompts needing significant improvement|
+| Technique       | Purpose                                      | When to Apply                         |
+|-----------------|----------------------------------------------|---------------------------------------|
+| basic           | Fix grammar, clarity, vague words           | Always beneficial                     |
+| chainOfThought  | Add reasoning triggers                       | Complex reasoning, debugging          |
+| fewShot         | Add 2-3 diverse examples                     | Classification, formatting, patterns  |
+| roleBased       | Add expert persona                            | Domain expertise needed               |
+| structured      | Add XML/Markdown structure                   | Multi-part or complex tasks           |
+| comprehensive   | Apply multiple techniques intelligently      | Significant improvement needed        |
 </techniques>
 
 <rules>
 ALWAYS:
-- Apply techniques in the requested order, building on each refinement
-- Preserve the original intent and task boundaries exactly
-- Match the optimized prompt to the target format (XML for Claude, Markdown for GPT)
-- Provide accurate before and after scores based on objective criteria
+- Follow the workflow steps in order
+- Preserve the original intent and task boundaries
+- Match the optimized prompt to the target format
 - Use integer scores only (no decimals)
+- List only techniques actually applied
+
+ASK:
+- If essential context is missing, note "Insufficient context: ..." in improvements
 
 NEVER:
-- Over-engineer simple prompts (match complexity to task)
-- Change the core task or add requirements not implied by the original
-- Mix XML and Markdown formatting in the same prompt
-- Apply techniques that don't add value (e.g., CoT for simple lookups)
+- Over-engineer simple prompts
+- Add requirements not implied by the original
+- Mix XML and Markdown in the same prompt
+- Output anything outside the required JSON schema
 </rules>
 
 <scoring>
 Provide integer scores from 0 to 100 for:
-- Clarity: Clear language, no ambiguity
-- Specificity: Concrete details, explicit constraints
-- Completeness: Context, output format, constraints specified
-- Structure: Logical organization, appropriate formatting
-- Effectiveness: Likelihood of consistent, quality responses
-- Overall: Weighted average of all dimensions
+- Clarity
+- Specificity
+- Completeness
+- Structure
+- Effectiveness
+- Overall (weighted average)
 </scoring>
 
 <output_rules>
@@ -231,7 +246,7 @@ function buildOptimizePrompt(
 ): string {
   return `${OPTIMIZE_SYSTEM_PROMPT}\n\nTarget Format: ${resolvedFormat}\nTechniques to apply: ${techniques.join(
     ', '
-  )}\n\n<original_prompt>\n${prompt}\n</original_prompt>`;
+  )}\n\n<original_prompt>\n${wrapPromptData(prompt)}\n</original_prompt>`;
 }
 
 function resolveOptimizeInputs(
@@ -288,9 +303,8 @@ async function handleOptimizePrompt(
 
   try {
     const resolved = resolveOptimizeInputs(input);
-    const safePrompt = escapePromptForXml(resolved.validatedPrompt);
     const optimizePrompt = buildOptimizePrompt(
-      safePrompt,
+      resolved.validatedPrompt,
       resolved.resolvedFormat,
       resolved.validatedTechniques
     );
