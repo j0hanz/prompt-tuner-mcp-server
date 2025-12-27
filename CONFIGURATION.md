@@ -1,224 +1,218 @@
 # PromptTuner MCP Configuration Guide
 
-## Environment Variables
+PromptTuner MCP is configured entirely via environment variables. Set them in your MCP client configuration (for example `mcp.json`, `claude_desktop_config.json`) or a `.env` file.
 
-All configuration is done through environment variables. Set them in your MCP client configuration (e.g., `mcp.json` for VS Code) or in a `.env` file.
+## Required configuration
 
-### Required Configuration
+You must pick a provider and supply its API key.
 
-| Variable            | Description             | Default           | Example                                                                              |
-| ------------------- | ----------------------- | ----------------- | ------------------------------------------------------------------------------------ |
-| `LLM_PROVIDER`      | LLM provider to use     | `openai`          | `openai`, `anthropic`, `google`                                                      |
-| `OPENAI_API_KEY`    | OpenAI API key          | -                 | `sk-...`                                                                             |
-| `ANTHROPIC_API_KEY` | Anthropic API key       | -                 | `sk-ant-...`                                                                         |
-| `GOOGLE_API_KEY`    | Google Gemini API key   | -                 | `AIzaSy...`                                                                          |
-| `LLM_MODEL`         | Model to use (optional) | Provider-specific | `gpt-4o`, `claude-3-5-sonnet-20241022`, `gemini-2.0-flash-exp`, `gemini-2.5-pro-exp` |
+| Variable | Default | Description |
+| --- | --- | --- |
+| `LLM_PROVIDER` | `openai` | `openai`, `anthropic`, or `google`. |
+| `OPENAI_API_KEY` | - | Required when `LLM_PROVIDER=openai`. |
+| `ANTHROPIC_API_KEY` | - | Required when `LLM_PROVIDER=anthropic`. |
+| `GOOGLE_API_KEY` | - | Required when `LLM_PROVIDER=google`. |
 
-**Note**: Only provide the API key for your chosen provider.
-**Note**: Every tool invocation calls the configured provider; there is no response cache.
+PromptTuner checks that the correct API key environment variable is set at startup. The provider will reject invalid keys at request time.
 
-### Performance & Limits (Optional)
+## Provider defaults
 
-| Variable            | Description               | Default         | Recommended Range       |
-| ------------------- | ------------------------- | --------------- | ----------------------- |
-| `LLM_TIMEOUT_MS`    | LLM request timeout (ms)  | `60000` (1 min) | 30000-120000            |
-| `LLM_MAX_TOKENS`    | Max tokens per response   | `8000`          | 2000-16000 (pro: 8000+) |
-| `MAX_PROMPT_LENGTH` | Max prompt length (chars) | `10000`         | 5000-50000              |
+| Provider | Default model | API key env |
+| --- | --- | --- |
+| `openai` | `gpt-4o` | `OPENAI_API_KEY` |
+| `anthropic` | `claude-3-5-sonnet-20241022` | `ANTHROPIC_API_KEY` |
+| `google` | `gemini-2.0-flash-exp` | `GOOGLE_API_KEY` |
 
-### Retry Configuration (Optional)
+Set `LLM_MODEL` to override the default model for the chosen provider.
 
-| Variable                 | Description                    | Default          | Recommended Range |
-| ------------------------ | ------------------------------ | ---------------- | ----------------- |
-| `RETRY_MAX_ATTEMPTS`     | Max retry attempts             | `3`              | 1-5               |
-| `RETRY_BASE_DELAY_MS`    | Initial retry delay (ms)       | `1000`           | 500-2000          |
-| `RETRY_MAX_DELAY_MS`     | Max retry delay (ms)           | `10000`          | 5000-30000        |
-| `RETRY_TOTAL_TIMEOUT_MS` | Total timeout for retries (ms) | `180000` (3 min) | 60000-300000      |
+## Limits and timeouts (optional)
 
-### Logging & Debugging (Optional)
+| Variable | Default | Description |
+| --- | --- | --- |
+| `MAX_PROMPT_LENGTH` | `10000` | Max trimmed prompt length (chars). |
+| `LLM_MAX_TOKENS` | `8000` | Upper bound for model output tokens. |
+| `LLM_TIMEOUT_MS` | `60000` | Per-request timeout (ms). |
 
-| Variable                | Description               | Default | Options         |
-| ----------------------- | ------------------------- | ------- | --------------- |
-| `LOG_FORMAT`            | Log output format         | `text`  | `text`, `json`  |
-| `DEBUG`                 | Enable debug logging      | `false` | `true`, `false` |
-| `INCLUDE_ERROR_CONTEXT` | Include context in errors | `false` | `true`, `false` |
+### Prompt length enforcement
 
-**Security Note**: When `INCLUDE_ERROR_CONTEXT=true`, error responses may include up to 500 characters of the prompt that caused the error. Only enable this in development.
+- Input is trimmed before validation.
+- If raw input exceeds `MAX_PROMPT_LENGTH * 2`, it is rejected as excessive whitespace.
+- If trimmed input exceeds `MAX_PROMPT_LENGTH`, it is rejected.
 
-### Provider-Specific (Optional)
+### Tool token caps
 
-| Variable                 | Description                   | Default | Options         |
-| ------------------------ | ----------------------------- | ------- | --------------- |
-| `GOOGLE_SAFETY_DISABLED` | Disable Gemini safety filters | `false` | `true`, `false` |
+Tool max tokens are derived from `LLM_MAX_TOKENS`:
 
-## Example Configurations
+| Tool | Max tokens |
+| --- | --- |
+| `analyze_prompt` | `min(LLM_MAX_TOKENS, 4000)` |
+| `refine_prompt` | `min(LLM_MAX_TOKENS, 2000)` |
+| `optimize_prompt` | `min(LLM_MAX_TOKENS, 3000)` |
+| `validate_prompt` | `min(LLM_MAX_TOKENS, 1000)` |
 
-### Minimal (Production)
+## Retry behavior (optional)
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `RETRY_MAX_ATTEMPTS` | `3` | Max retry attempts (total attempts = max + 1). |
+| `RETRY_BASE_DELAY_MS` | `1000` | Base delay for exponential backoff. |
+| `RETRY_MAX_DELAY_MS` | `10000` | Max delay between retries. |
+| `RETRY_TOTAL_TIMEOUT_MS` | `180000` | Total time allowed across retries. |
+
+Retries use exponential backoff with jitter and stop when the total timeout is exceeded.
+
+## Logging and error context (optional)
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `DEBUG` | `false` | Enables debug logging. Logs are written to stderr. |
+| `LOG_FORMAT` | `text` | Parsed but currently unused (logging output is JSON via pino). |
+| `INCLUDE_ERROR_CONTEXT` | `false` | Adds a sanitized prompt snippet (up to 200 chars) to errors. |
+
+## Provider-specific settings
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `GOOGLE_SAFETY_DISABLED` | `false` | When true, disables Gemini safety filters. |
+
+## validate_prompt token limits
+
+`validate_prompt` uses fixed limits when calculating `tokenUtilization`:
+
+| targetModel | Token limit |
+| --- | --- |
+| `claude` | `200000` |
+| `gpt` | `128000` |
+| `gemini` | `1000000` |
+| `generic` | `8000` |
+
+## Example configurations
+
+### Minimal (npx)
 
 ```json
 {
-  "prompttuner": {
-    "command": "node",
-    "args": ["/path/to/prompttuner-mcp/dist/index.js"],
-    "env": {
-      "LLM_PROVIDER": "openai",
-      "OPENAI_API_KEY": "${input:openai-api-key}"
+  "mcpServers": {
+    "prompttuner": {
+      "command": "npx",
+      "args": ["-y", "@j0hanz/prompt-tuner-mcp-server@latest"],
+      "env": {
+        "LLM_PROVIDER": "openai",
+        "OPENAI_API_KEY": "${input:openai-api-key}"
+      }
     }
   }
 }
 ```
 
-### Performance Tuned
+### From source (dist build)
 
 ```json
 {
-  "prompttuner": {
-    "command": "node",
-    "args": ["/path/to/prompttuner-mcp/dist/index.js"],
-    "env": {
-      "LLM_PROVIDER": "anthropic",
-      "ANTHROPIC_API_KEY": "${input:anthropic-api-key}",
-      "LLM_MODEL": "claude-3-5-sonnet-20241022",
-      "LLM_TIMEOUT_MS": "90000",
-      "LLM_MAX_TOKENS": "8000",
-      "RETRY_MAX_ATTEMPTS": "5"
+  "mcpServers": {
+    "prompttuner": {
+      "command": "node",
+      "args": ["/path/to/prompttuner-mcp/dist/index.js"],
+      "env": {
+        "LLM_PROVIDER": "anthropic",
+        "ANTHROPIC_API_KEY": "${input:anthropic-api-key}"
+      }
     }
   }
 }
 ```
 
-### Pro Models (Gemini 2.5 Pro, GPT-4o)
+### Performance tuned
 
 ```json
 {
-  "prompttuner": {
-    "command": "node",
-    "args": ["/path/to/prompttuner-mcp/dist/index.js"],
-    "env": {
-      "LLM_PROVIDER": "google",
-      "GOOGLE_API_KEY": "${input:google-api-key}",
-      "LLM_MODEL": "gemini-2.5-pro-exp",
-      "LLM_TIMEOUT_MS": "120000",
-      "LLM_MAX_TOKENS": "16000"
+  "mcpServers": {
+    "prompttuner": {
+      "command": "node",
+      "args": ["/path/to/prompttuner-mcp/dist/index.js"],
+      "env": {
+        "LLM_PROVIDER": "anthropic",
+        "ANTHROPIC_API_KEY": "${input:anthropic-api-key}",
+        "LLM_MODEL": "claude-3-5-sonnet-20241022",
+        "LLM_TIMEOUT_MS": "90000",
+        "LLM_MAX_TOKENS": "8000",
+        "RETRY_MAX_ATTEMPTS": "5"
+      }
     }
   }
 }
 ```
 
-### Development/Debug
+### High volume / low latency
 
 ```json
 {
-  "prompttuner": {
-    "command": "node",
-    "args": ["/path/to/prompttuner-mcp/dist/index.js"],
-    "env": {
-      "LLM_PROVIDER": "google",
-      "GOOGLE_API_KEY": "${input:google-api-key}",
-      "LLM_MODEL": "gemini-2.0-flash-exp",
-      "LOG_FORMAT": "json",
-      "DEBUG": "true",
-      "INCLUDE_ERROR_CONTEXT": "true"
+  "mcpServers": {
+    "prompttuner": {
+      "command": "node",
+      "args": ["/path/to/prompttuner-mcp/dist/index.js"],
+      "env": {
+        "LLM_PROVIDER": "openai",
+        "OPENAI_API_KEY": "${input:openai-api-key}",
+        "LLM_MODEL": "gpt-4o-mini",
+        "LLM_TIMEOUT_MS": "30000",
+        "LLM_MAX_TOKENS": "1500",
+        "RETRY_MAX_ATTEMPTS": "2",
+        "RETRY_BASE_DELAY_MS": "500"
+      }
     }
   }
 }
 ```
 
-### High Volume / Low Latency
+## What is not configurable
 
-```json
-{
-  "prompttuner": {
-    "command": "node",
-    "args": ["/path/to/prompttuner-mcp/dist/index.js"],
-    "env": {
-      "LLM_PROVIDER": "openai",
-      "OPENAI_API_KEY": "${input:openai-api-key}",
-      "LLM_MODEL": "gpt-4o-mini",
-      "LLM_TIMEOUT_MS": "30000",
-      "LLM_MAX_TOKENS": "1500",
-      "RETRY_MAX_ATTEMPTS": "2",
-      "RETRY_BASE_DELAY_MS": "500"
-    }
-  }
-}
-```
+The following behaviors are hardcoded for stability:
 
-## What's NOT Configurable (and Why)
+- Scoring weights: clarity 0.25, specificity 0.25, completeness 0.2, structure 0.15, effectiveness 0.15.
+- Prompt format detection patterns and scoring heuristics.
+- OpenAI temperature (0.7). Other providers use SDK defaults.
+- LLM response length cap (500000 chars) and JSON parsing safeguards.
+- Error context truncation length (200 chars when enabled).
 
-The following are intentionally hardcoded for stability and optimal performance:
+## Migration notes (older configs)
 
-### Scoring Algorithm
+If you have an old `.env` file, remove unused settings:
 
-- **Scoring dimension weights** (clarity: 0.25, specificity: 0.25, etc.)
-- **Reason**: Carefully tuned based on prompt engineering research
-
-### Analysis Constants
-
-- **Pattern matching regex** for detecting prompt characteristics
-- **Reason**: Complex regex patterns that work across all use cases
-
-### LLM Behavior
-
-- **Temperature** (0.7 for refinement tasks)
-- **Reason**: Optimal balance between creativity and consistency for prompt refinement
-
-### Internal Limits
-
-- **Analysis max tokens** (min(LLM_MAX_TOKENS, 4000))
-- **Refine max tokens** (min(LLM_MAX_TOKENS, 2000))
-- **Optimize max tokens** (min(LLM_MAX_TOKENS, 3000))
-- **Validate max tokens** (min(LLM_MAX_TOKENS, 1000))
-- **Tool timeouts** (LLM_TIMEOUT_MS)
-- **Max LLM response length** (500,000 chars)
-- **Error context truncation** (500 chars)
-- **Reason**: Safety constraints to prevent resource exhaustion
-
-## Migration from Old Configuration
-
-If you have an old `.env` file with these variables, **remove them** (they are not used):
-
-- ❌ `PORT` / `HOST` - HTTP mode not fully implemented in stdio version
-- ❌ `API_KEY` - No API authentication in current version
-- ❌ `CORS_ORIGIN` - No HTTP CORS in stdio version
-- ❌ `LOG_LEVEL` - Use `DEBUG=true/false` instead
-- ❌ `RATE_LIMIT` / `RATE_WINDOW_MS` - No rate limiting in current version
-- ❌ `REDIS_URL` / `CACHE_TTL` - No caching is used
-- ❌ `CIRCUIT_BREAKER_*` - Not implemented
-- ❌ `NODE_ENV` - Not used for configuration
-- ❌ `SESSION_TIMEOUT_MS` - No session management
+- `PORT`, `HOST`, `CORS_ORIGIN` (stdio transport only; `--http` is reserved).
+- `API_KEY` (no server-level auth).
+- `LOG_LEVEL` (use `DEBUG=true` or false).
+- `RATE_LIMIT`, `RATE_WINDOW_MS` (no server-side rate limiting).
+- `REDIS_URL`, `CACHE_TTL` (no caching).
+- `CIRCUIT_BREAKER_*` (not implemented).
+- `NODE_ENV` (not used for configuration).
+- `SESSION_TIMEOUT_MS` (no session management).
 
 ## Troubleshooting
 
-### High Memory Usage
+### Prompt rejected
 
-- Reduce `MAX_PROMPT_LENGTH` (e.g., `5000`)
+- Reduce `MAX_PROMPT_LENGTH` or trim the input to remove excessive whitespace.
 
-### Timeout Errors
+### Timeout errors
 
-- Increase `LLM_TIMEOUT_MS` (e.g., `90000`)
-- Increase `RETRY_TOTAL_TIMEOUT_MS` (e.g., `300000`)
-- Reduce `LLM_MAX_TOKENS` (e.g., `1500`)
+- Increase `LLM_TIMEOUT_MS` or `RETRY_TOTAL_TIMEOUT_MS`.
+- Reduce `LLM_MAX_TOKENS`.
 
-### Rate Limit Errors
+### Rate limit errors
 
-- Increase `RETRY_BASE_DELAY_MS` (e.g., `2000`)
-- Increase `RETRY_MAX_ATTEMPTS` (e.g., `5`)
+- Increase `RETRY_BASE_DELAY_MS` or `RETRY_MAX_ATTEMPTS`.
+- Reduce request frequency.
 
-### Slow Performance
+### Slow performance
 
-- Use faster model (e.g., `gpt-4o-mini` or `gemini-2.0-flash-exp`)
-- Reduce `LLM_MAX_TOKENS` (e.g., `1500`)
+- Use a faster model (for example `gpt-4o-mini` or `gemini-2.0-flash-exp`).
+- Reduce `LLM_MAX_TOKENS`.
 
-### Debug Logging Not Showing
+## Best practices
 
-- Set `DEBUG=true`
-- Check logs are going to stderr (where MCP logs are captured)
-
-## Best Practices
-
-1. **Always set only one API key** - Only configure the key for your chosen provider
-2. **Use input variables for secrets** - In mcp.json: `"OPENAI_API_KEY": "${input:openai-api-key}"`
-3. **Start with defaults** - Only override what you need
-4. **Enable debug logging temporarily** - `DEBUG=true` for troubleshooting only
-5. **Test timeout settings** - Start conservative, increase if seeing timeout errors
-6. **Use JSON logging in production** - `LOG_FORMAT=json` for easier parsing
+1. Configure only the API key for your chosen provider.
+2. Use input variables for secrets (for example `"OPENAI_API_KEY": "${input:openai-api-key}"`).
+3. Start with defaults and tune only when needed.
+4. Enable `DEBUG=true` temporarily for troubleshooting.
+5. Prefer JSON logging in production (current output is JSON via pino).

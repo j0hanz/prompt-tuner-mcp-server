@@ -18,6 +18,10 @@ import {
 } from '../lib/errors.js';
 import { getProviderInfo } from '../lib/llm-client.js';
 import {
+  mergeCharacteristics,
+  normalizeScore,
+} from '../lib/output-normalization.js';
+import {
   INPUT_HANDLING_SECTION,
   wrapPromptData,
 } from '../lib/prompt-policy.js';
@@ -193,23 +197,27 @@ function buildAnalysisPrompt(prompt: string): string {
 async function runAnalysis(
   analysisPrompt: string,
   signal?: AbortSignal
-): Promise<AnalysisResponse> {
-  return executeLLMWithJsonResponse<AnalysisResponse>(
-    analysisPrompt,
-    (value) => AnalysisResponseSchema.parse(value),
-    ErrorCode.E_LLM_FAILED,
-    TOOL_NAME,
-    {
-      maxTokens: ANALYSIS_MAX_TOKENS,
-      timeoutMs: ANALYSIS_TIMEOUT_MS,
-      signal,
-    }
-  );
+): Promise<{ result: AnalysisResponse; usedFallback: boolean }> {
+  const { value, usedFallback } =
+    await executeLLMWithJsonResponse<AnalysisResponse>(
+      analysisPrompt,
+      (value) => AnalysisResponseSchema.parse(value),
+      ErrorCode.E_LLM_FAILED,
+      TOOL_NAME,
+      {
+        maxTokens: ANALYSIS_MAX_TOKENS,
+        timeoutMs: ANALYSIS_TIMEOUT_MS,
+        signal,
+        retryOnParseFailure: true,
+      }
+    );
+  return { result: value, usedFallback };
 }
 
 function buildAnalysisResponse(
   analysisResult: AnalysisResponse,
-  provider: { provider: string; model: string }
+  provider: { provider: string; model: string },
+  meta: { usedFallback: boolean; scoreAdjusted: boolean; overallSource: string }
 ): ReturnType<typeof createSuccessResponse> {
   const output = formatAnalysisOutput(analysisResult, provider);
   return createSuccessResponse(output, {
@@ -220,6 +228,9 @@ function buildAnalysisResponse(
     suggestions: analysisResult.suggestions,
     score: analysisResult.score,
     characteristics: analysisResult.characteristics,
+    usedFallback: meta.usedFallback,
+    scoreAdjusted: meta.scoreAdjusted,
+    overallSource: meta.overallSource,
     provider: provider.provider,
     model: provider.model,
   });
@@ -241,12 +252,28 @@ async function handleAnalyzePrompt(
     await sendProgress(context, 'started', 0);
 
     const analysisPrompt = buildAnalysisPrompt(validatedPrompt);
-    const analysisResult = await runAnalysis(
+    const { result, usedFallback } = await runAnalysis(
       analysisPrompt,
       context.request.signal
     );
+    const normalizedScore = normalizeScore(result.score);
+    const characteristics = mergeCharacteristics(
+      validatedPrompt,
+      result.characteristics
+    );
+    const analysisResult: AnalysisResponse = {
+      ...result,
+      score: normalizedScore.score,
+      characteristics,
+    };
+    const scoreAdjusted = normalizedScore.adjusted;
+    const overallSource = scoreAdjusted ? 'server' : 'llm';
     const provider = await getProviderInfo();
-    const response = buildAnalysisResponse(analysisResult, provider);
+    const response = buildAnalysisResponse(analysisResult, provider, {
+      usedFallback,
+      scoreAdjusted,
+      overallSource,
+    });
     await sendProgress(context, 'completed', 100);
     return response;
   } catch (error) {

@@ -87,6 +87,18 @@ const FallbackFields = {
   usedFallback: z.boolean().optional().describe('Whether a fallback was used'),
 };
 
+const OverallSourceSchema = z
+  .enum(['llm', 'server'])
+  .describe('Source of overall scores');
+
+const ScoreAdjustmentFields = {
+  scoreAdjusted: z
+    .boolean()
+    .optional()
+    .describe('Whether overall score was normalized by the server'),
+  overallSource: OverallSourceSchema.optional(),
+};
+
 export const RefinePromptOutputSchema = z
   .object({
     ok: z.boolean().describe('True if refinement succeeded'),
@@ -114,6 +126,8 @@ export const AnalyzePromptOutputSchema = z
     characteristics: CharacteristicsSchema.optional().describe(
       'Prompt characteristics'
     ),
+    ...FallbackFields,
+    ...ScoreAdjustmentFields,
     ...ProviderModelErrorFields,
   })
   .describe('Analyze prompt response');
@@ -139,6 +153,7 @@ export const OptimizePromptOutputSchema = z
       .optional()
       .describe('List of improvements'),
     ...FallbackFields,
+    ...ScoreAdjustmentFields,
     ...ProviderModelErrorFields,
   })
   .describe('Optimize prompt response');

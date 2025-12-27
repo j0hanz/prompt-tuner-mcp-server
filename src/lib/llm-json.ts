@@ -50,6 +50,76 @@ function enforceMaxInputLength(
   );
 }
 
+type JsonBracket = '{' | '}' | '[' | ']';
+
+function isOpeningBracket(value: string): value is '{' | '[' {
+  return value === '{' || value === '[';
+}
+
+function isClosingBracket(value: string): value is '}' | ']' {
+  return value === '}' || value === ']';
+}
+
+function matchesBracket(open: '{' | '[', close: '}' | ']'): boolean {
+  return (open === '{' && close === '}') || (open === '[' && close === ']');
+}
+
+function extractFirstJsonFragment(text: string): string | null {
+  let startIndex = -1;
+  const stack: ('{' | '[')[] = [];
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i] as JsonBracket | '"' | '\\';
+
+    if (startIndex === -1) {
+      if (isOpeningBracket(char)) {
+        startIndex = i;
+        stack.push(char);
+      }
+      continue;
+    }
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (isOpeningBracket(char)) {
+      stack.push(char);
+      continue;
+    }
+
+    if (isClosingBracket(char)) {
+      const last = stack[stack.length - 1];
+      if (last && matchesBracket(last, char)) {
+        stack.pop();
+        if (stack.length === 0) {
+          return text.slice(startIndex, i + 1).trim();
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
 function tryParseJson<T>(
   jsonText: string,
   parse: (value: unknown) => T,
@@ -99,7 +169,10 @@ function throwParseFailure(
     options.errorCode,
     `Failed to parse ${contextLabel} as JSON`,
     undefined,
-    { strategiesAttempted: ['raw', 'codeblock-stripped'] }
+    {
+      strategiesAttempted: ['raw', 'codeblock-stripped', 'extracted-json'],
+      parseFailed: true,
+    }
   );
 }
 
@@ -133,5 +206,16 @@ export function parseJsonFromLlmResponse<T>(
     'stripped markers'
   );
   if (strippedAttempt.success) return strippedAttempt.value;
+
+  const extracted = extractFirstJsonFragment(jsonStr);
+  if (extracted) {
+    const extractedAttempt = tryParseJson(
+      extracted,
+      parse,
+      options.debugLabel,
+      'extracted fragment'
+    );
+    if (extractedAttempt.success) return extractedAttempt.value;
+  }
   return throwParseFailure(options, llmResponseText, maxPreviewChars);
 }

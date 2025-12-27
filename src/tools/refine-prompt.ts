@@ -18,6 +18,11 @@ import {
 } from '../lib/errors.js';
 import { getProviderInfo } from '../lib/llm-client.js';
 import { refineLLM } from '../lib/llm.js';
+import {
+  containsOutputScaffolding,
+  normalizePromptText,
+  validateTechniqueOutput,
+} from '../lib/output-validation.js';
 import { resolveFormat } from '../lib/prompt-analysis.js';
 import { getToolContext } from '../lib/tool-context.js';
 import {
@@ -63,6 +68,8 @@ const REFINE_PROMPT_TOOL = {
 };
 
 const TOOL_NAME = 'refine_prompt' as const;
+const STRICT_REFINEMENT_RULES =
+  '\nSTRICT RULES: Return only the refined prompt text. Do not include headings, explanations, or code fences. Ensure the output follows the selected technique and target format.';
 
 function resolveInputs(input: RefinePromptInput): ResolvedRefineInputs {
   const validatedPrompt = validatePrompt(input.prompt);
@@ -90,11 +97,12 @@ function buildRefineOutput(
   refined: string,
   corrections: string[],
   input: ResolvedRefineInputs,
+  techniqueUsed: OptimizationTechnique,
   provider: { provider: string; model: string }
 ): string {
   const meta = [
     formatProviderLine(provider),
-    `Technique: ${input.validatedTechnique}`,
+    `Technique: ${techniqueUsed}`,
     `Target format: ${input.resolvedFormat}`,
   ];
 
@@ -108,12 +116,20 @@ function buildRefineResponse(
   refined: string,
   corrections: string[],
   input: ResolvedRefineInputs,
+  techniqueUsed: OptimizationTechnique,
+  usedFallback: boolean,
   provider: { provider: string; model: string }
 ): ReturnType<typeof createSuccessResponse> {
-  const output = buildRefineOutput(refined, corrections, input, provider);
+  const output = buildRefineOutput(
+    refined,
+    corrections,
+    input,
+    techniqueUsed,
+    provider
+  );
   const promptResource = buildPromptResourceBlock(
     refined,
-    `refined-prompt-${input.validatedTechnique}-${input.resolvedFormat}`
+    `refined-prompt-${techniqueUsed}-${input.resolvedFormat}`
   );
   return createSuccessResponse(
     output,
@@ -122,9 +138,9 @@ function buildRefineResponse(
       original: input.validatedPrompt,
       refined,
       corrections,
-      technique: input.validatedTechnique,
+      technique: techniqueUsed,
       targetFormat: input.resolvedFormat,
-      usedFallback: false,
+      usedFallback,
       provider: provider.provider,
       model: provider.model,
     },
@@ -135,17 +151,57 @@ function buildRefineResponse(
 async function refineWithLLM(
   input: ResolvedRefineInputs,
   signal: AbortSignal
-): Promise<{ refined: string; corrections: string[] }> {
-  const refined = await refineLLM(
-    input.validatedPrompt,
-    input.validatedTechnique,
-    input.resolvedFormat,
-    REFINE_MAX_TOKENS,
-    REFINE_TIMEOUT_MS,
-    signal
-  );
+): Promise<{
+  refined: string;
+  corrections: string[];
+  techniqueUsed: OptimizationTechnique;
+  usedFallback: boolean;
+}> {
+  let usedFallback = false;
+  let techniqueUsed = input.validatedTechnique;
+
+  const attemptRefinement = async (
+    technique: OptimizationTechnique,
+    extraInstructions?: string
+  ): Promise<string> =>
+    refineLLM(
+      input.validatedPrompt,
+      technique,
+      input.resolvedFormat,
+      REFINE_MAX_TOKENS,
+      REFINE_TIMEOUT_MS,
+      signal,
+      extraInstructions
+    );
+
+  const validateOutput = (output: string): boolean => {
+    if (containsOutputScaffolding(output)) return false;
+    const validation = validateTechniqueOutput(
+      output,
+      techniqueUsed,
+      input.resolvedFormat
+    );
+    return validation.ok;
+  };
+
+  let refined = await attemptRefinement(techniqueUsed);
+  refined = normalizePromptText(refined).normalized;
+
+  if (!validateOutput(refined)) {
+    refined = await attemptRefinement(techniqueUsed, STRICT_REFINEMENT_RULES);
+    refined = normalizePromptText(refined).normalized;
+    usedFallback = true;
+  }
+
+  if (!validateOutput(refined) && techniqueUsed !== 'basic') {
+    techniqueUsed = 'basic';
+    refined = await attemptRefinement(techniqueUsed, STRICT_REFINEMENT_RULES);
+    refined = normalizePromptText(refined).normalized;
+    usedFallback = true;
+  }
+
   const corrections = buildCorrections(input.validatedPrompt, refined);
-  return { refined, corrections };
+  return { refined, corrections, techniqueUsed, usedFallback };
 }
 
 async function handleRefinePrompt(
@@ -156,12 +212,17 @@ async function handleRefinePrompt(
 
   try {
     const resolved = resolveInputs(input);
-    const { refined, corrections } = await refineWithLLM(
-      resolved,
-      context.request.signal
-    );
+    const { refined, corrections, techniqueUsed, usedFallback } =
+      await refineWithLLM(resolved, context.request.signal);
     const provider = await getProviderInfo();
-    return buildRefineResponse(refined, corrections, resolved, provider);
+    return buildRefineResponse(
+      refined,
+      corrections,
+      resolved,
+      techniqueUsed,
+      usedFallback,
+      provider
+    );
   } catch (error) {
     return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
   }

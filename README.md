@@ -6,176 +6,30 @@
 [![License](https://img.shields.io/npm/l/@j0hanz/prompt-tuner-mcp-server)](LICENSE)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)](https://nodejs.org/)
 
-An MCP server that helps you write better prompts for AI assistants. It analyzes, refines, and optimizes prompts to improve AI understanding and response quality.
+PromptTuner MCP is an MCP server that refines, analyzes, optimizes, and validates prompts using OpenAI, Anthropic, or Google Gemini.
 
-## ✨ Features
+## What it does
 
-| Feature                | Description                                                                                |
-| :--------------------- | :----------------------------------------------------------------------------------------- |
-| 🔧 **Refine Prompts**  | Fix grammar, improve clarity, and apply optimization techniques like Chain-of-Thought.     |
-| 📊 **Analyze Quality** | Score prompts (0-100) on clarity, specificity, completeness, structure, and effectiveness. |
-| 🚀 **Optimize**        | Apply multiple techniques sequentially for comprehensive improvement.                      |
-| ✅ **Validate**        | Pre-flight checks for anti-patterns, token limits, and security risks.                     |
+1. Validates and trims input prompts (enforces `MAX_PROMPT_LENGTH`).
+2. Resolves the target format (`auto` uses heuristics; falls back to `gpt` if no format is detected).
+3. Calls the selected provider with retry and timeout controls.
+4. Validates and normalizes LLM output, falling back to stricter prompts or the `basic` technique when needed.
+5. Returns human-readable text plus machine-friendly `structuredContent` (and prompt files for refined/optimized outputs).
 
-## 🎯 When to Use
+## Features
 
-- **Before sending a prompt**: Use `refine_prompt` to fix typos and vague language.
-- **When results are poor**: Use `analyze_prompt` to understand why the AI is struggling.
-- **For complex tasks**: Use `optimize_prompt` with "comprehensive" techniques.
-- **For security**: Use `validate_prompt` to check for injection risks.
+- Refine prompts with single techniques or full multi-technique optimization.
+- Analyze quality with scores, characteristics, and actionable suggestions.
+- Validate prompts for issues, token limits, and injection risks.
+- Auto-detect target format (Claude XML, GPT Markdown, or JSON).
+- Structured outputs with provider/model metadata, fallback indicators, and score normalization.
+- Retry logic with exponential backoff for transient provider failures.
 
-## 🚀 Quick Start
+## Quick Start
 
-The easiest way to run PromptTuner is using `npx`.
+PromptTuner runs over stdio (MCP default). The `--http` flag shown in some scripts is reserved and currently has no effect.
 
 ### Claude Desktop
-
-Add this to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "prompttuner": {
-      "command": "npx",
-      "args": ["-y", "@j0hanz/prompt-tuner-mcp-server@latest"],
-      "env": {
-        "LLM_PROVIDER": "openai",
-        "OPENAI_API_KEY": "sk-..."
-      }
-    }
-  }
-}
-```
-
-> **Note**: Replace `OPENAI_API_KEY` with `ANTHROPIC_API_KEY` or `GOOGLE_API_KEY` depending on your `LLM_PROVIDER` choice.
-
-## 📦 Installation
-
-### NPX (Recommended)
-
-```bash
-npx -y @j0hanz/prompt-tuner-mcp-server@latest
-```
-
-### Global Installation
-
-```bash
-npm install -g @j0hanz/prompt-tuner-mcp-server
-```
-
-### From Source
-
-```bash
-git clone https://github.com/j0hanz/prompt-tuner-mcp-server.git
-cd prompt-tuner-mcp-server
-npm install
-npm run build
-```
-
-## ⚙️ Configuration
-
-### Environment Variables
-
-PromptTuner requires an API key from an LLM provider to perform analysis and refinement.
-
-| Variable                 | Default            | Description                                                       |
-| :----------------------- | :----------------- | :---------------------------------------------------------------- |
-| `LLM_PROVIDER`           | `openai`           | Provider to use: `openai`, `anthropic`, or `google`.              |
-| `OPENAI_API_KEY`         | -                  | API key for OpenAI.                                               |
-| `ANTHROPIC_API_KEY`      | -                  | API key for Anthropic.                                            |
-| `GOOGLE_API_KEY`         | -                  | API key for Google Gemini.                                        |
-| `LLM_MODEL`              | (provider default) | Override the default model (e.g., `gpt-4o`, `claude-3-5-sonnet`). |
-| `MAX_PROMPT_LENGTH`      | `10000`            | Maximum characters allowed in a prompt.                           |
-| `LLM_TIMEOUT_MS`         | `60000`            | Timeout for LLM requests in milliseconds.                         |
-| `LLM_MAX_TOKENS`         | `8000`             | Maximum tokens for LLM response.                                  |
-| `GOOGLE_SAFETY_DISABLED` | `false`            | Disable Google Gemini safety filters (`true`/`false`).            |
-
-> For advanced configuration (retries, caching, logging), see [CONFIGURATION.md](CONFIGURATION.md).
-
-## 🔧 Tools
-
-All tool responses include `provider` and `model` metadata in structuredContent.
-
-### `refine_prompt`
-
-Fix grammar, improve clarity, and apply optimization techniques. Use when: user asks to fix/improve/optimize a prompt, prompt has typos, or prompt is vague.
-
-| Parameter      | Type   | Required | Default   | Description                                                                                  |
-| :------------- | :----- | :------- | :-------- | :------------------------------------------------------------------------------------------- |
-| `prompt`       | string | ✅       | -         | Prompt text to improve (plain text, Markdown, or XML).                                       |
-| `technique`    | string | ❌       | `"basic"` | Technique: `basic`, `chainOfThought`, `fewShot`, `roleBased`, `structured`, `comprehensive`. |
-| `targetFormat` | string | ❌       | `"auto"`  | Output format: `auto`, `claude`, `gpt`, `json`.                                              |
-
-**Returns:** Refined prompt text and details about changes made.
-
-### `analyze_prompt`
-
-Score prompt quality (0-100) across 5 dimensions using AI analysis: clarity, specificity, completeness, structure, effectiveness. Returns actionable suggestions.
-
-| Parameter | Type   | Required | Default | Description                                            |
-| :-------- | :----- | :------- | :------ | :----------------------------------------------------- |
-| `prompt`  | string | ✅       | -       | Prompt text to improve (plain text, Markdown, or XML). |
-
-**Returns:** Scores, characteristics (typos, vague language), and improvement suggestions.
-
-### `optimize_prompt`
-
-Apply multiple optimization techniques using AI (e.g., `["basic", "roleBased", "structured"]`). Returns before/after scores and improvements.
-
-| Parameter      | Type   | Required | Default     | Description                                            |
-| :------------- | :----- | :------- | :---------- | :----------------------------------------------------- |
-| `prompt`       | string | ✅       | -           | Prompt text to improve (plain text, Markdown, or XML). |
-| `techniques`   | array  | ❌       | `["basic"]` | Array of techniques to apply.                          |
-| `targetFormat` | string | ❌       | `"auto"`    | Output format: `auto`, `claude`, `gpt`, `json`.        |
-
-**Returns:** Optimized prompt, before/after scores, and list of improvements.
-
-### `validate_prompt`
-
-Pre-flight validation using AI: checks issues, estimates tokens, detects security risks. Returns isValid boolean and categorized issues.
-
-| Parameter        | Type    | Required | Default     | Description                                             |
-| :--------------- | :------ | :------- | :---------- | :------------------------------------------------------ |
-| `prompt`         | string  | ✅       | -           | Prompt to validate.                                     |
-| `targetModel`    | string  | ❌       | `"generic"` | Target AI model (`claude`, `gpt`, `gemini`, `generic`). |
-| `checkInjection` | boolean | ❌       | `true`      | Check for prompt injection patterns.                    |
-
-**Returns:** Validation status, token estimate, token limit/utilization, and list of issues (errors, warnings, info).
-
-## 💬 Prompts
-
-| Name             | Description                                             |
-| :--------------- | :------------------------------------------------------ |
-| `quick-optimize` | Fast prompt improvement with grammar and clarity fixes. |
-| `deep-optimize`  | Comprehensive optimization with all techniques applied. |
-| `analyze`        | Score prompt quality and get improvement suggestions.   |
-
-## 🔌 Client Configuration
-
-<details>
-<summary><b>VS Code (Claude Dev / Cline)</b></summary>
-
-Add to your VS Code settings or extension configuration:
-
-```json
-{
-  "mcpServers": {
-    "prompttuner": {
-      "command": "npx",
-      "args": ["-y", "@j0hanz/prompt-tuner-mcp-server@latest"],
-      "env": {
-        "LLM_PROVIDER": "openai",
-        "OPENAI_API_KEY": "sk-..."
-      }
-    }
-  }
-}
-```
-
-</details>
-
-<details>
-<summary><b>Claude Desktop</b></summary>
 
 Add to `claude_desktop_config.json`:
 
@@ -186,28 +40,6 @@ Add to `claude_desktop_config.json`:
       "command": "npx",
       "args": ["-y", "@j0hanz/prompt-tuner-mcp-server@latest"],
       "env": {
-        "LLM_PROVIDER": "anthropic",
-        "ANTHROPIC_API_KEY": "sk-ant-..."
-      }
-    }
-  }
-}
-```
-
-</details>
-
-<details>
-<summary><b>Cursor</b></summary>
-
-Add to Cursor MCP settings:
-
-```json
-{
-  "mcpServers": {
-    "prompttuner": {
-      "command": "npx",
-      "args": ["-y", "@j0hanz/prompt-tuner-mcp-server@latest"],
-      "env": {
         "LLM_PROVIDER": "openai",
         "OPENAI_API_KEY": "sk-..."
       }
@@ -216,18 +48,114 @@ Add to Cursor MCP settings:
 }
 ```
 
-</details>
+> Replace the API key and provider with your preferred LLM. Only configure the key for the active provider.
 
-## 🔒 Security
+## Configuration (Essentials)
 
-- **API Keys**: API keys are passed via environment variables and are never logged or exposed in outputs.
-- **Input Validation**: All inputs are validated using Zod schemas to prevent injection and malformed data.
-- **Prompt Injection**: The `validate_prompt` tool specifically checks for prompt injection patterns.
-- **Sanitization**: User inputs reflected in error messages are sanitized.
-- **External Execution**: Every tool invocation calls the configured external provider (no cached tool outputs).
-- **Provider Metadata**: Structured tool outputs include the provider and model for traceability.
+PromptTuner reads configuration from environment variables. Full reference in `CONFIGURATION.md`.
 
-## 🛠️ Development
+| Variable            | Default          | Description                                    |
+| ------------------- | ---------------- | ---------------------------------------------- |
+| `LLM_PROVIDER`      | `openai`         | `openai`, `anthropic`, or `google`.            |
+| `OPENAI_API_KEY`    | -                | Required when `LLM_PROVIDER=openai`.           |
+| `ANTHROPIC_API_KEY` | -                | Required when `LLM_PROVIDER=anthropic`.        |
+| `GOOGLE_API_KEY`    | -                | Required when `LLM_PROVIDER=google`.           |
+| `LLM_MODEL`         | provider default | Override the default model.                    |
+| `LLM_TIMEOUT_MS`    | `60000`          | Per-request timeout in milliseconds.           |
+| `LLM_MAX_TOKENS`    | `8000`           | Upper bound for LLM outputs (tool caps apply). |
+| `MAX_PROMPT_LENGTH` | `10000`          | Max trimmed prompt length (chars).             |
+
+## Tools
+
+All tools accept plain text, Markdown, or XML prompts. Responses include `content` (human-readable) and `structuredContent` (machine-readable).
+
+### refine_prompt
+
+Fix grammar, improve clarity, and apply a single technique.
+
+| Parameter      | Type   | Required | Default | Notes                                                                             |
+| -------------- | ------ | -------- | ------- | --------------------------------------------------------------------------------- |
+| `prompt`       | string | Yes      | -       | Trimmed and length-checked.                                                       |
+| `technique`    | string | No       | `basic` | `basic`, `chainOfThought`, `fewShot`, `roleBased`, `structured`, `comprehensive`. |
+| `targetFormat` | string | No       | `auto`  | `auto`, `claude`, `gpt`, `json`. `auto` uses heuristics.                          |
+
+Returns (structuredContent): `ok`, `original`, `refined`, `corrections`, `technique`, `targetFormat`, `usedFallback`, `provider`, `model`.
+
+### analyze_prompt
+
+Score prompt quality (0-100) and provide suggestions.
+
+| Parameter | Type   | Required | Default | Notes                       |
+| --------- | ------ | -------- | ------- | --------------------------- |
+| `prompt`  | string | Yes      | -       | Trimmed and length-checked. |
+
+Returns: `ok`, `hasTypos`, `isVague`, `missingContext`, `suggestions`, `score`, `characteristics`, `usedFallback`, `scoreAdjusted`, `overallSource`, `provider`, `model`.
+
+### optimize_prompt
+
+Apply multiple techniques sequentially and return before/after scores.
+
+| Parameter      | Type     | Required | Default     | Notes                               |
+| -------------- | -------- | -------- | ----------- | ----------------------------------- |
+| `prompt`       | string   | Yes      | -           | Trimmed and length-checked.         |
+| `techniques`   | string[] | No       | `["basic"]` | 1-6 techniques; duplicates removed. |
+| `targetFormat` | string   | No       | `auto`      | `auto`, `claude`, `gpt`, `json`.    |
+
+Returns: `ok`, `original`, `optimized`, `techniquesApplied`, `targetFormat`, `beforeScore`, `afterScore`, `scoreDelta`, `improvements`, `usedFallback`, `scoreAdjusted`, `overallSource`, `provider`, `model`.
+
+### validate_prompt
+
+Pre-flight validation: issues, token estimate, and injection risks.
+
+| Parameter        | Type    | Required | Default   | Notes                                                      |
+| ---------------- | ------- | -------- | --------- | ---------------------------------------------------------- |
+| `prompt`         | string  | Yes      | -         | Trimmed and length-checked.                                |
+| `targetModel`    | string  | No       | `generic` | `claude`, `gpt`, `gemini`, `generic` (token limits below). |
+| `checkInjection` | boolean | No       | `true`    | When true, security risks are flagged as errors.           |
+
+Returns: `ok`, `isValid`, `issues`, `tokenEstimate`, `tokenLimit`, `tokenUtilization`, `overLimit`, `targetModel`, `securityFlags`, `provider`, `model`.
+
+Token limits used for `validate_prompt`: `claude` 200000, `gpt` 128000, `gemini` 1000000, `generic` 8000.
+
+## Response Format
+
+- `content`: human-readable Markdown summary.
+- `structuredContent`: machine-parseable results.
+- Errors return `structuredContent.ok=false` and an `error` object with `code`, `message`, optional `context` (sanitized, up to 200 chars), `details`, and `recoveryHint`.
+- `refine_prompt` and `optimize_prompt` include a `resource` content block with a `file:///` URI containing the refined or optimized prompt.
+
+## Prompts
+
+| Name             | Description                                                     |
+| ---------------- | --------------------------------------------------------------- |
+| `quick-optimize` | Fast prompt improvement with grammar and clarity fixes.         |
+| `deep-optimize`  | Comprehensive optimization using the `comprehensive` technique. |
+| `analyze`        | Score prompt quality and return suggestions.                    |
+
+## Prompt Optimization Workflow
+
+### Technique selection guide
+
+| Task type         | Recommended techniques         |
+| ----------------- | ------------------------------ |
+| Simple cleanup    | `basic`                        |
+| Code tasks        | `roleBased` + `structured`     |
+| Complex reasoning | `roleBased` + `chainOfThought` |
+| Data extraction   | `structured` + `fewShot`       |
+| Maximum quality   | `comprehensive`                |
+
+### Recommended prompt architecture
+
+1. Role or identity
+2. Context or background
+3. Task or objective
+4. Steps or instructions
+5. Requirements or constraints (ALWAYS or NEVER)
+6. Output format
+7. Examples (if helpful)
+8. Final reminder
+
+## Development
 
 ### Prerequisites
 
@@ -236,39 +164,55 @@ Add to Cursor MCP settings:
 
 ### Scripts
 
-| Command              | Description                                        |
-| :------------------- | :------------------------------------------------- |
-| `npm run build`      | Compile TypeScript and set permissions.            |
-| `npm run dev`        | Run in watch mode for development.                 |
-| `npm run test`       | Run Vitest tests.                                  |
-| `npm run lint`       | Run ESLint.                                        |
-| `npm run type-check` | Run TypeScript type checking.                      |
-| `npm run inspector`  | Run the MCP Inspector to test tools interactively. |
+| Command                  | Description                                              |
+| ------------------------ | -------------------------------------------------------- |
+| `npm run build`          | Compile TypeScript and set permissions.                  |
+| `npm run dev`            | Run from source in watch mode.                           |
+| `npm run dev:http`       | Run from source with `--http` (reserved, no effect).     |
+| `npm run start`          | Run the compiled server from `dist/`.                    |
+| `npm run start:http`     | Run compiled server with `--http` (reserved, no effect). |
+| `npm run test`           | Run Vitest once.                                         |
+| `npm run test:coverage`  | Run tests with coverage.                                 |
+| `npm run test:watch`     | Run Vitest in watch mode.                                |
+| `npm run lint`           | Run ESLint.                                              |
+| `npm run format`         | Run Prettier.                                            |
+| `npm run type-check`     | TypeScript type checking.                                |
+| `npm run inspector`      | Run MCP Inspector against `dist/index.js`.               |
+| `npm run inspector:http` | Inspector with `--http` (reserved, no effect).           |
+| `npm run duplication`    | Run jscpd duplication report.                            |
 
-### Project Structure
+## Project Structure
 
 ```text
 src/
-├── index.ts          # Entry point
-├── server.ts         # MCP server setup
-├── config/           # Configuration and types
-├── lib/              # Shared utilities (LLM, errors)
-├── tools/            # Tool implementations
-├── resources/        # Resource implementations
-├── prompts/          # Prompt implementations
-└── schemas/          # Zod input/output schemas
+  index.ts        Entry point
+  server.ts       MCP server setup (stdio transport)
+  config/         Configuration and constants
+  lib/            Shared utilities (LLM, retry, validation)
+  tools/          Tool implementations
+  prompts/        Prompt templates
+  resources/      Resource registration (currently none)
+  schemas/        Zod input/output schemas
+  types/          Shared types
+
+tests/            Vitest suites
+
+dist/             Compiled output (generated)
+
+docs/             Static assets
 ```
 
-## 🤝 Contributing
+## Security
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+- API keys are supplied only via environment variables.
+- Inputs are validated with Zod and additional length checks.
+- Error context is sanitized and truncated when `INCLUDE_ERROR_CONTEXT=true`.
+- Google safety filters can be disabled only via `GOOGLE_SAFETY_DISABLED=true`.
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+## Contributing
 
-## 📄 License
+Pull requests are welcome. Please include a short summary, tests run, and note any configuration changes.
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## License
+
+MIT License. See `LICENSE` for details.

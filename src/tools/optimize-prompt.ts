@@ -21,6 +21,11 @@ import {
   ErrorCode,
 } from '../lib/errors.js';
 import { getProviderInfo } from '../lib/llm-client.js';
+import { normalizeScore } from '../lib/output-normalization.js';
+import {
+  normalizePromptText,
+  validateTechniqueOutput,
+} from '../lib/output-validation.js';
 import { resolveFormat } from '../lib/prompt-analysis.js';
 import {
   INPUT_HANDLING_SECTION,
@@ -99,6 +104,8 @@ Return JSON only. No markdown or extra text.
 </schema>`;
 
 const TOOL_NAME = 'optimize_prompt' as const;
+const STRICT_OPTIMIZE_RULES =
+  '\nSTRICT RULES: Return JSON only. Ensure the optimized prompt actually follows each technique listed in techniquesApplied. If structured, include the proper XML/Markdown structure; if chainOfThought, include exactly one reasoning trigger; if fewShot, include 2-3 Input/Output examples; if roleBased, include a clear "You are a/an/the ..." role statement.';
 
 function formatScoreLines(
   before: OptimizeResponse['beforeScore'],
@@ -172,11 +179,14 @@ const OPTIMIZE_PROMPT_TOOL = {
 function buildOptimizePrompt(
   prompt: string,
   resolvedFormat: TargetFormat,
-  techniques: OptimizationTechnique[]
+  techniques: OptimizationTechnique[],
+  extraRules?: string
 ): string {
   return `${OPTIMIZE_SYSTEM_PROMPT}\n\nTarget Format: ${resolvedFormat}\nTechniques to apply: ${techniques.join(
     ', '
-  )}\n\n<original_prompt>\n${wrapPromptData(prompt)}\n</original_prompt>`;
+  )}\n${extraRules ?? ''}\n\n<original_prompt>\n${wrapPromptData(
+    prompt
+  )}\n</original_prompt>`;
 }
 
 function resolveOptimizeInputs(
@@ -194,21 +204,81 @@ function resolveOptimizeInputs(
 async function runOptimization(
   optimizePrompt: string,
   signal: AbortSignal
-): Promise<OptimizeResponse> {
-  return executeLLMWithJsonResponse<OptimizeResponse>(
-    optimizePrompt,
-    (value) => OptimizeResponseSchema.parse(value),
-    ErrorCode.E_LLM_FAILED,
-    TOOL_NAME,
-    { maxTokens: OPTIMIZE_MAX_TOKENS, timeoutMs: OPTIMIZE_TIMEOUT_MS, signal }
-  );
+): Promise<{ result: OptimizeResponse; usedFallback: boolean }> {
+  const { value, usedFallback } =
+    await executeLLMWithJsonResponse<OptimizeResponse>(
+      optimizePrompt,
+      (value) => OptimizeResponseSchema.parse(value),
+      ErrorCode.E_LLM_FAILED,
+      TOOL_NAME,
+      {
+        maxTokens: OPTIMIZE_MAX_TOKENS,
+        timeoutMs: OPTIMIZE_TIMEOUT_MS,
+        signal,
+        retryOnParseFailure: true,
+      }
+    );
+  return { result: value, usedFallback };
+}
+
+function normalizeTechniques(
+  techniques: OptimizationTechnique[]
+): OptimizationTechnique[] {
+  return Array.from(new Set(techniques));
+}
+
+function validateOptimizeResult(
+  result: OptimizeResponse,
+  requested: OptimizationTechnique[],
+  targetFormat: TargetFormat
+): { ok: boolean; result: OptimizeResponse; reason?: string } {
+  const { normalized } = normalizePromptText(result.optimized);
+  const techniquesApplied = normalizeTechniques(result.techniquesApplied);
+  const requestedSet = new Set(requested);
+
+  if (techniquesApplied.some((technique) => !requestedSet.has(technique))) {
+    return {
+      ok: false,
+      result: { ...result, optimized: normalized, techniquesApplied },
+      reason: 'Unexpected techniques reported',
+    };
+  }
+
+  if (!techniquesApplied.length) {
+    return {
+      ok: false,
+      result: { ...result, optimized: normalized, techniquesApplied },
+      reason: 'No techniques applied',
+    };
+  }
+
+  for (const technique of techniquesApplied) {
+    const validation = validateTechniqueOutput(
+      normalized,
+      technique,
+      targetFormat
+    );
+    if (!validation.ok) {
+      return {
+        ok: false,
+        result: { ...result, optimized: normalized, techniquesApplied },
+        reason: validation.reason,
+      };
+    }
+  }
+
+  return {
+    ok: true,
+    result: { ...result, optimized: normalized, techniquesApplied },
+  };
 }
 
 function buildOptimizeResponse(
   result: OptimizeResponse,
   original: string,
   targetFormat: TargetFormat,
-  provider: { provider: string; model: string }
+  provider: { provider: string; model: string },
+  meta: { usedFallback: boolean; scoreAdjusted: boolean; overallSource: string }
 ): ReturnType<typeof createSuccessResponse> {
   const scoreDelta = result.afterScore.overall - result.beforeScore.overall;
   const output = formatOptimizeOutput(result, targetFormat, provider);
@@ -227,7 +297,9 @@ function buildOptimizeResponse(
       beforeScore: result.beforeScore,
       afterScore: result.afterScore,
       improvements: result.improvements,
-      usedFallback: false,
+      usedFallback: meta.usedFallback,
+      scoreAdjusted: meta.scoreAdjusted,
+      overallSource: meta.overallSource,
       scoreDelta,
       provider: provider.provider,
       model: provider.model,
@@ -249,16 +321,77 @@ async function handleOptimizePrompt(
       resolved.resolvedFormat,
       resolved.validatedTechniques
     );
-    const optimizationResult = await runOptimization(
+    let { result: optimizationResult, usedFallback } = await runOptimization(
       optimizePrompt,
       context.request.signal
     );
+    let validation = validateOptimizeResult(
+      optimizationResult,
+      resolved.validatedTechniques,
+      resolved.resolvedFormat
+    );
+
+    if (!validation.ok) {
+      const retryPrompt = buildOptimizePrompt(
+        resolved.validatedPrompt,
+        resolved.resolvedFormat,
+        resolved.validatedTechniques,
+        STRICT_OPTIMIZE_RULES
+      );
+      const retryResult = await runOptimization(
+        retryPrompt,
+        context.request.signal
+      );
+      usedFallback = true;
+      optimizationResult = retryResult.result;
+      validation = validateOptimizeResult(
+        optimizationResult,
+        resolved.validatedTechniques,
+        resolved.resolvedFormat
+      );
+    }
+
+    if (!validation.ok) {
+      const fallbackPrompt = buildOptimizePrompt(
+        resolved.validatedPrompt,
+        resolved.resolvedFormat,
+        ['basic'],
+        STRICT_OPTIMIZE_RULES
+      );
+      const fallbackResult = await runOptimization(
+        fallbackPrompt,
+        context.request.signal
+      );
+      usedFallback = true;
+      optimizationResult = fallbackResult.result;
+      validation = validateOptimizeResult(
+        optimizationResult,
+        ['basic'],
+        resolved.resolvedFormat
+      );
+    }
+
+    const normalizedResult = validation.result;
+    const normalizedBefore = normalizeScore(normalizedResult.beforeScore);
+    const normalizedAfter = normalizeScore(normalizedResult.afterScore);
+    const scoreAdjusted = normalizedBefore.adjusted || normalizedAfter.adjusted;
+    const overallSource = scoreAdjusted ? 'server' : 'llm';
+    const scoredResult: OptimizeResponse = {
+      ...normalizedResult,
+      beforeScore: normalizedBefore.score,
+      afterScore: normalizedAfter.score,
+    };
     const provider = await getProviderInfo();
     return buildOptimizeResponse(
-      optimizationResult,
+      scoredResult,
       resolved.validatedPrompt,
       resolved.resolvedFormat,
-      provider
+      provider,
+      {
+        usedFallback,
+        scoreAdjusted,
+        overallSource,
+      }
     );
   } catch (error) {
     return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);

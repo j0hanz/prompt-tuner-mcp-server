@@ -11,13 +11,15 @@ export async function refineLLM(
   targetFormat: TargetFormat,
   maxTokens = LLM_MAX_TOKENS,
   timeoutMs = LLM_TIMEOUT_MS,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  extraInstructions?: string
 ): Promise<string> {
   const client = await getLLMClient();
   const refinementPrompt = buildRefinementPrompt(
     prompt,
     technique,
-    targetFormat
+    targetFormat,
+    extraInstructions
   );
 
   const combinedSignal = buildAbortSignal(timeoutMs, signal);

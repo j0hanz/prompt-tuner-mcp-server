@@ -215,7 +215,7 @@ async function requestValidation(
   validationPrompt: string,
   signal: AbortSignal
 ): Promise<ValidationResponse> {
-  return executeLLMWithJsonResponse<ValidationResponse>(
+  const { value } = await executeLLMWithJsonResponse<ValidationResponse>(
     validationPrompt,
     (value) => ValidationResponseSchema.parse(value),
     ErrorCode.E_LLM_FAILED,
@@ -224,8 +224,10 @@ async function requestValidation(
       maxTokens: VALIDATE_MAX_TOKENS,
       timeoutMs: VALIDATE_TIMEOUT_MS,
       signal,
+      retryOnParseFailure: true,
     }
   );
+  return value;
 }
 
 function buildSecurityFlags(

@@ -22,13 +22,18 @@ const TECHNIQUE_TEMPLATES: Record<OptimizationTechnique, TechniqueTemplate> = {
 export function buildRefinementPrompt(
   originalPrompt: string,
   technique: OptimizationTechnique,
-  targetFormat: TargetFormat
+  targetFormat: TargetFormat,
+  extraInstructions?: string
 ): string {
   const template = getTechniqueTemplate(technique);
   const formatInstructions = getFormatInstructions(targetFormat);
+  const extra = extraInstructions
+    ? `\n<additional_rules>\n${extraInstructions}\n</additional_rules>\n`
+    : '';
 
   return `${template.systemPrompt}
 ${formatInstructions}
+${extra}
 
 <original_prompt>
 ${wrapPromptData(originalPrompt)}

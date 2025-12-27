@@ -212,7 +212,7 @@ export interface OptimizeScore {
 
 export interface OptimizeResponse {
   optimized: string;
-  techniquesApplied: string[];
+  techniquesApplied: OptimizationTechnique[];
   improvements: string[];
   beforeScore: OptimizeScore;
   afterScore: OptimizeScore;
