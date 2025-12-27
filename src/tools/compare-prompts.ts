@@ -5,11 +5,11 @@ import type {
   ServerRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import type { ComparisonResponse } from '../config/types.js';
+import type { ComparisonResponse, ErrorResponse } from '../config/types.js';
 import {
+  createErrorResponse,
   createSuccessResponse,
   ErrorCode,
-  toJsonRpcError,
 } from '../lib/errors.js';
 import { getToolContext } from '../lib/tool-context.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
@@ -165,6 +165,15 @@ function formatWinnerLabel(
   return parsed.winner === 'A' ? labelA : labelB;
 }
 
+function escapeXmlAttribute(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 function formatComparisonOutput(
   labelA: string,
   labelB: string,
@@ -222,7 +231,9 @@ function buildComparePrompt(
   promptA: string,
   promptB: string
 ): string {
-  return `${COMPARE_SYSTEM_PROMPT}\n\n<prompt_a label="${labelA}">\n${promptA}\n</prompt_a>\n\n<prompt_b label="${labelB}">\n${promptB}\n</prompt_b>`;
+  const safeLabelA = escapeXmlAttribute(labelA);
+  const safeLabelB = escapeXmlAttribute(labelB);
+  return `${COMPARE_SYSTEM_PROMPT}\n\n<prompt_a label="${safeLabelA}">\n${promptA}\n</prompt_a>\n\n<prompt_b label="${safeLabelB}">\n${promptB}\n</prompt_b>`;
 }
 
 async function runComparison(
@@ -263,13 +274,13 @@ function buildCompareResponse(
 async function handleComparePrompts(
   input: ComparePromptsInput,
   extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-): Promise<ReturnType<typeof createSuccessResponse>> {
+): Promise<ReturnType<typeof createSuccessResponse> | ErrorResponse> {
   const context = getToolContext(extra);
 
   try {
     return await runCompareFlow(input, context.request.signal);
   } catch (error) {
-    throw toJsonRpcError(
+    return createErrorResponse(
       error,
       ErrorCode.E_LLM_FAILED,
       `${input.promptA} | ${input.promptB}`

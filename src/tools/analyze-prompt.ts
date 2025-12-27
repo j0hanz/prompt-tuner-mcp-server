@@ -9,12 +9,12 @@ import {
   ANALYSIS_MAX_TOKENS,
   ANALYSIS_TIMEOUT_MS,
 } from '../config/constants.js';
-import type { AnalysisResponse } from '../config/types.js';
+import type { AnalysisResponse, ErrorResponse } from '../config/types.js';
 import {
+  createErrorResponse,
   createSuccessResponse,
   ErrorCode,
   logger,
-  toJsonRpcError,
 } from '../lib/errors.js';
 import { getToolContext, type ToolContext } from '../lib/tool-context.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
@@ -232,13 +232,20 @@ async function sendProgress(
   message: string,
   progress: number
 ): Promise<void> {
+  const progressToken = context._meta?.progressToken;
+  if (progressToken === undefined) return;
+
   await context.sendNotification({
     method: 'notifications/progress',
     params: {
-      progressToken: `analyze_prompt:${context.sessionId ?? 'unknown'}`,
+      progressToken,
       progress,
       message,
-      _meta: { tool: 'analyze_prompt', sessionId: context.sessionId },
+      _meta: {
+        tool: 'analyze_prompt',
+        requestId: context.requestId,
+        sessionId: context.sessionId,
+      },
     },
   });
 }
@@ -280,7 +287,7 @@ function buildAnalysisResponse(
 async function handleAnalyzePrompt(
   input: AnalyzePromptInput,
   extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-): Promise<ReturnType<typeof createSuccessResponse>> {
+): Promise<ReturnType<typeof createSuccessResponse> | ErrorResponse> {
   const context = getToolContext(extra);
 
   try {
@@ -300,7 +307,7 @@ async function handleAnalyzePrompt(
     );
     return buildAnalysisResponse(analysisResult);
   } catch (error) {
-    throw toJsonRpcError(error, ErrorCode.E_LLM_FAILED, input.prompt);
+    return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
   }
 }
 

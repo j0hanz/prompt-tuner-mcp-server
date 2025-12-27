@@ -6,14 +6,15 @@ import type {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import type {
+  ErrorResponse,
   OptimizationTechnique,
   OptimizeResponse,
   TargetFormat,
 } from '../config/types.js';
 import {
+  createErrorResponse,
   createSuccessResponse,
   ErrorCode,
-  toJsonRpcError,
 } from '../lib/errors.js';
 import { resolveFormat } from '../lib/prompt-analysis.js';
 import { getToolContext } from '../lib/tool-context.js';
@@ -282,7 +283,7 @@ function buildOptimizeResponse(
 async function handleOptimizePrompt(
   input: OptimizePromptInput,
   extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-): Promise<ReturnType<typeof createSuccessResponse>> {
+): Promise<ReturnType<typeof createSuccessResponse> | ErrorResponse> {
   const context = getToolContext(extra);
 
   try {
@@ -303,7 +304,7 @@ async function handleOptimizePrompt(
       resolved.resolvedFormat
     );
   } catch (error) {
-    throw toJsonRpcError(error, ErrorCode.E_LLM_FAILED, input.prompt);
+    return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
   }
 }
 

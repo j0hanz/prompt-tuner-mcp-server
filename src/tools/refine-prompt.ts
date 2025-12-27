@@ -5,13 +5,17 @@ import type {
   ServerRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import type { OptimizationTechnique, TargetFormat } from '../config/types.js';
+import type {
+  ErrorResponse,
+  OptimizationTechnique,
+  TargetFormat,
+} from '../config/types.js';
 import { getCachedRefinement, setCachedRefinement } from '../lib/cache.js';
 import {
+  createErrorResponse,
   createSuccessResponse,
   ErrorCode,
   logger,
-  toJsonRpcError,
 } from '../lib/errors.js';
 import { refineLLM } from '../lib/llm.js';
 import { resolveFormat } from '../lib/prompt-analysis.js';
@@ -126,7 +130,7 @@ async function refineAndCache(
 async function handleRefinePrompt(
   input: RefinePromptInput,
   extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-): Promise<ReturnType<typeof createSuccessResponse>> {
+): Promise<ReturnType<typeof createSuccessResponse> | ErrorResponse> {
   const context = getToolContext(extra);
 
   try {
@@ -143,7 +147,7 @@ async function handleRefinePrompt(
     );
     return buildRefineResponse(refined, corrections, resolved);
   } catch (error) {
-    throw toJsonRpcError(error, ErrorCode.E_LLM_FAILED, input.prompt);
+    return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
   }
 }
 

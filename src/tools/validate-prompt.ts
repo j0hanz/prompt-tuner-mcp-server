@@ -6,11 +6,15 @@ import type {
   ServerRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import type { ValidationIssue, ValidationResponse } from '../config/types.js';
+import type {
+  ErrorResponse,
+  ValidationIssue,
+  ValidationResponse,
+} from '../config/types.js';
 import {
+  createErrorResponse,
   createSuccessResponse,
   ErrorCode,
-  toJsonRpcError,
 } from '../lib/errors.js';
 import { getToolContext } from '../lib/tool-context.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
@@ -245,14 +249,14 @@ function buildValidationResponse(
 async function handleValidatePrompt(
   input: ValidatePromptInput,
   extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-): Promise<ReturnType<typeof createSuccessResponse>> {
+): Promise<ReturnType<typeof createSuccessResponse> | ErrorResponse> {
   const context = getToolContext(extra);
 
   let validatedPrompt: string;
   try {
     validatedPrompt = validatePrompt(input.prompt);
   } catch (error) {
-    throw toJsonRpcError(error, ErrorCode.E_INVALID_INPUT, input.prompt);
+    return createErrorResponse(error, ErrorCode.E_INVALID_INPUT, input.prompt);
   }
 
   const targetModel = resolveTargetModel(input);
@@ -275,7 +279,7 @@ async function handleValidatePrompt(
 
     return buildValidationResponse(parsed, targetModel, checkInjection);
   } catch (error) {
-    throw toJsonRpcError(error, ErrorCode.E_LLM_FAILED, input.prompt);
+    return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
   }
 }
 

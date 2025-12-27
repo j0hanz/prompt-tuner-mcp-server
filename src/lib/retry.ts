@@ -46,6 +46,18 @@ interface AttemptFailure {
 
 type AttemptResult<T> = AttemptSuccess<T> | AttemptFailure;
 
+function createAbortError(reason: unknown): Error {
+  if (reason instanceof Error) return reason;
+  const abortError = new Error('Request aborted');
+  abortError.name = 'AbortError';
+  return abortError;
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) return;
+  throw createAbortError(signal.reason);
+}
+
 function getMcpRetryDecision(error: unknown): boolean | null {
   if (!(error instanceof McpError)) return null;
   if (NON_RETRYABLE_MCP_CODES.has(error.code)) return false;
@@ -139,9 +151,11 @@ function logRetryAttempt(
 async function attemptHandler<T>(
   handler: () => Promise<T>,
   startTime: number,
-  totalTimeoutMs: number
+  totalTimeoutMs: number,
+  signal?: AbortSignal
 ): Promise<AttemptResult<T>> {
   ensureWithinTotalTimeout(startTime, totalTimeoutMs);
+  throwIfAborted(signal);
   try {
     const value = await handler();
     return { ok: true, value };
@@ -154,8 +168,10 @@ function resolveRetryDelay(
   attempt: number,
   options: Required<RetryOptions>,
   startTime: number,
-  lastError: unknown
+  lastError: unknown,
+  signal?: AbortSignal
 ): number | null {
+  if (signal?.aborted) return null;
   if (attempt >= options.maxRetries) return null;
   if (!isRetryableError(lastError)) {
     logNonRetryable(lastError);
@@ -180,10 +196,12 @@ async function waitForRetry(
   options: Required<RetryOptions>,
   lastError: unknown,
   delayMs: number,
-  startTime: number
+  startTime: number,
+  signal?: AbortSignal
 ): Promise<void> {
+  throwIfAborted(signal);
   logRetryAttempt(attempt, options.maxRetries, lastError, delayMs);
-  await setTimeout(delayMs);
+  await setTimeout(delayMs, undefined, { signal });
   ensureWithinTotalTimeout(startTime, options.totalTimeoutMs);
 }
 
@@ -200,7 +218,8 @@ function logRetriesExhausted(
 
 export async function withRetry<T>(
   handler: () => Promise<T>,
-  options: RetryOptions = {}
+  options: RetryOptions = {},
+  signal?: AbortSignal
 ): Promise<T> {
   const opts = { ...DEFAULT_OPTIONS, ...options };
   const startTime = Date.now();
@@ -210,14 +229,23 @@ export async function withRetry<T>(
     const result = await attemptHandler(
       handler,
       startTime,
-      opts.totalTimeoutMs
+      opts.totalTimeoutMs,
+      signal
     );
     if (result.ok) return result.value;
     lastError = result.error;
 
-    const delayMs = resolveRetryDelay(attempt, opts, startTime, lastError);
+    throwIfAborted(signal);
+
+    const delayMs = resolveRetryDelay(
+      attempt,
+      opts,
+      startTime,
+      lastError,
+      signal
+    );
     if (delayMs === null) break;
-    await waitForRetry(attempt, opts, lastError, delayMs, startTime);
+    await waitForRetry(attempt, opts, lastError, delayMs, startTime, signal);
   }
 
   logRetriesExhausted(opts, lastError);

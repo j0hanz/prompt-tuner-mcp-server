@@ -212,25 +212,31 @@ function classifyLLMError(error: unknown, provider: LLMProvider): McpError {
 
 export async function runGeneration(
   provider: LLMProvider,
-  requestFn: () => Promise<string>
+  requestFn: () => Promise<string>,
+  signal?: AbortSignal
 ): Promise<string> {
-  return withRetry(async () => {
-    const start = performance.now();
-    try {
-      const content = await requestFn();
-      assert.ok(
-        content,
-        'LLM returned empty response (possibly blocked or filtered)'
-      );
+  return withRetry(
+    async () => {
+      signal?.throwIfAborted();
+      const start = performance.now();
+      try {
+        const content = await requestFn();
+        assert.ok(
+          content,
+          'LLM returned empty response (possibly blocked or filtered)'
+        );
 
-      const durationMs = performance.now() - start;
-      logger.debug(
-        `LLM generation (${provider}) took ${durationMs.toFixed(2)}ms`
-      );
+        const durationMs = performance.now() - start;
+        logger.debug(
+          `LLM generation (${provider}) took ${durationMs.toFixed(2)}ms`
+        );
 
-      return content;
-    } catch (error) {
-      throw classifyLLMError(error, provider);
-    }
-  });
+        return content;
+      } catch (error) {
+        throw classifyLLMError(error, provider);
+      }
+    },
+    {},
+    signal
+  );
 }

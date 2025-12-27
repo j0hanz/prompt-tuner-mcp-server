@@ -5,11 +5,14 @@ import type {
   ServerRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import type { FormatDetectionResponse } from '../config/types.js';
+import type {
+  ErrorResponse,
+  FormatDetectionResponse,
+} from '../config/types.js';
 import {
+  createErrorResponse,
   createSuccessResponse,
   ErrorCode,
-  toJsonRpcError,
 } from '../lib/errors.js';
 import { getToolContext } from '../lib/tool-context.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
@@ -138,7 +141,7 @@ function formatDetectionOutput(parsed: FormatDetectionResponse): string {
 async function handleDetectFormat(
   input: DetectFormatInput,
   extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-): Promise<ReturnType<typeof createSuccessResponse>> {
+): Promise<ReturnType<typeof createSuccessResponse> | ErrorResponse> {
   const context = getToolContext(extra);
 
   try {
@@ -162,7 +165,7 @@ async function handleDetectFormat(
       recommendation: parsed.recommendation,
     });
   } catch (error) {
-    throw toJsonRpcError(error, ErrorCode.E_LLM_FAILED, input.prompt);
+    return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
   }
 }
 

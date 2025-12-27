@@ -97,16 +97,19 @@ abstract class BaseCompletionClient<TRequest, TResponse> implements LLMClient {
     maxTokens = LLM_MAX_TOKENS,
     options?: LLMRequestOptions
   ): Promise<string> {
-    return runGeneration(this.provider, () =>
-      createCompletion(
-        options,
-        (requestOptions) =>
-          this.createRequest(
-            this.buildRequest(prompt, maxTokens),
-            requestOptions
-          ),
-        (response) => this.extractText(response)
-      )
+    return runGeneration(
+      this.provider,
+      () =>
+        createCompletion(
+          options,
+          (requestOptions) =>
+            this.createRequest(
+              this.buildRequest(prompt, maxTokens),
+              requestOptions
+            ),
+          (response) => this.extractText(response)
+        ),
+      options?.signal
     );
   }
 
@@ -213,8 +216,10 @@ class GoogleClient implements LLMClient {
     maxTokens = LLM_MAX_TOKENS,
     options?: LLMRequestOptions
   ): Promise<string> {
-    return runGeneration(this.provider, () =>
-      this.requestCompletion(prompt, maxTokens, options)
+    return runGeneration(
+      this.provider,
+      () => this.requestCompletion(prompt, maxTokens, options),
+      options?.signal
     );
   }
 

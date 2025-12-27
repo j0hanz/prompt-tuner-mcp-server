@@ -10,6 +10,7 @@ import { config } from '../config/env.js';
 import {
   ErrorCode,
   type ErrorCodeType,
+  type ErrorResponse,
   type McpErrorOptions,
   type SuccessResponse,
 } from '../config/types.js';
@@ -71,6 +72,60 @@ export function createSuccessResponse<T extends Record<string, unknown>>(
   return {
     content: [{ type: 'text', text }],
     structuredContent: structured,
+  };
+}
+
+function buildStructuredError(
+  error: unknown,
+  fallbackCode: ErrorCodeType,
+  context?: string
+): {
+  code: ErrorCodeType;
+  message: string;
+  context?: string;
+  details?: Record<string, unknown>;
+  recoveryHint?: string;
+} {
+  if (isZodError(error)) {
+    const safeContext = resolveSafeContext(context);
+    return {
+      code: ErrorCode.E_INVALID_INPUT,
+      message: `Invalid params: ${error.message}`,
+      ...(safeContext ? { context: safeContext } : {}),
+      details: { issues: error.issues },
+      recoveryHint: DEFAULT_RECOVERY_HINTS[ErrorCode.E_INVALID_INPUT],
+    };
+  }
+
+  const mcpError = resolveMcpError(error);
+  const code = mcpError?.code ?? fallbackCode;
+  const message = mcpError?.message ?? resolveErrorMessage(error);
+  const safeContext = resolveSafeContext(context);
+  const details = resolveErrorDetails(mcpError);
+  const recoveryHint = resolveRecoveryHint(mcpError);
+
+  return {
+    code,
+    message,
+    ...(safeContext ? { context: safeContext } : {}),
+    ...(details ? { details } : {}),
+    ...(recoveryHint ? { recoveryHint } : {}),
+  };
+}
+
+export function createErrorResponse(
+  error: unknown,
+  fallbackCode: ErrorCodeType = ErrorCode.E_LLM_FAILED,
+  context?: string
+): ErrorResponse {
+  const structuredError = buildStructuredError(error, fallbackCode, context);
+  return {
+    content: [{ type: 'text', text: `Error: ${structuredError.message}` }],
+    structuredContent: {
+      ok: false,
+      error: structuredError,
+    },
+    isError: true,
   };
 }
 

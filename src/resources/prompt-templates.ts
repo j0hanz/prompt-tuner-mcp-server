@@ -1,5 +1,9 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import {
+  ErrorCode as JsonRpcErrorCode,
+  McpError as JsonRpcMcpError,
+} from '@modelcontextprotocol/sdk/types.js';
 
 import { analysisTemplates } from './prompt-templates/analysis.js';
 import { codingTemplates } from './prompt-templates/coding.js';
@@ -94,20 +98,6 @@ function completeName(
   );
 }
 
-function buildErrorContents(
-  uri: URL,
-  message: string
-): { contents: { uri: string; text: string }[] } {
-  return {
-    contents: [
-      {
-        uri: uri.href,
-        text: message,
-      },
-    ],
-  };
-}
-
 function resolveCategoryTemplates(
   category: string
 ): Record<string, string> | null {
@@ -151,13 +141,16 @@ function handleTemplateRequest(
   const categoryTemplates = resolveCategoryTemplates(categoryStr);
 
   if (!categoryTemplates) {
-    return buildErrorContents(uri, buildCategoryError(categoryStr));
+    throw new JsonRpcMcpError(
+      JsonRpcErrorCode.InvalidParams,
+      buildCategoryError(categoryStr)
+    );
   }
 
   const template = categoryTemplates[nameStr];
   if (!template) {
-    return buildErrorContents(
-      uri,
+    throw new JsonRpcMcpError(
+      JsonRpcErrorCode.InvalidParams,
       buildTemplateError(categoryStr, nameStr, Object.keys(categoryTemplates))
     );
   }
