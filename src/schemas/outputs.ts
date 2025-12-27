@@ -77,6 +77,16 @@ const ValidationIssueSchema = z
   })
   .describe('Validation issue');
 
+const ProviderModelErrorFields = {
+  provider: ProviderSchema.optional(),
+  model: ModelSchema.optional(),
+  error: ErrorSchema.optional().describe('Error details when ok=false'),
+};
+
+const FallbackFields = {
+  usedFallback: z.boolean().optional().describe('Whether a fallback was used'),
+};
+
 export const RefinePromptOutputSchema = z
   .object({
     ok: z.boolean().describe('True if refinement succeeded'),
@@ -85,13 +95,8 @@ export const RefinePromptOutputSchema = z
     corrections: z.array(z.string()).optional().describe('Applied corrections'),
     technique: TechniqueSchema.optional().describe('Technique used'),
     targetFormat: z.enum(TARGET_FORMATS).optional().describe('Resolved format'),
-    usedFallback: z
-      .boolean()
-      .optional()
-      .describe('Whether a fallback was used'),
-    provider: ProviderSchema.optional(),
-    model: ModelSchema.optional(),
-    error: ErrorSchema.optional().describe('Error details when ok=false'),
+    ...FallbackFields,
+    ...ProviderModelErrorFields,
   })
   .describe('Refine prompt response');
 
@@ -109,9 +114,7 @@ export const AnalyzePromptOutputSchema = z
     characteristics: CharacteristicsSchema.optional().describe(
       'Prompt characteristics'
     ),
-    provider: ProviderSchema.optional(),
-    model: ModelSchema.optional(),
-    error: ErrorSchema.optional().describe('Error details when ok=false'),
+    ...ProviderModelErrorFields,
   })
   .describe('Analyze prompt response');
 
@@ -135,13 +138,8 @@ export const OptimizePromptOutputSchema = z
       .array(z.string())
       .optional()
       .describe('List of improvements'),
-    usedFallback: z
-      .boolean()
-      .optional()
-      .describe('Whether a fallback was used'),
-    provider: ProviderSchema.optional(),
-    model: ModelSchema.optional(),
-    error: ErrorSchema.optional().describe('Error details when ok=false'),
+    ...FallbackFields,
+    ...ProviderModelErrorFields,
   })
   .describe('Optimize prompt response');
 
@@ -168,8 +166,6 @@ export const ValidatePromptOutputSchema = z
       .optional()
       .describe('Target model name'),
     securityFlags: z.array(z.string()).optional().describe('Security flags'),
-    provider: ProviderSchema.optional(),
-    model: ModelSchema.optional(),
-    error: ErrorSchema.optional().describe('Error details when ok=false'),
+    ...ProviderModelErrorFields,
   })
   .describe('Validate prompt response');

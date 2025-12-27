@@ -171,12 +171,7 @@ function resolveRetryDelay(
   lastError: unknown,
   signal?: AbortSignal
 ): number | null {
-  if (signal?.aborted) return null;
-  if (attempt >= options.maxRetries) return null;
-  if (!isRetryableError(lastError)) {
-    logNonRetryable(lastError);
-    return null;
-  }
+  if (shouldStopRetry(attempt, options, lastError, signal)) return null;
 
   const delayMs = calculateDelay(
     attempt,
@@ -189,6 +184,21 @@ function resolveRetryDelay(
   }
 
   return delayMs;
+}
+
+function shouldStopRetry(
+  attempt: number,
+  options: Required<RetryOptions>,
+  lastError: unknown,
+  signal?: AbortSignal
+): boolean {
+  if (signal?.aborted) return true;
+  if (attempt >= options.maxRetries) return true;
+  if (!isRetryableError(lastError)) {
+    logNonRetryable(lastError);
+    return true;
+  }
+  return false;
 }
 
 async function waitForRetry(

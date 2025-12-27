@@ -73,42 +73,72 @@ export function createSuccessResponse<T extends Record<string, unknown>>(
   };
 }
 
-function buildStructuredError(
-  error: unknown,
-  fallbackCode: ErrorCodeType,
-  context?: string
-): {
+interface StructuredErrorPayload {
   code: ErrorCodeType;
   message: string;
   context?: string;
   details?: Record<string, unknown>;
   recoveryHint?: string;
-} {
-  if (isZodError(error)) {
-    const safeContext = resolveSafeContext(context);
-    return {
-      code: ErrorCode.E_INVALID_INPUT,
-      message: `Invalid params: ${error.message}`,
-      ...(safeContext ? { context: safeContext } : {}),
-      details: { issues: error.issues },
-      recoveryHint: DEFAULT_RECOVERY_HINTS[ErrorCode.E_INVALID_INPUT],
-    };
-  }
+}
 
+function buildZodStructuredError(
+  error: unknown,
+  context?: string
+): StructuredErrorPayload | null {
+  if (!isZodError(error)) return null;
+
+  const safeContext = resolveSafeContext(context);
+  return {
+    code: ErrorCode.E_INVALID_INPUT,
+    message: `Invalid params: ${error.message}`,
+    ...(safeContext ? { context: safeContext } : {}),
+    details: { issues: error.issues },
+    recoveryHint: DEFAULT_RECOVERY_HINTS[ErrorCode.E_INVALID_INPUT],
+  };
+}
+
+function buildGenericStructuredError(
+  error: unknown,
+  fallbackCode: ErrorCodeType,
+  context?: string
+): StructuredErrorPayload {
   const mcpError = resolveMcpError(error);
-  const code = mcpError?.code ?? fallbackCode;
-  const message = mcpError?.message ?? resolveErrorMessage(error);
+  const code = resolveStructuredCode(mcpError, fallbackCode);
+  const message = resolveStructuredMessage(mcpError, error);
   const safeContext = resolveSafeContext(context);
   const details = resolveErrorDetails(mcpError);
   const recoveryHint = resolveRecoveryHint(mcpError);
 
-  return {
-    code,
-    message,
-    ...(safeContext ? { context: safeContext } : {}),
-    ...(details ? { details } : {}),
-    ...(recoveryHint ? { recoveryHint } : {}),
-  };
+  const payload: StructuredErrorPayload = { code, message };
+  if (safeContext) payload.context = safeContext;
+  if (details) payload.details = details;
+  if (recoveryHint) payload.recoveryHint = recoveryHint;
+  return payload;
+}
+
+function resolveStructuredCode(
+  mcpError: McpError | null,
+  fallbackCode: ErrorCodeType
+): ErrorCodeType {
+  return mcpError?.code ?? fallbackCode;
+}
+
+function resolveStructuredMessage(
+  mcpError: McpError | null,
+  error: unknown
+): string {
+  return mcpError?.message ?? resolveErrorMessage(error);
+}
+
+function buildStructuredError(
+  error: unknown,
+  fallbackCode: ErrorCodeType,
+  context?: string
+): StructuredErrorPayload {
+  return (
+    buildZodStructuredError(error, context) ??
+    buildGenericStructuredError(error, fallbackCode, context)
+  );
 }
 
 export function createErrorResponse(
@@ -206,17 +236,16 @@ function buildSafeErrorData(
   mcpError: McpError | null,
   context?: string
 ): Record<string, unknown> | undefined {
+  const data: Record<string, unknown> = {};
   const safeContext = resolveSafeContext(context);
   const details = resolveErrorDetails(mcpError);
   const recoveryHint = resolveRecoveryHint(mcpError);
 
-  if (!safeContext && !details && !recoveryHint) return undefined;
+  if (safeContext) data.context = safeContext;
+  if (details) data.details = details;
+  if (recoveryHint) data.recoveryHint = recoveryHint;
 
-  return {
-    ...(safeContext ? { context: safeContext } : {}),
-    ...(details ? { details } : {}),
-    ...(recoveryHint ? { recoveryHint } : {}),
-  };
+  return Object.keys(data).length ? data : undefined;
 }
 
 function isZodError(error: unknown): error is ZodError {

@@ -11,70 +11,17 @@ import type {
   LLMProvider,
   LLMRequestOptions,
 } from '../config/types.js';
+import {
+  buildAnthropicRequest,
+  buildOpenAIRequest,
+  checkAborted,
+  createCompletion,
+  DEFAULT_TIMEOUT_MS,
+  extractAnthropicText,
+  extractOpenAIText,
+} from './llm-providers/helpers.js';
 import { runGeneration } from './llm-runtime.js';
 
-const DEFAULT_TIMEOUT_MS = 60000;
-function checkAborted(signal?: AbortSignal): void {
-  signal?.throwIfAborted();
-}
-function trimText(value: string | null | undefined): string {
-  return value?.trim() ?? '';
-}
-function buildTimeoutOptions(options?: LLMRequestOptions): {
-  timeout: number;
-  signal?: AbortSignal;
-} {
-  return {
-    timeout: options?.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-    signal: options?.signal,
-  };
-}
-async function createCompletion<TResponse, TResult>(
-  options: LLMRequestOptions | undefined,
-  create: (requestOptions: {
-    timeout: number;
-    signal?: AbortSignal;
-  }) => Promise<TResponse>,
-  extract: (response: TResponse) => TResult
-): Promise<TResult> {
-  const response = await create(buildTimeoutOptions(options));
-  return extract(response);
-}
-function buildOpenAIRequest(
-  model: string,
-  prompt: string,
-  maxTokens: number
-): OpenAI.Chat.Completions.ChatCompletionCreateParams {
-  return {
-    model,
-    messages: [{ role: 'user', content: prompt }],
-    max_tokens: maxTokens,
-    temperature: 0.7,
-  };
-}
-function extractOpenAIText(
-  response: OpenAI.Chat.Completions.ChatCompletion
-): string {
-  const choice = response.choices[0];
-  if (!choice) return '';
-  return trimText(choice.message.content);
-}
-function buildAnthropicRequest(
-  model: string,
-  prompt: string,
-  maxTokens: number
-): Anthropic.Messages.MessageCreateParams {
-  return {
-    model,
-    max_tokens: maxTokens,
-    messages: [{ role: 'user', content: prompt }],
-  };
-}
-function extractAnthropicText(response: Anthropic.Messages.Message): string {
-  const textBlock = response.content.find((block) => block.type === 'text');
-  if (!textBlock || !('text' in textBlock)) return '';
-  return trimText(textBlock.text);
-}
 abstract class BaseCompletionClient<TRequest, TResponse> implements LLMClient {
   protected abstract readonly provider: LLMProvider;
   protected readonly model: string;
@@ -201,6 +148,10 @@ const GOOGLE_SAFETY_CATEGORIES = [
   HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY,
 ] as const;
 
+type GoogleGenerateResponse = Awaited<
+  ReturnType<GoogleGenAI['models']['generateContent']>
+>;
+
 class GoogleClient implements LLMClient {
   private readonly client: GoogleGenAI;
   private readonly model: string;
@@ -275,30 +226,40 @@ class GoogleClient implements LLMClient {
 
     const { signal } = options ?? {};
 
-    if (signal) {
-      const abortPromise = new Promise<never>((_, reject) => {
-        const onAbort = (): void => {
-          reject(new Error('Request aborted'));
-        };
-        signal.addEventListener('abort', onAbort);
-        void generatePromise.finally(() => {
-          signal.removeEventListener('abort', onAbort);
-        });
-      });
-
-      try {
-        const response = await Promise.race([generatePromise, abortPromise]);
-        return response.text ?? '';
-      } catch (error) {
-        if (signal.aborted) {
-          void generatePromise.catch(() => {});
-        }
-        throw error;
-      }
+    if (!signal) {
+      const response = await generatePromise;
+      return this.finalizeResponse(response);
     }
 
-    const response = await generatePromise;
+    return this.executeWithAbort(generatePromise, signal);
+  }
 
+  private async executeWithAbort(
+    generatePromise: Promise<GoogleGenerateResponse>,
+    signal: AbortSignal
+  ): Promise<string> {
+    const abortPromise = new Promise<never>((_, reject) => {
+      const onAbort = (): void => {
+        reject(new Error('Request aborted'));
+      };
+      signal.addEventListener('abort', onAbort);
+      void generatePromise.finally(() => {
+        signal.removeEventListener('abort', onAbort);
+      });
+    });
+
+    try {
+      const response = await Promise.race([generatePromise, abortPromise]);
+      return this.finalizeResponse(response);
+    } catch (error) {
+      if (signal.aborted) {
+        void generatePromise.catch(() => {});
+      }
+      throw error;
+    }
+  }
+
+  private finalizeResponse(response: GoogleGenerateResponse): string {
     if (String(response.candidates?.[0]?.finishReason) === 'SAFETY') {
       throw new Error('Content filtered by safety settings');
     }

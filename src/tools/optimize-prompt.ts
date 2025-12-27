@@ -9,12 +9,11 @@ import {
   OPTIMIZE_MAX_TOKENS,
   OPTIMIZE_TIMEOUT_MS,
 } from '../config/constants.js';
-import {
-  type ErrorResponse,
-  OPTIMIZATION_TECHNIQUES,
-  type OptimizationTechnique,
-  type OptimizeResponse,
-  type TargetFormat,
+import type {
+  ErrorResponse,
+  OptimizationTechnique,
+  OptimizeResponse,
+  TargetFormat,
 } from '../config/types.js';
 import {
   createErrorResponse,
@@ -45,6 +44,7 @@ import {
   OptimizePromptOutputSchema,
 } from '../schemas/index.js';
 import { OptimizeResponseSchema } from '../schemas/llm-responses.js';
+import { formatImprovements } from './optimize-prompt/formatters.js';
 
 const OPTIMIZE_SYSTEM_PROMPT = `<role>
 You are an expert prompt optimizer.
@@ -97,8 +97,6 @@ Return JSON only. No markdown or extra text.
 }
 </schema>`;
 
-const TECHNIQUE_SET = new Set(OPTIMIZATION_TECHNIQUES);
-
 function formatScoreLines(
   before: OptimizeResponse['beforeScore'],
   after: OptimizeResponse['afterScore']
@@ -111,43 +109,6 @@ function formatScoreLines(
   const afterLine = `After: ${after.overall}/100 (clarity ${after.clarity}, specificity ${after.specificity}, completeness ${after.completeness}, structure ${after.structure}, effectiveness ${after.effectiveness})`;
 
   return asBulletList([beforeLine, afterLine, deltaText]);
-}
-
-function groupImprovements(improvements: string[]): Map<string, string[]> {
-  const groups = new Map<string, string[]>();
-  for (const improvement of improvements) {
-    const match = /^([a-zA-Z]+)\s*:\s*(.+)$/.exec(improvement);
-    const technique = match?.[1];
-    const detail = match?.[2];
-    if (
-      technique &&
-      detail &&
-      TECHNIQUE_SET.has(technique as OptimizationTechnique)
-    ) {
-      const bucket = groups.get(technique) ?? [];
-      bucket.push(detail);
-      groups.set(technique, bucket);
-      continue;
-    }
-    const bucket = groups.get('general') ?? [];
-    bucket.push(improvement);
-    groups.set('general', bucket);
-  }
-  return groups;
-}
-
-function formatImprovements(improvements: string[]): string[] {
-  const groups = groupImprovements(improvements);
-  if (groups.size === 1 && groups.has('general')) {
-    return asBulletList(improvements);
-  }
-
-  const lines: string[] = [];
-  for (const [technique, items] of groups) {
-    lines.push(`Technique: ${technique}`);
-    lines.push(...asBulletList(items));
-  }
-  return lines;
 }
 
 function formatOptimizeOutput(

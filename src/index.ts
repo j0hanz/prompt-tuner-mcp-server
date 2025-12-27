@@ -19,31 +19,28 @@ const SIGNALS: NodeJS.Signals[] = [
 const ERROR_EVENTS = ['uncaughtException', 'unhandledRejection'] as const;
 const EXIT_EVENTS = ['beforeExit'] as const;
 type ExitEvent = (typeof EXIT_EVENTS)[number];
+interface ShutdownReason {
+  signal?: NodeJS.Signals;
+  err?: unknown;
+  event?: ExitEvent;
+}
 
 let shuttingDown = false;
 let server: ReturnType<typeof createServer> | null = null;
 
-async function beginShutdown(reason: {
-  signal?: NodeJS.Signals;
-  err?: unknown;
-  event?: ExitEvent;
-}): Promise<void> {
-  if (shuttingDown) {
-    if (reason.signal) {
-      logger.error(
-        { signal: reason.signal },
-        `Second ${reason.signal}, exiting`
-      );
-    } else if (reason.err) {
-      logger.error({ err: reason.err }, 'Second error, exiting');
-    } else {
-      logger.error('Second shutdown event, exiting');
-    }
-    process.exit(1);
+function logSecondShutdown(reason: ShutdownReason): void {
+  if (reason.signal) {
+    logger.error({ signal: reason.signal }, `Second ${reason.signal}, exiting`);
     return;
   }
+  if (reason.err) {
+    logger.error({ err: reason.err }, 'Second error, exiting');
+    return;
+  }
+  logger.error('Second shutdown event, exiting');
+}
 
-  shuttingDown = true;
+function logShutdownStart(reason: ShutdownReason): void {
   if (reason.err) {
     logger.error({ err: reason.err }, 'Server closing due to error');
   }
@@ -53,20 +50,43 @@ async function beginShutdown(reason: {
   if (reason.event) {
     logger.info({ event: reason.event }, 'Server shutting down gracefully');
   }
+}
 
-  let exitCode = reason.err ? 1 : 0;
-  const timeout = setTimeout(() => {
+function resolveExitCode(reason: ShutdownReason): number {
+  return reason.err ? 1 : 0;
+}
+
+function startForcedShutdownTimer(): NodeJS.Timeout {
+  return setTimeout(() => {
     logger.error(
       { delayMs: SHUTDOWN_DELAY_MS },
       'Forced shutdown due to timeout'
     );
     process.exit(1);
   }, SHUTDOWN_DELAY_MS);
+}
+
+async function closeServerIfConnected(): Promise<void> {
+  if (server?.isConnected()) {
+    await server.close();
+  }
+}
+
+async function beginShutdown(reason: ShutdownReason): Promise<void> {
+  if (shuttingDown) {
+    logSecondShutdown(reason);
+    process.exit(1);
+    return;
+  }
+
+  shuttingDown = true;
+  logShutdownStart(reason);
+
+  let exitCode = resolveExitCode(reason);
+  const timeout = startForcedShutdownTimer();
 
   try {
-    if (server?.isConnected()) {
-      await server.close();
-    }
+    await closeServerIfConnected();
   } catch (error) {
     exitCode = 1;
     logger.error({ err: error }, 'Error during shutdown');
