@@ -2,6 +2,13 @@ const PROMPT_DATA_START = '<<<PROMPTTUNER_INPUT_START>>>';
 const PROMPT_DATA_END = '<<<PROMPTTUNER_INPUT_END>>>';
 
 function sanitizePromptMarkers(prompt: string): string {
+  if (
+    !prompt.includes(PROMPT_DATA_START) &&
+    !prompt.includes(PROMPT_DATA_END)
+  ) {
+    return prompt;
+  }
+
   return prompt
     .replaceAll(PROMPT_DATA_START, '[PROMPTTUNER_INPUT_START]')
     .replaceAll(PROMPT_DATA_END, '[PROMPTTUNER_INPUT_END]');

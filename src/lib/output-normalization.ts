@@ -33,7 +33,16 @@ function safeTest(pattern: RegExp, text: string): boolean {
 function countWords(text: string): number {
   const trimmed = text.trim();
   if (!trimmed) return 0;
-  return trimmed.split(/\s+/).filter(Boolean).length;
+  let count = 0;
+  const pattern = /\S+/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(trimmed)) !== null) {
+    count += 1;
+    if (match[0] === '') {
+      pattern.lastIndex += 1;
+    }
+  }
+  return count;
 }
 
 export function normalizeScore(score: OptimizeScore): {

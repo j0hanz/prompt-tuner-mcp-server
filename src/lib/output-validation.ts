@@ -33,10 +33,35 @@ function escapeRegExp(value: string): string {
 }
 
 function countOccurrences(text: string, pattern: RegExp): number {
+  if (!pattern.global) {
+    return pattern.test(text) ? 1 : 0;
+  }
+
   pattern.lastIndex = 0;
-  const matches = text.match(pattern);
-  return matches ? matches.length : 0;
+  let count = 0;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(text)) !== null) {
+    count += 1;
+    if (match[0] === '') {
+      pattern.lastIndex += 1;
+    }
+  }
+  return count;
 }
+
+const COT_TRIGGER_PATTERNS = COT_TRIGGERS.map((trigger) => {
+  const parts = trigger
+    .split(/\s+/)
+    .map((part) => escapeRegExp(part))
+    .join('\\s+');
+  return new RegExp(`(?:^|\\s)${parts}(?:[.!?,;:]|\\s|$)`, 'gi');
+});
+
+const FEW_SHOT_INPUT_RE = /(^|\n)\s*Input\s*:/gi;
+const FEW_SHOT_OUTPUT_RE = /(^|\n)\s*Output\s*:/gi;
+const FEW_SHOT_EXAMPLE_RE = /(^|\n)\s*Example\s+\d+/gi;
+const FEW_SHOT_XML_RE = /<example>/gi;
+const FEW_SHOT_MARKDOWN_RE = /###\s*Example/gi;
 
 export function normalizePromptText(text: string): {
   normalized: string;
@@ -56,8 +81,7 @@ export function normalizePromptText(text: string): {
   const lines = normalized.split(/\r?\n/);
   const firstLine = lines[0];
   if (firstLine && /^(refined|optimized)?\s*prompt\s*:/i.test(firstLine)) {
-    lines.shift();
-    normalized = lines.join('\n').trim();
+    normalized = lines.slice(1).join('\n').trim();
     labelStripped = true;
   }
 
@@ -107,12 +131,7 @@ function validateRole(text: string): boolean {
 }
 
 function validateChainOfThought(text: string): boolean {
-  const total = COT_TRIGGERS.reduce((count, trigger) => {
-    const parts = trigger
-      .split(/\s+/)
-      .map((part) => escapeRegExp(part))
-      .join('\\s+');
-    const pattern = new RegExp(`(?:^|\\s)${parts}(?:[.!?,;:]|\\s|$)`, 'gi');
+  const total = COT_TRIGGER_PATTERNS.reduce((count, pattern) => {
     return count + countOccurrences(text, pattern);
   }, 0);
 
@@ -120,12 +139,12 @@ function validateChainOfThought(text: string): boolean {
 }
 
 function validateFewShot(text: string): boolean {
-  const inputCount = countOccurrences(text, /(^|\n)\s*Input\s*:/gi);
-  const outputCount = countOccurrences(text, /(^|\n)\s*Output\s*:/gi);
+  const inputCount = countOccurrences(text, FEW_SHOT_INPUT_RE);
+  const outputCount = countOccurrences(text, FEW_SHOT_OUTPUT_RE);
   const exampleCount =
-    countOccurrences(text, /(^|\n)\s*Example\s+\d+/gi) +
-    countOccurrences(text, /<example>/gi) +
-    countOccurrences(text, /###\s*Example/gi);
+    countOccurrences(text, FEW_SHOT_EXAMPLE_RE) +
+    countOccurrences(text, FEW_SHOT_XML_RE) +
+    countOccurrences(text, FEW_SHOT_MARKDOWN_RE);
 
   if (Math.min(inputCount, outputCount) >= 2) {
     return true;

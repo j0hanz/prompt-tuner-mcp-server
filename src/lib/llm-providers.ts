@@ -156,6 +156,10 @@ class GoogleClient implements LLMClient {
   private readonly client: GoogleGenAI;
   private readonly model: string;
   private readonly provider: LLMProvider = 'google';
+  private safetySettingsCache: {
+    disabled: boolean;
+    settings: { category: HarmCategory; threshold: HarmBlockThreshold }[];
+  } | null = null;
 
   constructor(apiKey: string, model: string) {
     this.client = new GoogleGenAI({ apiKey });
@@ -200,14 +204,21 @@ class GoogleClient implements LLMClient {
   }[] {
     // WARNING: Disabling safety settings can expose the application to harmful content.
     // Use with caution and only in trusted environments.
-    const threshold = config.GOOGLE_SAFETY_DISABLED
+    const disabled = config.GOOGLE_SAFETY_DISABLED;
+    if (this.safetySettingsCache?.disabled === disabled) {
+      return this.safetySettingsCache.settings;
+    }
+
+    const threshold = disabled
       ? HarmBlockThreshold.OFF
       : HarmBlockThreshold.BLOCK_ONLY_HIGH;
 
-    return GOOGLE_SAFETY_CATEGORIES.map((category) => ({
+    const settings = GOOGLE_SAFETY_CATEGORIES.map((category) => ({
       category,
       threshold,
     }));
+    this.safetySettingsCache = { disabled, settings };
+    return settings;
   }
 
   private async executeRequest(

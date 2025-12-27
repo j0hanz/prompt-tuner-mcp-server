@@ -192,10 +192,15 @@ export function parseJsonFromLlmResponse<T>(
 
   const jsonStr = llmResponseText.trim();
   const maxPreviewChars = options.maxPreviewChars ?? LLM_ERROR_PREVIEW_CHARS;
+  const startsWithCodeFence = jsonStr.startsWith('```');
+  const firstChar = jsonStr[0];
+  const looksLikeJson = firstChar === '{' || firstChar === '[';
 
   // Try raw parse first
-  const rawAttempt = tryParseJson(jsonStr, parse, options.debugLabel, 'raw');
-  if (rawAttempt.success) return rawAttempt.value;
+  if (!startsWithCodeFence && looksLikeJson) {
+    const rawAttempt = tryParseJson(jsonStr, parse, options.debugLabel, 'raw');
+    if (rawAttempt.success) return rawAttempt.value;
+  }
 
   // Try with code block markers stripped
   const stripped = stripCodeBlockMarkers(jsonStr);

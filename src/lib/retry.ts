@@ -24,6 +24,14 @@ const RETRYABLE_ERROR_CODES = new Set([
 
 const RETRYABLE_HTTP_CODES = new Set(['429', '500', '502', '503', '504']);
 
+const RETRYABLE_ERROR_CODES_LOWER = new Set(
+  Array.from(RETRYABLE_ERROR_CODES, (code) => code.toLowerCase())
+);
+
+const RETRYABLE_HTTP_CODES_LOWER = new Set(
+  Array.from(RETRYABLE_HTTP_CODES, (code) => code.toLowerCase())
+);
+
 const NON_RETRYABLE_MCP_CODES = new Set<string>([
   ErrorCode.E_LLM_AUTH_FAILED,
   ErrorCode.E_INVALID_INPUT,
@@ -78,7 +86,7 @@ function getErrorMessageLower(error: unknown): string {
 
 function containsAny(haystack: string, needles: Iterable<string>): boolean {
   for (const needle of needles) {
-    if (haystack.includes(needle.toLowerCase())) return true;
+    if (haystack.includes(needle)) return true;
   }
   return false;
 }
@@ -92,8 +100,8 @@ function isRetryableError(error: unknown): boolean {
 
   const errorMessage = getErrorMessageLower(error);
   return (
-    containsAny(errorMessage, RETRYABLE_ERROR_CODES) ||
-    containsAny(errorMessage, RETRYABLE_HTTP_CODES)
+    containsAny(errorMessage, RETRYABLE_ERROR_CODES_LOWER) ||
+    containsAny(errorMessage, RETRYABLE_HTTP_CODES_LOWER)
   );
 }
 

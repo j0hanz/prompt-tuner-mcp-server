@@ -47,7 +47,9 @@ function renderTemplate(
 ): string {
   let rendered = template;
   for (const [key, value] of Object.entries(replacements)) {
-    rendered = rendered.replaceAll(`{{${key}}}`, value);
+    const token = `{{${key}}}`;
+    if (!rendered.includes(token)) continue;
+    rendered = rendered.replaceAll(token, value);
   }
   return rendered;
 }
