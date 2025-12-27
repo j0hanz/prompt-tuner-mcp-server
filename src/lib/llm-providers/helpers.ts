@@ -10,11 +10,11 @@ export function checkAborted(signal?: AbortSignal): void {
   signal?.throwIfAborted();
 }
 
-export function trimText(value: string | null | undefined): string {
+function trimText(value: string | null | undefined): string {
   return value?.trim() ?? '';
 }
 
-export function buildTimeoutOptions(options?: LLMRequestOptions): {
+function buildTimeoutOptions(options?: LLMRequestOptions): {
   timeout: number;
   signal?: AbortSignal;
 } {

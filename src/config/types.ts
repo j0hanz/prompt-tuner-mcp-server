@@ -2,29 +2,29 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 export type ToolRegistrar = (server: McpServer) => void;
 
-export interface TextContentBlock {
+interface TextContentBlock {
   type: 'text';
   text: string;
 }
 
-export interface TextResourcePayload {
+interface TextResourcePayload {
   uri: string;
   mimeType?: string;
   text: string;
 }
 
-export interface BlobResourcePayload {
+interface BlobResourcePayload {
   uri: string;
   mimeType?: string;
   blob: string;
 }
 
-export interface ResourceContentBlock {
+interface ResourceContentBlock {
   type: 'resource';
   resource: TextResourcePayload | BlobResourcePayload;
 }
 
-export interface ResourceLinkContentBlock {
+interface ResourceLinkContentBlock {
   type: 'resource_link';
   uri: string;
   name: string;
@@ -84,33 +84,6 @@ export const TARGET_FORMATS = [
 ] as const satisfies readonly [string, string, ...string[]];
 
 export type TargetFormat = (typeof TARGET_FORMATS)[number];
-
-export interface PromptScore {
-  clarity: number;
-  specificity: number;
-  completeness: number;
-  structure: number;
-  effectiveness: number;
-  overall: number;
-}
-
-export interface PromptCharacteristics {
-  detectedFormat: TargetFormat;
-  hasExamples: boolean;
-  hasRoleContext: boolean;
-  hasStructure: boolean;
-  hasStepByStep: boolean;
-  wordCount: number;
-  estimatedComplexity: 'simple' | 'moderate' | 'complex';
-}
-
-export interface SuggestionContext {
-  prompt: string;
-  characteristics: PromptCharacteristics;
-  score: PromptScore;
-}
-
-export type SuggestionGenerator = (ctx: SuggestionContext) => string | null;
 
 export interface PatternCache {
   hasClaudePatterns: boolean;
@@ -180,10 +153,6 @@ export interface RetryOptions {
   maxDelayMs?: number;
   totalTimeoutMs?: number;
 }
-
-export type LogFormat = 'json' | 'text';
-
-export type LogLevel = 'error' | 'warn' | 'info' | 'debug';
 
 export interface McpErrorOptions {
   context?: string;

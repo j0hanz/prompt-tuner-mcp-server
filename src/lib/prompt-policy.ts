@@ -1,5 +1,5 @@
-export const PROMPT_DATA_START = '<<<PROMPTTUNER_INPUT_START>>>';
-export const PROMPT_DATA_END = '<<<PROMPTTUNER_INPUT_END>>>';
+const PROMPT_DATA_START = '<<<PROMPTTUNER_INPUT_START>>>';
+const PROMPT_DATA_END = '<<<PROMPTTUNER_INPUT_END>>>';
 
 function sanitizePromptMarkers(prompt: string): string {
   return prompt

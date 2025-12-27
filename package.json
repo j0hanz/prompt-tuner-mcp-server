@@ -56,7 +56,6 @@
     "@anthropic-ai/sdk": "^0.71.2",
     "@google/genai": "^1.34.0",
     "@modelcontextprotocol/sdk": "^1.25.1",
-    "lru-cache": "^11.2.4",
     "openai": "^6.14.0",
     "pino": "^10.1.0",
     "zod": "^3.25.76"

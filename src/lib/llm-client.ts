@@ -36,7 +36,7 @@ function resolveApiKey(provider: LLMProvider): string | undefined {
 }
 
 function createLLMClient(): LLMClient {
-  const providerEnv = config.LLM_PROVIDER as LLMProvider;
+  const providerEnv = config.LLM_PROVIDER;
   const providerConfig = PROVIDER_CONFIG[providerEnv];
   const apiKey = resolveApiKey(providerEnv);
 

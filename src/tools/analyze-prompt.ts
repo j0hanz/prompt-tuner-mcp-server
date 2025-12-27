@@ -5,10 +5,7 @@ import type {
   ServerRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import {
-  ANALYSIS_MAX_TOKENS,
-  ANALYSIS_TIMEOUT_MS,
-} from '../config/constants.js';
+import { ANALYSIS_MAX_TOKENS, LLM_TIMEOUT_MS } from '../config/constants.js';
 import type { AnalysisResponse, ErrorResponse } from '../config/types.js';
 import {
   createErrorResponse,
@@ -206,7 +203,7 @@ async function runAnalysis(
       TOOL_NAME,
       {
         maxTokens: ANALYSIS_MAX_TOKENS,
-        timeoutMs: ANALYSIS_TIMEOUT_MS,
+        timeoutMs: LLM_TIMEOUT_MS,
         signal,
         retryOnParseFailure: true,
       }

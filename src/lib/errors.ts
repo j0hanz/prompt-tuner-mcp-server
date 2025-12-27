@@ -1,8 +1,5 @@
 import { inspect } from 'node:util';
 
-import { McpError as JsonRpcMcpError } from '@modelcontextprotocol/sdk/types.js';
-import { ErrorCode as JsonRpcErrorCode } from '@modelcontextprotocol/sdk/types.js';
-
 import pino from 'pino';
 import type { ZodError } from 'zod';
 
@@ -217,73 +214,6 @@ function resolveSafeContext(context?: string): string | undefined {
 
 export { ErrorCode };
 
-function resolveJsonRpcCode(
-  mcpError: McpError | null,
-  fallbackCode: ErrorCodeType
-): JsonRpcErrorCode {
-  if (mcpError?.code === ErrorCode.E_INVALID_INPUT) {
-    return JsonRpcErrorCode.InvalidParams;
-  }
-
-  if (fallbackCode === ErrorCode.E_INVALID_INPUT) {
-    return JsonRpcErrorCode.InvalidParams;
-  }
-
-  return JsonRpcErrorCode.InternalError;
-}
-
-function buildSafeErrorData(
-  mcpError: McpError | null,
-  context?: string
-): Record<string, unknown> | undefined {
-  const data: Record<string, unknown> = {};
-  const safeContext = resolveSafeContext(context);
-  const details = resolveErrorDetails(mcpError);
-  const recoveryHint = resolveRecoveryHint(mcpError);
-
-  if (safeContext) data.context = safeContext;
-  if (details) data.details = details;
-  if (recoveryHint) data.recoveryHint = recoveryHint;
-
-  return Object.keys(data).length ? data : undefined;
-}
-
 function isZodError(error: unknown): error is ZodError {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'issues' in (error as Record<string, unknown>)
-  );
-}
-
-export function toJsonRpcError(
-  error: unknown,
-  fallbackCode: ErrorCodeType = ErrorCode.E_LLM_FAILED,
-  context?: string
-): JsonRpcMcpError {
-  if (error instanceof JsonRpcMcpError) return error;
-
-  if (isZodError(error)) {
-    return new JsonRpcMcpError(
-      JsonRpcErrorCode.InvalidParams,
-      `Invalid params: ${error.message}`,
-      { issues: error.issues }
-    );
-  }
-
-  const mcpError = resolveMcpError(error);
-  if (mcpError) {
-    return new JsonRpcMcpError(
-      resolveJsonRpcCode(mcpError, fallbackCode),
-      mcpError.message,
-      buildSafeErrorData(mcpError, context)
-    );
-  }
-
-  const message = resolveErrorMessage(error);
-  return new JsonRpcMcpError(
-    resolveJsonRpcCode(null, fallbackCode),
-    message,
-    buildSafeErrorData(null, context)
-  );
+  return typeof error === 'object' && error !== null && 'issues' in error;
 }

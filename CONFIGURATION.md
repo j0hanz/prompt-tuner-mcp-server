@@ -6,32 +6,32 @@ PromptTuner MCP is configured entirely via environment variables. Set them in yo
 
 You must pick a provider and supply its API key.
 
-| Variable | Default | Description |
-| --- | --- | --- |
-| `LLM_PROVIDER` | `openai` | `openai`, `anthropic`, or `google`. |
-| `OPENAI_API_KEY` | - | Required when `LLM_PROVIDER=openai`. |
-| `ANTHROPIC_API_KEY` | - | Required when `LLM_PROVIDER=anthropic`. |
-| `GOOGLE_API_KEY` | - | Required when `LLM_PROVIDER=google`. |
+| Variable            | Default  | Description                             |
+| ------------------- | -------- | --------------------------------------- |
+| `LLM_PROVIDER`      | `openai` | `openai`, `anthropic`, or `google`.     |
+| `OPENAI_API_KEY`    | -        | Required when `LLM_PROVIDER=openai`.    |
+| `ANTHROPIC_API_KEY` | -        | Required when `LLM_PROVIDER=anthropic`. |
+| `GOOGLE_API_KEY`    | -        | Required when `LLM_PROVIDER=google`.    |
 
 PromptTuner checks that the correct API key environment variable is set at startup. The provider will reject invalid keys at request time.
 
 ## Provider defaults
 
-| Provider | Default model | API key env |
-| --- | --- | --- |
-| `openai` | `gpt-4o` | `OPENAI_API_KEY` |
+| Provider    | Default model                | API key env         |
+| ----------- | ---------------------------- | ------------------- |
+| `openai`    | `gpt-4o`                     | `OPENAI_API_KEY`    |
 | `anthropic` | `claude-3-5-sonnet-20241022` | `ANTHROPIC_API_KEY` |
-| `google` | `gemini-2.0-flash-exp` | `GOOGLE_API_KEY` |
+| `google`    | `gemini-2.0-flash-exp`       | `GOOGLE_API_KEY`    |
 
 Set `LLM_MODEL` to override the default model for the chosen provider.
 
 ## Limits and timeouts (optional)
 
-| Variable | Default | Description |
-| --- | --- | --- |
-| `MAX_PROMPT_LENGTH` | `10000` | Max trimmed prompt length (chars). |
-| `LLM_MAX_TOKENS` | `8000` | Upper bound for model output tokens. |
-| `LLM_TIMEOUT_MS` | `60000` | Per-request timeout (ms). |
+| Variable            | Default | Description                          |
+| ------------------- | ------- | ------------------------------------ |
+| `MAX_PROMPT_LENGTH` | `10000` | Max trimmed prompt length (chars).   |
+| `LLM_MAX_TOKENS`    | `8000`  | Upper bound for model output tokens. |
+| `LLM_TIMEOUT_MS`    | `60000` | Per-request timeout (ms).            |
 
 ### Prompt length enforcement
 
@@ -43,36 +43,36 @@ Set `LLM_MODEL` to override the default model for the chosen provider.
 
 Tool max tokens are derived from `LLM_MAX_TOKENS`:
 
-| Tool | Max tokens |
-| --- | --- |
-| `analyze_prompt` | `min(LLM_MAX_TOKENS, 4000)` |
-| `refine_prompt` | `min(LLM_MAX_TOKENS, 2000)` |
+| Tool              | Max tokens                  |
+| ----------------- | --------------------------- |
+| `analyze_prompt`  | `min(LLM_MAX_TOKENS, 4000)` |
+| `refine_prompt`   | `min(LLM_MAX_TOKENS, 2000)` |
 | `optimize_prompt` | `min(LLM_MAX_TOKENS, 3000)` |
 | `validate_prompt` | `min(LLM_MAX_TOKENS, 1000)` |
 
 ## Retry behavior (optional)
 
-| Variable | Default | Description |
-| --- | --- | --- |
-| `RETRY_MAX_ATTEMPTS` | `3` | Max retry attempts (total attempts = max + 1). |
-| `RETRY_BASE_DELAY_MS` | `1000` | Base delay for exponential backoff. |
-| `RETRY_MAX_DELAY_MS` | `10000` | Max delay between retries. |
-| `RETRY_TOTAL_TIMEOUT_MS` | `180000` | Total time allowed across retries. |
+| Variable                 | Default  | Description                                    |
+| ------------------------ | -------- | ---------------------------------------------- |
+| `RETRY_MAX_ATTEMPTS`     | `3`      | Max retry attempts (total attempts = max + 1). |
+| `RETRY_BASE_DELAY_MS`    | `1000`   | Base delay for exponential backoff.            |
+| `RETRY_MAX_DELAY_MS`     | `10000`  | Max delay between retries.                     |
+| `RETRY_TOTAL_TIMEOUT_MS` | `180000` | Total time allowed across retries.             |
 
 Retries use exponential backoff with jitter and stop when the total timeout is exceeded.
 
 ## Logging and error context (optional)
 
-| Variable | Default | Description |
-| --- | --- | --- |
-| `DEBUG` | `false` | Enables debug logging. Logs are written to stderr. |
-| `LOG_FORMAT` | `text` | Parsed but currently unused (logging output is JSON via pino). |
-| `INCLUDE_ERROR_CONTEXT` | `false` | Adds a sanitized prompt snippet (up to 200 chars) to errors. |
+| Variable                | Default | Description                                                    |
+| ----------------------- | ------- | -------------------------------------------------------------- |
+| `DEBUG`                 | `false` | Enables debug logging. Logs are written to stderr.             |
+| `LOG_FORMAT`            | `text`  | Parsed but currently unused (logging output is JSON via pino). |
+| `INCLUDE_ERROR_CONTEXT` | `false` | Adds a sanitized prompt snippet (up to 200 chars) to errors.   |
 
 ## Provider-specific settings
 
-| Variable | Default | Description |
-| --- | --- | --- |
+| Variable                 | Default | Description                                |
+| ------------------------ | ------- | ------------------------------------------ |
 | `GOOGLE_SAFETY_DISABLED` | `false` | When true, disables Gemini safety filters. |
 
 ## validate_prompt token limits
@@ -80,11 +80,11 @@ Retries use exponential backoff with jitter and stop when the total timeout is e
 `validate_prompt` uses fixed limits when calculating `tokenUtilization`:
 
 | targetModel | Token limit |
-| --- | --- |
-| `claude` | `200000` |
-| `gpt` | `128000` |
-| `gemini` | `1000000` |
-| `generic` | `8000` |
+| ----------- | ----------- |
+| `claude`    | `200000`    |
+| `gpt`       | `128000`    |
+| `gemini`    | `1000000`   |
+| `generic`   | `8000`      |
 
 ## Example configurations
 

@@ -13,10 +13,3 @@ export {
   OptimizePromptOutputSchema,
   ValidatePromptOutputSchema,
 } from './outputs.js';
-
-export {
-  OptimizeResponseSchema,
-  OptimizeScoreSchema,
-  AnalysisResponseSchema,
-  AnalysisCharacteristicsSchema,
-} from './llm-responses.js';

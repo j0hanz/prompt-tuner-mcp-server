@@ -5,10 +5,7 @@ import type {
   ServerRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import {
-  OPTIMIZE_MAX_TOKENS,
-  OPTIMIZE_TIMEOUT_MS,
-} from '../config/constants.js';
+import { LLM_TIMEOUT_MS, OPTIMIZE_MAX_TOKENS } from '../config/constants.js';
 import type {
   ErrorResponse,
   OptimizationTechnique,
@@ -213,7 +210,7 @@ async function runOptimization(
       TOOL_NAME,
       {
         maxTokens: OPTIMIZE_MAX_TOKENS,
-        timeoutMs: OPTIMIZE_TIMEOUT_MS,
+        timeoutMs: LLM_TIMEOUT_MS,
         signal,
         retryOnParseFailure: true,
       }

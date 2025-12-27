@@ -129,10 +129,3 @@ export function validateLLMOutput(
 
   return output;
 }
-
-export function escapePromptForXml(prompt: string): string {
-  return prompt
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}

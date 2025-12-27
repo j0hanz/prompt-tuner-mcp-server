@@ -2,21 +2,11 @@ import { z } from 'zod';
 
 import { OPTIMIZATION_TECHNIQUES } from '../config/types.js';
 
-// Re-export types from centralized types.ts
-export type {
-  AnalysisCharacteristics,
-  AnalysisResponse,
-  OptimizeResponse,
-  OptimizeScore,
-  ValidationIssue,
-  ValidationResponse,
-} from '../config/types.js';
-
 // Schema for score values (0-100)
 const ScoreSchema = z.number().int().min(0).max(100);
 
 // Schema for optimization scores across dimensions
-export const OptimizeScoreSchema = z.object({
+const OptimizeScoreSchema = z.object({
   clarity: ScoreSchema,
   specificity: ScoreSchema,
   completeness: ScoreSchema,
@@ -38,7 +28,7 @@ export const OptimizeResponseSchema = z.object({
 });
 
 // Schema for analysis characteristics
-export const AnalysisCharacteristicsSchema = z.object({
+const AnalysisCharacteristicsSchema = z.object({
   hasTypos: z.boolean(),
   isVague: z.boolean(),
   missingContext: z.boolean(),
@@ -59,7 +49,7 @@ export const AnalysisResponseSchema = z.object({
 });
 
 // Schema for validation issue
-export const ValidationIssueSchema = z.object({
+const ValidationIssueSchema = z.object({
   type: z.enum(['error', 'warning', 'info']),
   message: z.string(),
   suggestion: z.string().optional(),

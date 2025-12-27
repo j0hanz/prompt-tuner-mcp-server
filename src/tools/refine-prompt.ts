@@ -5,7 +5,7 @@ import type {
   ServerRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { REFINE_MAX_TOKENS, REFINE_TIMEOUT_MS } from '../config/constants.js';
+import { LLM_TIMEOUT_MS, REFINE_MAX_TOKENS } from '../config/constants.js';
 import type {
   ErrorResponse,
   OptimizationTechnique,
@@ -169,7 +169,7 @@ async function refineWithLLM(
       technique,
       input.resolvedFormat,
       REFINE_MAX_TOKENS,
-      REFINE_TIMEOUT_MS,
+      LLM_TIMEOUT_MS,
       signal,
       extraInstructions
     );

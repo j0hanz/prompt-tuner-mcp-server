@@ -23,18 +23,23 @@ const PROVIDER_ENV_KEYS = {
 
 // Monitor Node.js warnings for deprecations and potential issues
 process.on('warning', (warning) => {
+  const code = 'code' in warning ? warning.code : undefined;
   logger.warn(
     {
       message: warning.message,
-      code: (warning as NodeJS.ErrnoException).code,
+      code,
     },
     `Node.js warning: ${warning.name}`
   );
 });
 
+function isProviderKey(key: string): key is keyof typeof PROVIDER_ENV_KEYS {
+  return key in PROVIDER_ENV_KEYS;
+}
+
 function getProviderEnvKey(provider: string): string | null {
-  if (provider in PROVIDER_ENV_KEYS) {
-    return PROVIDER_ENV_KEYS[provider as keyof typeof PROVIDER_ENV_KEYS];
+  if (isProviderKey(provider)) {
+    return PROVIDER_ENV_KEYS[provider];
   }
   return null;
 }

@@ -6,10 +6,7 @@ import type {
   ServerRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import {
-  VALIDATE_MAX_TOKENS,
-  VALIDATE_TIMEOUT_MS,
-} from '../config/constants.js';
+import { LLM_TIMEOUT_MS, VALIDATE_MAX_TOKENS } from '../config/constants.js';
 import type {
   ErrorResponse,
   ValidationIssue,
@@ -222,7 +219,7 @@ async function requestValidation(
     TOOL_NAME,
     {
       maxTokens: VALIDATE_MAX_TOKENS,
-      timeoutMs: VALIDATE_TIMEOUT_MS,
+      timeoutMs: LLM_TIMEOUT_MS,
       signal,
       retryOnParseFailure: true,
     }
