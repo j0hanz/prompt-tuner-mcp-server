@@ -21,12 +21,13 @@ const EXIT_EVENTS = ['beforeExit'] as const;
 type ExitEvent = (typeof EXIT_EVENTS)[number];
 
 let shuttingDown = false;
+let server: ReturnType<typeof createServer> | null = null;
 
-function beginShutdown(reason: {
+async function beginShutdown(reason: {
   signal?: NodeJS.Signals;
   err?: unknown;
   event?: ExitEvent;
-}): void {
+}): Promise<void> {
   if (shuttingDown) {
     if (reason.signal) {
       logger.error(
@@ -39,6 +40,7 @@ function beginShutdown(reason: {
       logger.error('Second shutdown event, exiting');
     }
     process.exit(1);
+    return;
   }
 
   shuttingDown = true;
@@ -52,7 +54,7 @@ function beginShutdown(reason: {
     logger.info({ event: reason.event }, 'Server shutting down gracefully');
   }
 
-  const exitCode = reason.err ? 1 : 0;
+  let exitCode = reason.err ? 1 : 0;
   const timeout = setTimeout(() => {
     logger.error(
       { delayMs: SHUTDOWN_DELAY_MS },
@@ -61,35 +63,41 @@ function beginShutdown(reason: {
     process.exit(1);
   }, SHUTDOWN_DELAY_MS);
 
-  setImmediate(() => {
+  try {
+    if (server?.isConnected()) {
+      await server.close();
+    }
+  } catch (error) {
+    exitCode = 1;
+    logger.error({ err: error }, 'Error during shutdown');
+  } finally {
     clearTimeout(timeout);
     process.exit(exitCode);
-  });
+  }
 }
 
 for (const signal of SIGNALS) {
   process.once(signal, (received) => {
-    beginShutdown({ signal: received });
+    void beginShutdown({ signal: received });
   });
 }
 for (const event of ERROR_EVENTS) {
   process.once(event, (err) => {
-    beginShutdown({ err });
+    void beginShutdown({ err });
   });
 }
 for (const event of EXIT_EVENTS) {
   process.once(event, () => {
-    beginShutdown({ event });
+    void beginShutdown({ event });
   });
 }
 
 async function main(): Promise<void> {
   await validateApiKeys();
-  const server = createServer();
+  server = createServer();
   await startServer(server);
 }
 
 main().catch((error: unknown) => {
-  logger.error({ err: error }, 'Fatal error');
-  process.exit(1);
+  void beginShutdown({ err: error });
 });

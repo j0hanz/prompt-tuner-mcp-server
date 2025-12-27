@@ -40,6 +40,9 @@ const ScoreSchema = z
 
 const CharacteristicsSchema = z
   .object({
+    hasTypos: z.boolean().describe('Typos detected'),
+    isVague: z.boolean().describe('Vague language detected'),
+    missingContext: z.boolean().describe('Missing context detected'),
     detectedFormat: z.enum(TARGET_FORMATS).describe('Detected prompt format'),
     hasExamples: z.boolean().describe('Whether examples are present'),
     hasRoleContext: z.boolean().describe('Whether a role/persona is defined'),

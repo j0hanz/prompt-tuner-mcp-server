@@ -283,6 +283,9 @@ function buildAnalysisResponse(
   const output = formatAnalysisOutput(analysisResult);
   return createSuccessResponse(output, {
     ok: true,
+    hasTypos: analysisResult.characteristics.hasTypos,
+    isVague: analysisResult.characteristics.isVague,
+    missingContext: analysisResult.characteristics.missingContext,
     suggestions: analysisResult.suggestions,
     score: analysisResult.score,
     characteristics: analysisResult.characteristics,
