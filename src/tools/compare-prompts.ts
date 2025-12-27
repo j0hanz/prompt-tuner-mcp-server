@@ -133,7 +133,7 @@ const COMPARE_PROMPTS_TOOL = {
   annotations: {
     readOnlyHint: true,
     idempotentHint: false,
-    openWorldHint: false,
+    openWorldHint: true,
   },
 };
 

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { OPTIMIZATION_TECHNIQUES } from '../config/types.js';
+
 // Re-export types from centralized types.ts
 export type {
   AnalysisCharacteristics,
@@ -28,7 +30,10 @@ export const OptimizeScoreSchema = z.object({
 // Schema for optimize_prompt LLM response
 export const OptimizeResponseSchema = z.object({
   optimized: z.string().min(1).describe('The fully optimized prompt'),
-  techniquesApplied: z.array(z.string()).min(1).describe('Techniques applied'),
+  techniquesApplied: z
+    .array(z.enum(OPTIMIZATION_TECHNIQUES))
+    .min(1)
+    .describe('Techniques applied'),
   improvements: z.array(z.string()).describe('List of improvements made'),
   beforeScore: OptimizeScoreSchema,
   afterScore: OptimizeScoreSchema,

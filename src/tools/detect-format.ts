@@ -122,7 +122,7 @@ const DETECT_FORMAT_TOOL = {
   annotations: {
     readOnlyHint: true,
     idempotentHint: false,
-    openWorldHint: false,
+    openWorldHint: true,
   },
 };
 

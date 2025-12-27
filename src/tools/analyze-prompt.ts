@@ -168,7 +168,7 @@ const ANALYZE_PROMPT_TOOL = {
   annotations: {
     readOnlyHint: true,
     idempotentHint: false,
-    openWorldHint: false,
+    openWorldHint: true,
   },
 };
 
@@ -277,7 +277,6 @@ function buildAnalysisResponse(
   const output = formatAnalysisOutput(analysisResult);
   return createSuccessResponse(output, {
     ok: true,
-    ...analysisResult.characteristics,
     suggestions: analysisResult.suggestions,
     score: analysisResult.score,
     characteristics: analysisResult.characteristics,

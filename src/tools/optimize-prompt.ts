@@ -220,7 +220,7 @@ const OPTIMIZE_PROMPT_TOOL = {
   annotations: {
     readOnlyHint: true,
     idempotentHint: false,
-    openWorldHint: false,
+    openWorldHint: true,
   },
 };
 
