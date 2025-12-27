@@ -549,19 +549,24 @@ async function handleOptimizePrompt(
     );
     const buildValidationConfig = (
       techniques: ConcreteTechnique[]
-    ): OptimizeValidationConfig => ({
-      allowedTechniques: techniques,
-      requiredTechniques: resolved.requiredTechniques.filter((technique) =>
-        techniques.includes(technique)
-      ),
-      minAppliedTechniques: resolved.deepOptimization
-        ? Math.min(2, techniques.length)
-        : 1,
-      targetFormat: resolved.resolvedFormat,
-      originalPrompt: resolved.validatedPrompt,
-      requireMeaningfulChange: resolved.requireMeaningfulChange,
-      deepOptimization: resolved.deepOptimization,
-    });
+    ): OptimizeValidationConfig => {
+      const allowedTechniques = resolved.deepOptimization
+        ? COMPREHENSIVE_TECHNIQUE_ORDER
+        : techniques;
+      return {
+        allowedTechniques,
+        requiredTechniques: resolved.requiredTechniques.filter((technique) =>
+          allowedTechniques.includes(technique)
+        ),
+        minAppliedTechniques: resolved.deepOptimization
+          ? Math.min(2, techniques.length)
+          : 1,
+        targetFormat: resolved.resolvedFormat,
+        originalPrompt: resolved.validatedPrompt,
+        requireMeaningfulChange: resolved.requireMeaningfulChange,
+        deepOptimization: resolved.deepOptimization,
+      };
+    };
 
     let validation = validateOptimizeResult(
       optimizationResult,
