@@ -8,6 +8,7 @@ import type { ZodError } from 'zod';
 
 import { config } from '../config/env.js';
 import {
+  type ContentBlock,
   ErrorCode,
   type ErrorCodeType,
   type ErrorResponse,
@@ -63,10 +64,11 @@ export class McpError extends Error {
 
 export function createSuccessResponse<T extends Record<string, unknown>>(
   text: string,
-  structured: T
+  structured: T,
+  extraContent: ContentBlock[] = []
 ): SuccessResponse<T> {
   return {
-    content: [{ type: 'text', text }],
+    content: [{ type: 'text', text }, ...extraContent],
     structuredContent: structured,
   };
 }

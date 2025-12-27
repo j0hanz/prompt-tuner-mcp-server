@@ -34,6 +34,7 @@ import {
   buildOutput,
 } from '../lib/tool-formatters.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
+import { buildPromptResourceBlock } from '../lib/tool-resources.js';
 import {
   validateFormat,
   validatePrompt,
@@ -250,20 +251,28 @@ function buildOptimizeResponse(
 ): ReturnType<typeof createSuccessResponse> {
   const scoreDelta = result.afterScore.overall - result.beforeScore.overall;
   const output = formatOptimizeOutput(result, targetFormat, provider);
-  return createSuccessResponse(output, {
-    ok: true,
-    original,
-    optimized: result.optimized,
-    techniquesApplied: result.techniquesApplied,
-    targetFormat,
-    beforeScore: result.beforeScore,
-    afterScore: result.afterScore,
-    improvements: result.improvements,
-    usedFallback: false,
-    scoreDelta,
-    provider: provider.provider,
-    model: provider.model,
-  });
+  const promptResource = buildPromptResourceBlock(
+    result.optimized,
+    `optimized-prompt-${targetFormat}`
+  );
+  return createSuccessResponse(
+    output,
+    {
+      ok: true,
+      original,
+      optimized: result.optimized,
+      techniquesApplied: result.techniquesApplied,
+      targetFormat,
+      beforeScore: result.beforeScore,
+      afterScore: result.afterScore,
+      improvements: result.improvements,
+      usedFallback: false,
+      scoreDelta,
+      provider: provider.provider,
+      model: provider.model,
+    },
+    [promptResource]
+  );
 }
 
 async function handleOptimizePrompt(

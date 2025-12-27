@@ -25,6 +25,7 @@ import {
   asCodeBlock,
   buildOutput,
 } from '../lib/tool-formatters.js';
+import { buildPromptResourceBlock } from '../lib/tool-resources.js';
 import {
   validateFormat,
   validatePrompt,
@@ -107,17 +108,25 @@ function buildRefineResponse(
   provider: { provider: string; model: string }
 ): ReturnType<typeof createSuccessResponse> {
   const output = buildRefineOutput(refined, corrections, input, provider);
-  return createSuccessResponse(output, {
-    ok: true,
-    original: input.validatedPrompt,
+  const promptResource = buildPromptResourceBlock(
     refined,
-    corrections,
-    technique: input.validatedTechnique,
-    targetFormat: input.resolvedFormat,
-    usedFallback: false,
-    provider: provider.provider,
-    model: provider.model,
-  });
+    `refined-prompt-${input.validatedTechnique}-${input.resolvedFormat}`
+  );
+  return createSuccessResponse(
+    output,
+    {
+      ok: true,
+      original: input.validatedPrompt,
+      refined,
+      corrections,
+      technique: input.validatedTechnique,
+      targetFormat: input.resolvedFormat,
+      usedFallback: false,
+      provider: provider.provider,
+      model: provider.model,
+    },
+    [promptResource]
+  );
 }
 
 async function refineWithLLM(

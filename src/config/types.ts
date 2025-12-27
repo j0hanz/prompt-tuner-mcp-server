@@ -2,9 +2,44 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 export type ToolRegistrar = (server: McpServer) => void;
 
+export interface TextContentBlock {
+  type: 'text';
+  text: string;
+}
+
+export interface TextResourcePayload {
+  uri: string;
+  mimeType?: string;
+  text: string;
+}
+
+export interface BlobResourcePayload {
+  uri: string;
+  mimeType?: string;
+  blob: string;
+}
+
+export interface ResourceContentBlock {
+  type: 'resource';
+  resource: TextResourcePayload | BlobResourcePayload;
+}
+
+export interface ResourceLinkContentBlock {
+  type: 'resource_link';
+  uri: string;
+  name: string;
+  description?: string;
+  mimeType?: string;
+}
+
+export type ContentBlock =
+  | TextContentBlock
+  | ResourceContentBlock
+  | ResourceLinkContentBlock;
+
 export interface ErrorResponse {
   [key: string]: unknown;
-  content: { type: 'text'; text: string }[];
+  content: ContentBlock[];
   structuredContent: {
     ok: false;
     error: {
@@ -20,7 +55,7 @@ export interface ErrorResponse {
 
 export interface SuccessResponse<T extends Record<string, unknown>> {
   [key: string]: unknown;
-  content: { type: 'text'; text: string }[];
+  content: ContentBlock[];
   structuredContent: T;
 }
 
