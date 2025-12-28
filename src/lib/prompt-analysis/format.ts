@@ -7,7 +7,7 @@ import type {
 } from '../../config/types.js';
 
 // Caches pattern detection results for format scoring
-function cachePatterns(prompt: string): PatternCache {
+export function buildPatternCache(prompt: string): PatternCache {
   return {
     hasClaudePatterns: PATTERNS.claudePatterns.test(prompt),
     hasXmlStructure: PATTERNS.xmlStructure.test(prompt),
@@ -116,13 +116,16 @@ function calculateConfidence(
 }
 
 // Detects target format and confidence level
-export function detectTargetFormat(prompt: string): {
+export function detectTargetFormat(
+  prompt: string,
+  cache?: PatternCache
+): {
   format: TargetFormat;
   confidence: number;
   recommendation: string;
 } {
-  const cache = cachePatterns(prompt);
-  const results = scoreFormats(cache);
+  const patternCache = cache ?? buildPatternCache(prompt);
+  const results = scoreFormats(patternCache);
   const maxNet = Math.max(...results.map((r) => r.net));
 
   if (maxNet <= 0) {

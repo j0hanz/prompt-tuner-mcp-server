@@ -32,7 +32,11 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function countOccurrences(text: string, pattern: RegExp): number {
+function countOccurrencesUpTo(
+  text: string,
+  pattern: RegExp,
+  maxCount: number
+): number {
   if (!pattern.global) {
     return pattern.test(text) ? 1 : 0;
   }
@@ -42,6 +46,7 @@ function countOccurrences(text: string, pattern: RegExp): number {
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(text)) !== null) {
     count += 1;
+    if (count >= maxCount) return count;
     if (match[0] === '') {
       pattern.lastIndex += 1;
     }
@@ -49,19 +54,20 @@ function countOccurrences(text: string, pattern: RegExp): number {
   return count;
 }
 
-const COT_TRIGGER_PATTERNS = COT_TRIGGERS.map((trigger) => {
-  const parts = trigger
+const COT_TRIGGER_PARTS = COT_TRIGGERS.map((trigger) =>
+  trigger
     .split(/\s+/)
     .map((part) => escapeRegExp(part))
-    .join('\\s+');
-  return new RegExp(`(?:^|\\s)${parts}(?:[.!?,;:]|\\s|$)`, 'gi');
-});
+    .join('\\s+')
+);
 
-const FEW_SHOT_INPUT_RE = /(^|\n)\s*Input\s*:/gi;
-const FEW_SHOT_OUTPUT_RE = /(^|\n)\s*Output\s*:/gi;
-const FEW_SHOT_EXAMPLE_RE = /(^|\n)\s*Example\s+\d+/gi;
-const FEW_SHOT_XML_RE = /<example>/gi;
-const FEW_SHOT_MARKDOWN_RE = /###\s*Example/gi;
+const COT_TRIGGER_RE = new RegExp(
+  `(?:^|\\s)(?:${COT_TRIGGER_PARTS.join('|')})(?:[.!?,;:]|\\s|$)`,
+  'gi'
+);
+
+const FEW_SHOT_MARKER_RE =
+  /(^|\n)\s*(Input\s*:|Output\s*:|Example\s+\d+)|###\s*Example|<example>/gi;
 
 export function normalizePromptText(text: string): {
   normalized: string;
@@ -78,10 +84,12 @@ export function normalizePromptText(text: string): {
     }
   }
 
-  const lines = normalized.split(/\r?\n/);
-  const firstLine = lines[0];
+  const newlineIndex = normalized.indexOf('\n');
+  const firstLine =
+    newlineIndex === -1 ? normalized : normalized.slice(0, newlineIndex);
   if (firstLine && /^(refined|optimized)?\s*prompt\s*:/i.test(firstLine)) {
-    normalized = lines.slice(1).join('\n').trim();
+    normalized =
+      newlineIndex === -1 ? '' : normalized.slice(newlineIndex + 1).trim();
     labelStripped = true;
   }
 
@@ -131,26 +139,41 @@ function validateRole(text: string): boolean {
 }
 
 function validateChainOfThought(text: string): boolean {
-  const total = COT_TRIGGER_PATTERNS.reduce((count, pattern) => {
-    return count + countOccurrences(text, pattern);
-  }, 0);
-
-  return total === 1;
+  return countOccurrencesUpTo(text, COT_TRIGGER_RE, 2) === 1;
 }
 
 function validateFewShot(text: string): boolean {
-  const inputCount = countOccurrences(text, FEW_SHOT_INPUT_RE);
-  const outputCount = countOccurrences(text, FEW_SHOT_OUTPUT_RE);
-  const exampleCount =
-    countOccurrences(text, FEW_SHOT_EXAMPLE_RE) +
-    countOccurrences(text, FEW_SHOT_XML_RE) +
-    countOccurrences(text, FEW_SHOT_MARKDOWN_RE);
+  let inputCount = 0;
+  let outputCount = 0;
+  let exampleCount = 0;
 
-  if (Math.min(inputCount, outputCount) >= 2) {
-    return true;
+  FEW_SHOT_MARKER_RE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = FEW_SHOT_MARKER_RE.exec(text)) !== null) {
+    const marker = match[2];
+    if (marker) {
+      const normalizedMarker = marker.toLowerCase();
+      if (normalizedMarker.startsWith('input')) {
+        inputCount += 1;
+      } else if (normalizedMarker.startsWith('output')) {
+        outputCount += 1;
+      } else {
+        exampleCount += 1;
+      }
+    } else {
+      exampleCount += 1;
+    }
+
+    if (Math.min(inputCount, outputCount) >= 2 || exampleCount >= 2) {
+      return true;
+    }
+
+    if (match[0] === '') {
+      FEW_SHOT_MARKER_RE.lastIndex += 1;
+    }
   }
 
-  return exampleCount >= 2;
+  return Math.min(inputCount, outputCount) >= 2 || exampleCount >= 2;
 }
 
 export function validateTechniqueOutput(

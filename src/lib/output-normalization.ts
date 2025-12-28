@@ -3,7 +3,7 @@ import type {
   AnalysisCharacteristics,
   OptimizeScore,
 } from '../config/types.js';
-import { detectTargetFormat } from './prompt-analysis.js';
+import { buildPatternCache, detectTargetFormat } from './prompt-analysis.js';
 
 const SCORE_KEYS = [
   'clarity',
@@ -72,16 +72,17 @@ export function mergeCharacteristics(
   prompt: string,
   base: AnalysisCharacteristics
 ): AnalysisCharacteristics {
-  const derivedFormat = detectTargetFormat(prompt).format;
+  const patternCache = buildPatternCache(prompt);
+  const derivedFormat = detectTargetFormat(prompt, patternCache).format;
   const derivedWordCount = countWords(prompt);
   const derivedHasRole = safeTest(PATTERNS.hasRole, prompt);
   const derivedHasExamples =
     safeTest(PATTERNS.exampleIndicators, prompt) ||
     safeTest(PATTERNS.fewShotStructure, prompt);
   const derivedHasStructure =
-    safeTest(PATTERNS.xmlStructure, prompt) ||
-    safeTest(PATTERNS.markdownStructure, prompt) ||
-    safeTest(PATTERNS.jsonStructure, prompt);
+    patternCache.hasXmlStructure ||
+    patternCache.hasMarkdownStructure ||
+    patternCache.hasJsonStructure;
   const derivedHasStepByStep = safeTest(PATTERNS.stepByStepIndicators, prompt);
   const derivedIsVague = base.isVague || safeTest(PATTERNS.vagueWords, prompt);
 

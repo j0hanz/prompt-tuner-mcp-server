@@ -1,1 +1,5 @@
-export { detectTargetFormat, resolveFormat } from './prompt-analysis/format.js';
+export {
+  buildPatternCache,
+  detectTargetFormat,
+  resolveFormat,
+} from './prompt-analysis/format.js';
