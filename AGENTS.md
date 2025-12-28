@@ -1,39 +1,82 @@
-# Repository Guidelines
+# AGENTS.md
 
-## Project Structure & Module Organization
+## Project Overview
 
-- `src/` holds TypeScript source. `src/index.ts` is the entry point and `src/server.ts` wires the MCP server. Subfolders include `config/`, `lib/`, `tools/`, `resources/`, `prompts/`, `schemas/`, and `types/`.
-- `tests/` contains Vitest suites; test files use the `*.test.ts` naming pattern.
-- `dist/` is generated build output (do not edit by hand).
-- `docs/` stores static assets. `CONFIGURATION.md` documents runtime environment variables.
+- **Goal**: MCP server for refining, analyzing, optimizing, and validating AI prompts.
+- **Stack**: Node.js (>=20), TypeScript, Model Context Protocol (MCP), Zod, Vitest.
+- **Key Libraries**: `@modelcontextprotocol/sdk`, `openai`, `@anthropic-ai/sdk`, `@google/genai`, `zod`.
 
-## Build, Test, and Development Commands
+## Repo Map / Structure
 
-- `npm run dev` / `npm run dev:http`: run from source with tsx watch (HTTP variant adds `--http`).
-- `npm run build`: compile TypeScript into `dist/` and set executable permissions.
-- `npm run start` / `npm run start:http`: run the compiled server from `dist/`.
-- `npm run test` / `npm run test:watch`: run Vitest once or in watch mode.
-- `npm run lint` and `npm run format`: ESLint checks and Prettier formatting.
-- `npm run type-check`: `tsc --noEmit` for strict type validation.
+- `src/`: TypeScript source code.
+  - `index.ts`: CLI entry point.
+  - `server.ts`: MCP server initialization and tool registration.
+  - `config/`: Environment variables, constants, and configuration logic.
+  - `lib/`: Core logic (LLM clients, retry mechanisms, validation, prompt analysis).
+  - `tools/`: Tool implementations (`refine_prompt`, `analyze_prompt`, etc.).
+  - `schemas/`: Zod schemas for inputs and outputs.
+  - `prompts/`: Internal prompt templates used by the server.
+- `tests/`: Integration and unit tests (`*.test.ts`).
+- `dist/`: Compiled JavaScript output (generated).
+- `docs/`: Documentation assets.
+- `CONFIGURATION.md`: Detailed environment variable reference.
 
-## Coding Style & Naming Conventions
+## Setup & Environment
 
-- TypeScript, ES modules, Node >= 20.
-- Prettier rules: 2-space indentation, single quotes, trailing commas, 80-char line width, sorted imports.
-- ESLint is strict; avoid `any`, unused imports, and floating promises; prefer `type` imports.
-- Naming: `camelCase` for variables/functions, `PascalCase` for types, `UPPER_CASE` for constants; leading `_` is allowed for unused args.
+- **Install dependencies**: `npm install`
+- **Environment variables**:
+  - Defined in `src/config/env.ts` and documented in `CONFIGURATION.md`.
+  - Key variables: `LLM_PROVIDER`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`.
+- **Node.js Version**: `>=20.0.0` (enforced in `package.json`).
 
-## Testing Guidelines
+## Development Workflow
 
-- Use Vitest in the Node environment; keep tests in `tests/` and name `*.test.ts`.
-- Favor deterministic tests and keep individual tests under the 15s timeout.
+- **Dev mode**: `npm run dev` (runs `src/index.ts` with `tsx watch`).
+- **Build**: `npm run build` (compiles to `dist/` and sets executable permissions).
+- **Start production**: `npm run start` (runs `dist/index.js`).
+- **MCP Inspector**: `npm run inspector` (debugs the server using the MCP inspector).
 
-## Commit & Pull Request Guidelines
+## Testing
 
-- History favors short, imperative summaries; common pattern is `refactor: ...`, plus plain `Add ...` and version bumps like `1.0.5`.
-- PRs should include a brief summary, tests run (for example, `npm run test`), and note any config or environment changes. Link related issues when applicable.
+- **Run all tests**: `npm run test` (uses Vitest).
+- **Watch mode**: `npm run test:watch`.
+- **Coverage**: `npm run test:coverage`.
+- **Test files**: Located in `tests/` directory, matching `*.test.ts`.
 
-## Security & Configuration Tips
+## Code Style & Conventions
 
-- Runtime behavior is driven by environment variables; see `CONFIGURATION.md` for required keys and limits.
-- Never commit API keys. Be cautious with `INCLUDE_ERROR_CONTEXT=true` in production.
+- **Language**: TypeScript (ES2022 target, NodeNext module resolution).
+- **Linting**: `npm run lint` (ESLint with `typescript-eslint` and `unused-imports`).
+- **Formatting**: `npm run format` (Prettier).
+- **Type Checking**: `npm run type-check` (runs `tsc --noEmit`).
+- **Naming Conventions**:
+  - Variables/Functions: `camelCase`.
+  - Types/Interfaces/Classes: `PascalCase`.
+  - Constants: `UPPER_CASE`.
+  - Files: `kebab-case`.
+- **Rules**:
+  - No `any` types (`@typescript-eslint/no-explicit-any`).
+  - Explicit function return types required.
+  - Unused imports are forbidden.
+  - Prefer `type` imports.
+
+## Build / Release
+
+- **Output Directory**: `dist/` (cleared and regenerated on build).
+- **Process**: `npm run build` compiles TS to JS and makes `dist/index.js` executable.
+
+## Security & Safety
+
+- **Secrets**: API keys must be passed via environment variables; never committed.
+- **Validation**: All tool inputs are validated using Zod schemas in `src/schemas/`.
+- **Error Handling**: Error context is sanitized to prevent leaking sensitive info (controlled by `INCLUDE_ERROR_CONTEXT`).
+
+## Pull Request / Commit Guidelines
+
+- **Commit Messages**: Imperative mood (e.g., "Add feature", "Fix bug").
+- **Required Checks**: Ensure `npm run lint`, `npm run type-check`, and `npm run test` pass before submitting.
+
+## Troubleshooting
+
+- **Missing API Key**: Ensure `LLM_PROVIDER` matches the set API key (e.g., `OPENAI_API_KEY` for `openai`).
+- **Build Errors**: Run `npm run type-check` to identify TypeScript issues.
