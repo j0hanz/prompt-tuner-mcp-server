@@ -20,19 +20,15 @@ import {
 import { getProviderInfo } from '../lib/llm-client.js';
 import { wrapPromptData } from '../lib/prompt-policy.js';
 import { getToolContext } from '../lib/tool-context.js';
-import {
-  asBulletList,
-  buildOutput,
-  formatProviderLine,
-} from '../lib/tool-formatters.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
-import { validatePrompt } from '../lib/validation.js';
 import {
   ValidatePromptInputSchema,
   ValidatePromptOutputSchema,
 } from '../schemas/index.js';
 import { ValidationResponseSchema } from '../schemas/llm-responses.js';
+import { formatValidationOutput } from './validate-prompt/formatters.js';
 import { VALIDATION_SYSTEM_PROMPT } from './validate-prompt/prompt.js';
+import type { ValidationModel } from './validate-prompt/types.js';
 
 const INJECTION_TERMS = [
   'injection',
@@ -49,9 +45,6 @@ const TOKEN_LIMITS_BY_MODEL = {
   generic: 8000,
 } as const;
 
-type ValidationModel = keyof typeof TOKEN_LIMITS_BY_MODEL;
-const DEFAULT_VALIDATION_MODEL: ValidationModel = 'generic';
-
 const TOOL_NAME = 'validate_prompt' as const;
 
 interface ValidatePromptInput {
@@ -60,17 +53,18 @@ interface ValidatePromptInput {
   checkInjection?: boolean;
 }
 
-interface OutputSection {
-  title: string;
-  lines: string[];
+interface ParsedValidatePromptInput {
+  prompt: string;
+  targetModel: ValidationModel;
+  checkInjection: boolean;
 }
 
 const VALIDATE_PROMPT_TOOL = {
   title: 'Validate Prompt',
   description:
     'Pre-flight validation using AI: checks issues, estimates tokens, detects security risks. Returns isValid boolean and categorized issues.',
-  inputSchema: ValidatePromptInputSchema.shape,
-  outputSchema: ValidatePromptOutputSchema.shape,
+  inputSchema: ValidatePromptInputSchema,
+  outputSchema: ValidatePromptOutputSchema,
   annotations: {
     readOnlyHint: true,
     idempotentHint: false,
@@ -78,77 +72,14 @@ const VALIDATE_PROMPT_TOOL = {
   },
 };
 
-function formatIssueLine(issue: ValidationIssue): string {
-  if (!issue.suggestion) return issue.message;
-  return `${issue.message} | Suggestion: ${issue.suggestion}`;
-}
-
-function normalizeTargetModel(model?: string): ValidationModel {
-  const normalized = model?.toLowerCase() ?? DEFAULT_VALIDATION_MODEL;
-  return normalized in TOKEN_LIMITS_BY_MODEL
-    ? (normalized as ValidationModel)
-    : DEFAULT_VALIDATION_MODEL;
+function parseValidateInput(
+  input: ValidatePromptInput
+): ParsedValidatePromptInput {
+  return ValidatePromptInputSchema.parse(input);
 }
 
 function resolveModelTokenLimit(targetModel: ValidationModel): number {
   return TOKEN_LIMITS_BY_MODEL[targetModel];
-}
-
-function buildSummaryLines(
-  parsed: ValidationResponse,
-  targetModel: ValidationModel,
-  tokenLimit: number
-): string[] {
-  const overLimit = parsed.tokenEstimate > tokenLimit;
-  const utilization = Math.round((parsed.tokenEstimate / tokenLimit) * 100);
-  return [
-    `Status: ${parsed.isValid ? 'Valid' : 'Invalid'}`,
-    `Target model: ${targetModel}`,
-    `Token estimate: ~${parsed.tokenEstimate} (limit ${tokenLimit})`,
-    `Token utilization: ${utilization}%`,
-    `Over limit: ${overLimit ? 'Yes' : 'No'}`,
-  ];
-}
-
-function buildIssueSections(parsed: ValidationResponse): OutputSection[] {
-  const groups: { label: string; type: ValidationIssue['type'] }[] = [
-    { label: 'Errors', type: 'error' },
-    { label: 'Warnings', type: 'warning' },
-    { label: 'Info', type: 'info' },
-  ];
-
-  return groups.flatMap((group) => {
-    const items = parsed.issues.filter((issue) => issue.type === group.type);
-    if (!items.length) return [];
-    return [
-      {
-        title: `${group.label} (${items.length})`,
-        lines: asBulletList(items.map(formatIssueLine)),
-      },
-    ];
-  });
-}
-
-function formatValidationOutput(
-  parsed: ValidationResponse,
-  targetModel: ValidationModel,
-  tokenLimit: number,
-  provider: { provider: string; model: string }
-): string {
-  const sections: OutputSection[] = [
-    {
-      title: 'Summary',
-      lines: asBulletList(buildSummaryLines(parsed, targetModel, tokenLimit)),
-    },
-    ...buildIssueSections(parsed),
-  ];
-
-  return buildOutput(
-    'Prompt Validation',
-    [formatProviderLine(provider)],
-    sections,
-    [parsed.isValid ? 'Prompt is ready to use.' : 'Fix errors before use.']
-  );
 }
 
 function issueMentionsInjection(issue: ValidationIssue): boolean {
@@ -160,40 +91,18 @@ function hasInjectionIssue(parsed: ValidationResponse): boolean {
   return parsed.issues.some(issueMentionsInjection);
 }
 
-function resolveValidationModel(input: ValidatePromptInput): ValidationModel {
-  return normalizeTargetModel(input.targetModel);
-}
-
-function resolveCheckInjection(input: ValidatePromptInput): boolean {
-  return input.checkInjection ?? true;
-}
-
-function resolveValidationInputs(
-  input: ValidatePromptInput,
-  validatedPrompt: string
-): {
+function resolveValidationInputs(input: ParsedValidatePromptInput): {
   targetModel: ValidationModel;
   checkInjection: boolean;
   validationPrompt: string;
 } {
-  const targetModel = resolveValidationModel(input);
-  const checkInjection = resolveCheckInjection(input);
+  const { targetModel, checkInjection } = input;
   const validationPrompt = buildValidationPrompt(
-    validatedPrompt,
+    input.prompt,
     targetModel,
     checkInjection
   );
   return { targetModel, checkInjection, validationPrompt };
-}
-
-function resolveValidatedPrompt(
-  input: ValidatePromptInput
-): string | ErrorResponse {
-  try {
-    return validatePrompt(input.prompt);
-  } catch (error) {
-    return createErrorResponse(error, ErrorCode.E_INVALID_INPUT, input.prompt);
-  }
 }
 
 function buildValidationPrompt(
@@ -276,21 +185,18 @@ async function handleValidatePrompt(
 ): Promise<ReturnType<typeof createSuccessResponse> | ErrorResponse> {
   const context = getToolContext(extra);
 
-  const validatedPrompt = resolveValidatedPrompt(input);
-  if (typeof validatedPrompt !== 'string') return validatedPrompt;
-
-  const { targetModel, checkInjection, validationPrompt } =
-    resolveValidationInputs(input, validatedPrompt);
-
   try {
-    const parsed = await requestValidation(
+    const parsed = parseValidateInput(input);
+    const { targetModel, checkInjection, validationPrompt } =
+      resolveValidationInputs(parsed);
+    const validation = await requestValidation(
       validationPrompt,
       context.request.signal
     );
     const tokenLimit = resolveModelTokenLimit(targetModel);
     const provider = await getProviderInfo();
     return buildValidationResponse(
-      parsed,
+      validation,
       targetModel,
       checkInjection,
       tokenLimit,

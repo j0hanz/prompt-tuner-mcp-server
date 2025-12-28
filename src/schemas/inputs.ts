@@ -53,50 +53,58 @@ const targetFormatSchema = z
   .enum(TARGET_FORMATS)
   .describe('auto | claude | gpt | json');
 
-export const RefinePromptInputSchema = z.object({
-  prompt: promptSchema,
-  technique: techniqueSchema
-    .optional()
-    .default('basic')
-    .describe(
-      'basic | chainOfThought | fewShot | roleBased | structured | comprehensive'
-    ),
-  targetFormat: targetFormatSchema
-    .optional()
-    .default('auto')
-    .describe('auto | claude | gpt | json'),
-});
+export const RefinePromptInputSchema = z
+  .object({
+    prompt: promptSchema,
+    technique: techniqueSchema
+      .optional()
+      .default('basic')
+      .describe(
+        'basic | chainOfThought | fewShot | roleBased | structured | comprehensive'
+      ),
+    targetFormat: targetFormatSchema
+      .optional()
+      .default('auto')
+      .describe('auto | claude | gpt | json'),
+  })
+  .strict();
 
-export const AnalyzePromptInputSchema = z.object({
-  prompt: promptSchema,
-});
+export const AnalyzePromptInputSchema = z
+  .object({
+    prompt: promptSchema,
+  })
+  .strict();
 
-export const OptimizePromptInputSchema = z.object({
-  prompt: promptSchema,
-  techniques: z
-    .array(techniqueSchema)
-    .min(1, 'At least one technique required')
-    .max(6, 'Maximum 6 techniques allowed')
-    .default(['basic'])
-    .describe(
-      'Array of: basic, chainOfThought, fewShot, roleBased, structured, comprehensive'
-    ),
-  targetFormat: targetFormatSchema
-    .optional()
-    .default('auto')
-    .describe('auto | claude | gpt | json'),
-});
+export const OptimizePromptInputSchema = z
+  .object({
+    prompt: promptSchema,
+    techniques: z
+      .array(techniqueSchema)
+      .min(1, 'At least one technique required')
+      .max(6, 'Maximum 6 techniques allowed')
+      .default(['basic'])
+      .describe(
+        'Array of: basic, chainOfThought, fewShot, roleBased, structured, comprehensive'
+      ),
+    targetFormat: targetFormatSchema
+      .optional()
+      .default('auto')
+      .describe('auto | claude | gpt | json'),
+  })
+  .strict();
 
-export const ValidatePromptInputSchema = z.object({
-  prompt: promptSchema.describe('Prompt to validate'),
-  targetModel: z
-    .enum(['claude', 'gpt', 'gemini', 'generic'])
-    .optional()
-    .default('generic')
-    .describe('Target AI model for token limit validation'),
-  checkInjection: z
-    .boolean()
-    .optional()
-    .default(true)
-    .describe('Check for prompt injection patterns'),
-});
+export const ValidatePromptInputSchema = z
+  .object({
+    prompt: promptSchema.describe('Prompt to validate'),
+    targetModel: z
+      .enum(['claude', 'gpt', 'gemini', 'generic'])
+      .optional()
+      .default('generic')
+      .describe('Target AI model for token limit validation'),
+    checkInjection: z
+      .boolean()
+      .optional()
+      .default(true)
+      .describe('Check for prompt injection patterns'),
+  })
+  .strict();

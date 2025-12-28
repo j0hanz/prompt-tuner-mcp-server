@@ -6,6 +6,7 @@ import {
 } from '../config/constants.js';
 import type { ErrorCodeType } from '../config/types.js';
 import { logger, McpError } from './errors.js';
+import { extractFirstJsonFragment } from './llm-json/scan.js';
 
 // Matches opening code block: ```json or ``` at start (with optional whitespace/newlines before)
 const CODE_BLOCK_START_RE = /^[\s\n]*```(?:json)?[\s\n]*/i;
@@ -48,76 +49,6 @@ function enforceMaxInputLength(
     undefined,
     { responseLength: llmResponseText.length, maxLength: maxInputLength }
   );
-}
-
-type JsonBracket = '{' | '}' | '[' | ']';
-
-function isOpeningBracket(value: string): value is '{' | '[' {
-  return value === '{' || value === '[';
-}
-
-function isClosingBracket(value: string): value is '}' | ']' {
-  return value === '}' || value === ']';
-}
-
-function matchesBracket(open: '{' | '[', close: '}' | ']'): boolean {
-  return (open === '{' && close === '}') || (open === '[' && close === ']');
-}
-
-function extractFirstJsonFragment(text: string): string | null {
-  let startIndex = -1;
-  const stack: ('{' | '[')[] = [];
-  let inString = false;
-  let escaped = false;
-
-  for (let i = 0; i < text.length; i += 1) {
-    const char = text[i] as JsonBracket | '"' | '\\';
-
-    if (startIndex === -1) {
-      if (isOpeningBracket(char)) {
-        startIndex = i;
-        stack.push(char);
-      }
-      continue;
-    }
-
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-        continue;
-      }
-      if (char === '\\') {
-        escaped = true;
-        continue;
-      }
-      if (char === '"') {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (char === '"') {
-      inString = true;
-      continue;
-    }
-
-    if (isOpeningBracket(char)) {
-      stack.push(char);
-      continue;
-    }
-
-    if (isClosingBracket(char)) {
-      const last = stack[stack.length - 1];
-      if (last && matchesBracket(last, char)) {
-        stack.pop();
-        if (stack.length === 0) {
-          return text.slice(startIndex, i + 1).trim();
-        }
-      }
-    }
-  }
-
-  return null;
 }
 
 function tryParseJson<T>(
@@ -176,6 +107,70 @@ function throwParseFailure(
   );
 }
 
+function resolveParseOptions(options: {
+  errorCode: ErrorCodeType;
+  maxPreviewChars?: number;
+  maxInputLength?: number;
+  debugLabel?: string;
+}): {
+  errorCode: ErrorCodeType;
+  maxPreviewChars: number;
+  maxInputLength: number;
+  debugLabel?: string;
+} {
+  return {
+    errorCode: options.errorCode,
+    maxPreviewChars: options.maxPreviewChars ?? LLM_ERROR_PREVIEW_CHARS,
+    maxInputLength: options.maxInputLength ?? LLM_MAX_RESPONSE_LENGTH,
+    debugLabel: options.debugLabel,
+  };
+}
+
+function isJsonStart(text: string): boolean {
+  const firstChar = text[0];
+  return firstChar === '{' || firstChar === '[';
+}
+
+function shouldTryRawParse(text: string): boolean {
+  return !text.startsWith('```') && isJsonStart(text);
+}
+
+function buildParseCandidates(
+  text: string
+): { label: string; payload: string }[] {
+  const candidates: { label: string; payload: string }[] = [];
+  if (shouldTryRawParse(text)) {
+    candidates.push({ label: 'raw', payload: text });
+  }
+  candidates.push({
+    label: 'stripped markers',
+    payload: stripCodeBlockMarkers(text),
+  });
+
+  const extracted = extractFirstJsonFragment(text);
+  if (extracted) {
+    candidates.push({ label: 'extracted fragment', payload: extracted });
+  }
+  return candidates;
+}
+
+function parseFromCandidates<T>(
+  candidates: { label: string; payload: string }[],
+  parse: (value: unknown) => T,
+  debugLabel: string | undefined
+): T | null {
+  for (const candidate of candidates) {
+    const attempt = tryParseJson(
+      candidate.payload,
+      parse,
+      debugLabel,
+      candidate.label
+    );
+    if (attempt.success) return attempt.value;
+  }
+  return null;
+}
+
 export function parseJsonFromLlmResponse<T>(
   llmResponseText: string,
   parse: (value: unknown) => T,
@@ -186,41 +181,25 @@ export function parseJsonFromLlmResponse<T>(
     debugLabel?: string;
   }
 ): T {
-  // Input validation: prevent DoS attacks with excessively large responses
-  const maxInputLength = options.maxInputLength ?? LLM_MAX_RESPONSE_LENGTH;
-  enforceMaxInputLength(llmResponseText, maxInputLength, options.errorCode);
+  const parseOptions = resolveParseOptions(options);
+  enforceMaxInputLength(
+    llmResponseText,
+    parseOptions.maxInputLength,
+    parseOptions.errorCode
+  );
 
   const jsonStr = llmResponseText.trim();
-  const maxPreviewChars = options.maxPreviewChars ?? LLM_ERROR_PREVIEW_CHARS;
-  const startsWithCodeFence = jsonStr.startsWith('```');
-  const firstChar = jsonStr[0];
-  const looksLikeJson = firstChar === '{' || firstChar === '[';
-
-  // Try raw parse first
-  if (!startsWithCodeFence && looksLikeJson) {
-    const rawAttempt = tryParseJson(jsonStr, parse, options.debugLabel, 'raw');
-    if (rawAttempt.success) return rawAttempt.value;
-  }
-
-  // Try with code block markers stripped
-  const stripped = stripCodeBlockMarkers(jsonStr);
-  const strippedAttempt = tryParseJson(
-    stripped,
+  const candidates = buildParseCandidates(jsonStr);
+  const parsed = parseFromCandidates(
+    candidates,
     parse,
-    options.debugLabel,
-    'stripped markers'
+    parseOptions.debugLabel
   );
-  if (strippedAttempt.success) return strippedAttempt.value;
+  if (parsed !== null) return parsed;
 
-  const extracted = extractFirstJsonFragment(jsonStr);
-  if (extracted) {
-    const extractedAttempt = tryParseJson(
-      extracted,
-      parse,
-      options.debugLabel,
-      'extracted fragment'
-    );
-    if (extractedAttempt.success) return extractedAttempt.value;
-  }
-  return throwParseFailure(options, llmResponseText, maxPreviewChars);
+  return throwParseFailure(
+    parseOptions,
+    llmResponseText,
+    parseOptions.maxPreviewChars
+  );
 }

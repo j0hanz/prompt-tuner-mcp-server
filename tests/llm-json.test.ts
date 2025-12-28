@@ -52,6 +52,25 @@ describe('parseJsonFromLlmResponse', () => {
     expect(result.count).toBe(2);
   });
 
+  it('parses JSON with braces inside strings', () => {
+    const payload =
+      'Payload: {"ok":true,"text":"{not a brace}","items":[{"a":1}]} done';
+    const result = parseJsonFromLlmResponse(
+      payload,
+      (value) => {
+        if (typeof value !== 'object' || value === null) {
+          throw new Error('invalid');
+        }
+        return value as { ok: boolean; text: string; items: { a: number }[] };
+      },
+      { errorCode: ErrorCode.E_INVALID_INPUT }
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.text).toBe('{not a brace}');
+    expect(result.items[0]?.a).toBe(1);
+  });
+
   it('rejects payloads that exceed maxInputLength', () => {
     const payload = 'abcdef';
     expect(() =>

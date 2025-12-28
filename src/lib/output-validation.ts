@@ -13,10 +13,50 @@ const DISALLOWED_SCAFFOLDING_PATTERNS: RegExp[] = [
 ];
 
 const ROLE_STATEMENT_RE = /\bYou are (a|an|the)\b/i;
+const PROMPT_LABEL_RE = /^(refined|optimized)?\s*prompt\s*:/i;
 
 function safeTest(pattern: RegExp, text: string): boolean {
   pattern.lastIndex = 0;
   return pattern.test(text);
+}
+
+function isWrappedCodeFence(text: string): boolean {
+  return text.startsWith('```') && text.endsWith('```');
+}
+
+function extractFenceContent(text: string): string | null {
+  const fenceMatch = WRAPPED_CODE_BLOCK_RE.exec(text);
+  const content = fenceMatch?.[1]?.trim();
+  if (!content) return null;
+  return content;
+}
+
+function stripCodeFence(text: string): string {
+  if (!isWrappedCodeFence(text)) return text;
+  const content = extractFenceContent(text);
+  return content ?? text;
+}
+
+function splitFirstLine(text: string): {
+  firstLine: string;
+  remainder: string;
+} {
+  const newlineIndex = text.indexOf('\n');
+  if (newlineIndex === -1) {
+    return { firstLine: text, remainder: '' };
+  }
+  return {
+    firstLine: text.slice(0, newlineIndex),
+    remainder: text.slice(newlineIndex + 1),
+  };
+}
+
+function stripPromptLabel(text: string): { text: string; stripped: boolean } {
+  const { firstLine, remainder } = splitFirstLine(text);
+  if (!firstLine || !PROMPT_LABEL_RE.test(firstLine)) {
+    return { text, stripped: false };
+  }
+  return { text: remainder.trim(), stripped: true };
 }
 
 export function normalizePromptText(text: string): {
@@ -24,42 +64,16 @@ export function normalizePromptText(text: string): {
   changed: boolean;
 } {
   const trimmed = text.trim();
-  let normalized = trimmed;
-  let labelStripped = false;
+  let normalized = stripCodeFence(trimmed);
 
-  if (trimmed.startsWith('```') && trimmed.endsWith('```')) {
-    const fenceMatch = WRAPPED_CODE_BLOCK_RE.exec(trimmed);
-    if (fenceMatch?.[1]?.trim()) {
-      normalized = fenceMatch[1].trim();
-    }
+  const labelResult = stripPromptLabel(normalized);
+  normalized = labelResult.text;
+  if (labelResult.stripped) {
+    normalized = stripCodeFence(normalized);
   }
 
-  const newlineIndex = normalized.indexOf('\n');
-  const firstLine =
-    newlineIndex === -1 ? normalized : normalized.slice(0, newlineIndex);
-  if (firstLine && /^(refined|optimized)?\s*prompt\s*:/i.test(firstLine)) {
-    normalized =
-      newlineIndex === -1 ? '' : normalized.slice(newlineIndex + 1).trim();
-    labelStripped = true;
-  }
-
-  const trimmedAfterLabel = normalized.trim();
-  if (
-    labelStripped &&
-    trimmedAfterLabel.startsWith('```') &&
-    trimmedAfterLabel.endsWith('```')
-  ) {
-    const fenceMatch = WRAPPED_CODE_BLOCK_RE.exec(trimmedAfterLabel);
-    if (fenceMatch?.[1]?.trim()) {
-      normalized = fenceMatch[1].trim();
-    }
-  }
-
-  if (!normalized) {
-    normalized = trimmed;
-  }
-
-  return { normalized, changed: normalized !== trimmed };
+  const finalText = normalized || trimmed;
+  return { normalized: finalText, changed: finalText !== trimmed };
 }
 
 export function containsOutputScaffolding(text: string): boolean {
@@ -68,47 +82,51 @@ export function containsOutputScaffolding(text: string): boolean {
   );
 }
 
+const STRUCTURE_VALIDATORS: Record<TargetFormat, (text: string) => boolean> = {
+  claude: (text) =>
+    safeTest(PATTERNS.xmlStructure, text) ||
+    safeTest(PATTERNS.claudePatterns, text),
+  gpt: (text) => safeTest(PATTERNS.markdownStructure, text),
+  json: (text) => safeTest(PATTERNS.jsonStructure, text) || /json/i.test(text),
+  auto: () => true,
+};
+
 function validateStructured(text: string, targetFormat: TargetFormat): boolean {
-  if (targetFormat === 'claude') {
-    return (
-      safeTest(PATTERNS.xmlStructure, text) ||
-      safeTest(PATTERNS.claudePatterns, text)
-    );
-  }
-  if (targetFormat === 'gpt') {
-    return safeTest(PATTERNS.markdownStructure, text);
-  }
-  if (targetFormat === 'json') {
-    return safeTest(PATTERNS.jsonStructure, text) || /json/i.test(text);
-  }
-  return true;
+  return STRUCTURE_VALIDATORS[targetFormat](text);
 }
 
 function validateRole(text: string): boolean {
   return ROLE_STATEMENT_RE.test(text.slice(0, 200));
 }
 
+function okResult(): { ok: true } {
+  return { ok: true };
+}
+
+function failResult(reason: string): { ok: false; reason: string } {
+  return { ok: false, reason };
+}
+
+const TECHNIQUE_VALIDATORS: Record<
+  OptimizationTechnique,
+  (text: string, targetFormat: TargetFormat) => { ok: boolean; reason?: string }
+> = {
+  structured: (text, targetFormat) =>
+    validateStructured(text, targetFormat)
+      ? okResult()
+      : failResult('Structured format not detected'),
+  roleBased: (text) =>
+    validateRole(text) ? okResult() : failResult('Role statement not detected'),
+  chainOfThought: () => okResult(),
+  fewShot: () => okResult(),
+  basic: () => okResult(),
+  comprehensive: () => okResult(),
+};
+
 export function validateTechniqueOutput(
   text: string,
   technique: OptimizationTechnique,
   targetFormat: TargetFormat
 ): { ok: boolean; reason?: string } {
-  switch (technique) {
-    case 'structured': {
-      const ok = validateStructured(text, targetFormat);
-      return ok ? { ok } : { ok, reason: 'Structured format not detected' };
-    }
-    case 'chainOfThought': {
-      return { ok: true };
-    }
-    case 'fewShot': {
-      return { ok: true };
-    }
-    case 'roleBased': {
-      const ok = validateRole(text);
-      return ok ? { ok } : { ok, reason: 'Role statement not detected' };
-    }
-    default:
-      return { ok: true };
-  }
+  return TECHNIQUE_VALIDATORS[technique](text, targetFormat);
 }

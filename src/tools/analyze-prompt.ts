@@ -30,7 +30,6 @@ import {
   formatProviderLine,
 } from '../lib/tool-formatters.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
-import { validatePrompt } from '../lib/validation.js';
 import {
   AnalyzePromptInputSchema,
   AnalyzePromptOutputSchema,
@@ -96,8 +95,8 @@ const ANALYZE_PROMPT_TOOL = {
   title: 'Analyze Prompt',
   description:
     'Score prompt quality (0-100) across 5 dimensions using AI analysis: clarity, specificity, completeness, structure, effectiveness. Returns actionable suggestions.',
-  inputSchema: AnalyzePromptInputSchema.shape,
-  outputSchema: AnalyzePromptOutputSchema.shape,
+  inputSchema: AnalyzePromptInputSchema,
+  outputSchema: AnalyzePromptOutputSchema,
   annotations: {
     readOnlyHint: true,
     idempotentHint: false,
@@ -156,6 +155,30 @@ function formatAnalysisOutput(
       },
     ]
   );
+}
+
+function parseAnalyzeInput(input: AnalyzePromptInput): AnalyzePromptInput {
+  return AnalyzePromptInputSchema.parse(input);
+}
+
+function normalizeAnalysisResult(
+  result: AnalysisResponse,
+  prompt: string
+): {
+  analysisResult: AnalysisResponse;
+  scoreAdjusted: boolean;
+  overallSource: string;
+} {
+  const normalizedScore = normalizeScore(result.score);
+  const characteristics = mergeCharacteristics(prompt, result.characteristics);
+  const analysisResult: AnalysisResponse = {
+    ...result,
+    score: normalizedScore.score,
+    characteristics,
+  };
+  const scoreAdjusted = normalizedScore.adjusted;
+  const overallSource = scoreAdjusted ? 'server' : 'llm';
+  return { analysisResult, scoreAdjusted, overallSource };
 }
 
 async function sendProgress(
@@ -240,37 +263,29 @@ async function handleAnalyzePrompt(
   const context = getToolContext(extra);
 
   try {
+    const parsed = parseAnalyzeInput(input);
     logger.info(
-      { sessionId: context.sessionId, promptLength: input.prompt.length },
+      { sessionId: context.sessionId, promptLength: parsed.prompt.length },
       `${TOOL_NAME} called`
     );
-
-    const validatedPrompt = validatePrompt(input.prompt);
     await sendProgress(context, 'started', 0);
 
-    const analysisPrompt = buildAnalysisPrompt(validatedPrompt);
+    const analysisPrompt = buildAnalysisPrompt(parsed.prompt);
     const { result, usedFallback } = await runAnalysis(
       analysisPrompt,
       context.request.signal
     );
-    const normalizedScore = normalizeScore(result.score);
-    const characteristics = mergeCharacteristics(
-      validatedPrompt,
-      result.characteristics
-    );
-    const analysisResult: AnalysisResponse = {
-      ...result,
-      score: normalizedScore.score,
-      characteristics,
-    };
-    const scoreAdjusted = normalizedScore.adjusted;
-    const overallSource = scoreAdjusted ? 'server' : 'llm';
+    const normalized = normalizeAnalysisResult(result, parsed.prompt);
     const provider = await getProviderInfo();
-    const response = buildAnalysisResponse(analysisResult, provider, {
-      usedFallback,
-      scoreAdjusted,
-      overallSource,
-    });
+    const response = buildAnalysisResponse(
+      normalized.analysisResult,
+      provider,
+      {
+        usedFallback,
+        scoreAdjusted: normalized.scoreAdjusted,
+        overallSource: normalized.overallSource,
+      }
+    );
     await sendProgress(context, 'completed', 100);
     return response;
   } catch (error) {

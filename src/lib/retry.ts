@@ -68,17 +68,20 @@ function getErrorStatus(error: unknown): number | null {
   return null;
 }
 
+function hasRetryableCode(error: unknown): boolean {
+  const code = getErrorCode(error);
+  return Boolean(code && RETRYABLE_ERROR_CODES.has(code));
+}
+
+function hasRetryableStatus(error: unknown): boolean {
+  const status = getErrorStatus(error);
+  return Boolean(status && RETRYABLE_HTTP_STATUS.has(status));
+}
+
 function isRetryableError(error: unknown): boolean {
   const mcpDecision = getMcpRetryDecision(error);
   if (mcpDecision !== null) return mcpDecision;
-
-  const code = getErrorCode(error);
-  if (code && RETRYABLE_ERROR_CODES.has(code)) return true;
-
-  const status = getErrorStatus(error);
-  if (status && RETRYABLE_HTTP_STATUS.has(status)) return true;
-
-  return false;
+  return hasRetryableCode(error) || hasRetryableStatus(error);
 }
 
 function calculateDelay(
@@ -143,6 +146,31 @@ function logRetriesExhausted(
   );
 }
 
+function resolveRetryDelay(
+  attempt: number,
+  options: Required<RetryOptions>,
+  lastError: unknown,
+  startTime: number
+): number | null {
+  if (attempt >= options.maxRetries) return null;
+  if (!isRetryableError(lastError)) {
+    logNonRetryable(lastError);
+    return null;
+  }
+
+  const delayMs = calculateDelay(
+    attempt,
+    options.baseDelayMs,
+    options.maxDelayMs
+  );
+  if (wouldExceedTotalTimeout(startTime, options.totalTimeoutMs, delayMs)) {
+    logger.warn('Retry loop would exceed total timeout, aborting');
+    return null;
+  }
+
+  return delayMs;
+}
+
 export async function withRetry<T>(
   handler: () => Promise<T>,
   options: RetryOptions = {},
@@ -163,17 +191,8 @@ export async function withRetry<T>(
 
     throwIfAborted(signal);
 
-    if (attempt >= opts.maxRetries) break;
-    if (!isRetryableError(lastError)) {
-      logNonRetryable(lastError);
-      break;
-    }
-
-    const delayMs = calculateDelay(attempt, opts.baseDelayMs, opts.maxDelayMs);
-    if (wouldExceedTotalTimeout(startTime, opts.totalTimeoutMs, delayMs)) {
-      logger.warn('Retry loop would exceed total timeout, aborting');
-      break;
-    }
+    const delayMs = resolveRetryDelay(attempt, opts, lastError, startTime);
+    if (delayMs === null) break;
 
     logRetryAttempt(attempt, opts.maxRetries, lastError, delayMs);
     await setTimeout(delayMs, undefined, { signal });

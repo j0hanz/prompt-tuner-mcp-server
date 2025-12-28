@@ -18,23 +18,41 @@ function normalizeTechniqueName(value: string): OptimizationTechnique | null {
     : null;
 }
 
+function resolveTechnique(value?: string): OptimizationTechnique | null {
+  if (!value) return null;
+  return normalizeTechniqueName(value);
+}
+
+function resolveDetail(value?: string): string | null {
+  const detail = value?.trim();
+  if (!detail) return null;
+  return detail;
+}
+
+function extractTechniqueMatch(trimmed: string): {
+  technique: OptimizationTechnique | null;
+  detail: string;
+} | null {
+  const match = TECHNIQUE_TAG_PATTERN.exec(trimmed);
+  if (!match) return null;
+
+  const technique = resolveTechnique(match[1]);
+  const detail = resolveDetail(match[2]);
+  if (!detail) return null;
+
+  return { technique, detail };
+}
+
 function splitTechniqueTag(improvement: string): {
   bucket: string;
   detail: string;
 } {
   const trimmed = improvement.trim();
-  const match = TECHNIQUE_TAG_PATTERN.exec(trimmed);
-  if (!match) {
+  const match = extractTechniqueMatch(trimmed);
+  if (!match?.technique) {
     return { bucket: 'general', detail: trimmed };
   }
-
-  const technique = match[1] ? normalizeTechniqueName(match[1]) : null;
-  const detail = match[2]?.trim();
-  if (!detail || !technique) {
-    return { bucket: 'general', detail: trimmed };
-  }
-
-  return { bucket: technique, detail };
+  return { bucket: match.technique, detail: match.detail };
 }
 
 function groupImprovementsByTechnique(
@@ -53,9 +71,22 @@ function groupImprovementsByTechnique(
   return groups;
 }
 
+function isGeneralOnly(groups: Map<string, string[]>): boolean {
+  return groups.size === 1 && groups.has('general');
+}
+
+function pushTechniqueGroup(
+  lines: string[],
+  technique: string,
+  items: string[]
+): void {
+  lines.push(`Technique: ${technique}`);
+  lines.push(...asBulletList(items));
+}
+
 export function formatImprovements(improvements: string[]): string[] {
   const groups = groupImprovementsByTechnique(improvements);
-  if (groups.size === 1 && groups.has('general')) {
+  if (isGeneralOnly(groups)) {
     return asBulletList(improvements.map((item) => item.trim()));
   }
 
@@ -63,8 +94,7 @@ export function formatImprovements(improvements: string[]): string[] {
   for (const technique of TECHNIQUE_DISPLAY_ORDER) {
     const items = groups.get(technique);
     if (!items?.length) continue;
-    lines.push(`Technique: ${technique}`);
-    lines.push(...asBulletList(items));
+    pushTechniqueGroup(lines, technique, items);
   }
   return lines;
 }

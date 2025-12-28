@@ -29,6 +29,13 @@ export default defineConfig(
       'unused-imports': unusedImports,
     },
     rules: {
+      complexity: ['error', { max: 5, variant: 'classic' }],
+      'max-lines-per-function': [
+        'error',
+        { max: 40, skipBlankLines: true, skipComments: true },
+      ],
+      'max-depth': ['error', 2],
+
       'unused-imports/no-unused-imports': 'error',
       'unused-imports/no-unused-vars': [
         'warn',
