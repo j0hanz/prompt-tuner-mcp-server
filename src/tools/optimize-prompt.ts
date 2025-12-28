@@ -5,11 +5,7 @@ import type {
   ServerRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import {
-  LLM_TIMEOUT_MS,
-  OPTIMIZE_MAX_TOKENS,
-  PATTERNS,
-} from '../config/constants.js';
+import { LLM_TIMEOUT_MS, OPTIMIZE_MAX_TOKENS } from '../config/constants.js';
 import type {
   ErrorResponse,
   OptimizationTechnique,
@@ -118,15 +114,6 @@ function isConcreteTechnique(
   return technique !== 'comprehensive';
 }
 
-const DEEP_OPTIMIZE_RULES = `
-DEEP OPTIMIZATION RULES:
-- Apply multiple concrete techniques (not just "comprehensive").
-- Always include structured formatting aligned to the target format.
-- If the prompt lacks a clear role, add a concise role statement.
-- Include an explicit output format section.
-- Do not return the original prompt unchanged.
-- In techniquesApplied, list the specific techniques used (do not list "comprehensive").`;
-
 const COMPREHENSIVE_TECHNIQUE_ORDER: ConcreteTechnique[] = [
   'basic',
   'roleBased',
@@ -189,10 +176,6 @@ interface ResolvedOptimizeInputs {
   validatedPrompt: string;
   effectiveTechniques: ConcreteTechnique[];
   resolvedFormat: TargetFormat;
-  deepOptimization: boolean;
-  requireMeaningfulChange: boolean;
-  requiredTechniques: ConcreteTechnique[];
-  fallbackTechniques: ConcreteTechnique[];
 }
 
 const OPTIMIZE_PROMPT_TOOL = {
@@ -221,94 +204,6 @@ function buildOptimizePrompt(
   )}\n</original_prompt>`;
 }
 
-function safeTest(pattern: RegExp, text: string): boolean {
-  pattern.lastIndex = 0;
-  return pattern.test(text);
-}
-
-interface PromptSignals {
-  hasRole: boolean;
-  hasStructure: boolean;
-  hasConstraints: boolean;
-  hasOutputSpec: boolean;
-  hasExamples: boolean;
-  needsReasoning: boolean;
-}
-
-function detectPromptSignals(
-  prompt: string,
-  targetFormat: TargetFormat
-): PromptSignals {
-  const hasStructure =
-    safeTest(PATTERNS.xmlStructure, prompt) ||
-    safeTest(PATTERNS.markdownStructure, prompt) ||
-    safeTest(PATTERNS.jsonStructure, prompt);
-  const hasOutputSpec =
-    safeTest(PATTERNS.outputSpecPatterns, prompt) ||
-    (targetFormat === 'json' && hasStructure);
-
-  return {
-    hasRole: safeTest(PATTERNS.hasRole, prompt),
-    hasStructure,
-    hasConstraints: safeTest(PATTERNS.constraintPatterns, prompt),
-    hasOutputSpec,
-    hasExamples:
-      safeTest(PATTERNS.exampleIndicators, prompt) ||
-      safeTest(PATTERNS.fewShotStructure, prompt),
-    needsReasoning: safeTest(PATTERNS.needsReasoning, prompt),
-  };
-}
-
-function needsDeepUpgrade(signals: PromptSignals): boolean {
-  return !signals.hasStructure || !signals.hasOutputSpec;
-}
-
-function normalizeForComparison(text: string): string {
-  const { normalized } = normalizePromptText(text);
-  return normalized.replace(/\s+/g, ' ').trim();
-}
-
-function buildComprehensiveTechniques(
-  prompt: string,
-  requested: OptimizationTechnique[],
-  targetFormat: TargetFormat
-): ConcreteTechnique[] {
-  const base = requested.filter(isConcreteTechnique);
-  const signals = detectPromptSignals(prompt, targetFormat);
-  const techniques = new Set<ConcreteTechnique>(base);
-
-  techniques.add('basic');
-  techniques.add('structured');
-
-  if (!signals.hasRole) {
-    techniques.add('roleBased');
-  }
-
-  if (signals.needsReasoning) {
-    techniques.add('chainOfThought');
-  }
-
-  if (signals.hasExamples) {
-    techniques.add('fewShot');
-  }
-
-  return COMPREHENSIVE_TECHNIQUE_ORDER.filter((technique) =>
-    techniques.has(technique)
-  );
-}
-
-function buildFallbackTechniques(
-  prompt: string,
-  targetFormat: TargetFormat
-): ConcreteTechnique[] {
-  const signals = detectPromptSignals(prompt, targetFormat);
-  const techniques: ConcreteTechnique[] = ['basic', 'structured'];
-  if (!signals.hasRole) {
-    techniques.push('roleBased');
-  }
-  return techniques;
-}
-
 function resolveOptimizeInputs(
   input: OptimizePromptInput
 ): ResolvedOptimizeInputs {
@@ -320,30 +215,10 @@ function resolveOptimizeInputs(
   const resolvedFormat = resolveFormat(validatedFormat, validatedPrompt);
   const deepOptimization = requestedTechniques.includes('comprehensive');
   const effectiveTechniques = deepOptimization
-    ? buildComprehensiveTechniques(
-        validatedPrompt,
-        requestedTechniques,
-        resolvedFormat
-      )
+    ? COMPREHENSIVE_TECHNIQUE_ORDER
     : requestedTechniques.filter(isConcreteTechnique);
-  const signals = detectPromptSignals(validatedPrompt, resolvedFormat);
-  const requireMeaningfulChange = deepOptimization && needsDeepUpgrade(signals);
-  const requiredTechniques: ConcreteTechnique[] = deepOptimization
-    ? ['structured']
-    : [];
-  const fallbackTechniques = deepOptimization
-    ? buildFallbackTechniques(validatedPrompt, resolvedFormat)
-    : (['basic'] as ConcreteTechnique[]);
 
-  return {
-    validatedPrompt,
-    effectiveTechniques,
-    resolvedFormat,
-    deepOptimization,
-    requireMeaningfulChange,
-    requiredTechniques,
-    fallbackTechniques,
-  };
+  return { validatedPrompt, effectiveTechniques, resolvedFormat };
 }
 
 async function runOptimization(
@@ -374,12 +249,7 @@ function normalizeTechniques(
 
 interface OptimizeValidationConfig {
   allowedTechniques: ConcreteTechnique[];
-  requiredTechniques: ConcreteTechnique[];
-  minAppliedTechniques: number;
   targetFormat: TargetFormat;
-  originalPrompt: string;
-  requireMeaningfulChange: boolean;
-  deepOptimization: boolean;
 }
 
 function validateOptimizeResult(
@@ -419,24 +289,6 @@ function validateOptimizeResult(
     };
   }
 
-  if (appliedTechniques.length < config.minAppliedTechniques) {
-    return {
-      ok: false,
-      result: { ...result, optimized: normalized, techniquesApplied },
-      reason: 'Insufficient techniques applied',
-    };
-  }
-
-  for (const required of config.requiredTechniques) {
-    if (!appliedTechniques.includes(required)) {
-      return {
-        ok: false,
-        result: { ...result, optimized: normalized, techniquesApplied },
-        reason: `Required technique missing: ${required}`,
-      };
-    }
-  }
-
   for (const technique of appliedTechniques) {
     const validation = validateTechniqueOutput(
       normalized,
@@ -448,39 +300,6 @@ function validateOptimizeResult(
         ok: false,
         result: { ...result, optimized: normalized, techniquesApplied },
         reason: validation.reason,
-      };
-    }
-  }
-
-  if (config.requireMeaningfulChange) {
-    const normalizedOriginal = normalizeForComparison(config.originalPrompt);
-    const normalizedOptimized = normalizeForComparison(normalized);
-    if (normalizedOriginal === normalizedOptimized) {
-      return {
-        ok: false,
-        result: { ...result, optimized: normalized, techniquesApplied },
-        reason: 'Optimized prompt unchanged',
-      };
-    }
-  }
-
-  if (config.deepOptimization) {
-    const originalSignals = detectPromptSignals(
-      config.originalPrompt,
-      config.targetFormat
-    );
-    const optimizedSignals = detectPromptSignals(
-      normalized,
-      config.targetFormat
-    );
-    if (
-      needsDeepUpgrade(originalSignals) &&
-      (!optimizedSignals.hasStructure || !optimizedSignals.hasOutputSpec)
-    ) {
-      return {
-        ok: false,
-        result: { ...result, optimized: normalized, techniquesApplied },
-        reason: 'Missing required deep-optimization structure or output format',
       };
     }
   }
@@ -534,51 +353,27 @@ async function handleOptimizePrompt(
 
   try {
     const resolved = resolveOptimizeInputs(input);
-    const baseRules = resolved.deepOptimization
-      ? DEEP_OPTIMIZE_RULES
-      : undefined;
     const optimizePrompt = buildOptimizePrompt(
       resolved.validatedPrompt,
       resolved.resolvedFormat,
-      resolved.effectiveTechniques,
-      baseRules
+      resolved.effectiveTechniques
     );
     let { result: optimizationResult, usedFallback } = await runOptimization(
       optimizePrompt,
       context.request.signal
     );
-    const buildValidationConfig = (
-      techniques: ConcreteTechnique[]
-    ): OptimizeValidationConfig => {
-      const allowedTechniques = resolved.deepOptimization
-        ? COMPREHENSIVE_TECHNIQUE_ORDER
-        : techniques;
-      return {
-        allowedTechniques,
-        requiredTechniques: resolved.requiredTechniques.filter((technique) =>
-          allowedTechniques.includes(technique)
-        ),
-        minAppliedTechniques: resolved.deepOptimization
-          ? Math.min(2, techniques.length)
-          : 1,
-        targetFormat: resolved.resolvedFormat,
-        originalPrompt: resolved.validatedPrompt,
-        requireMeaningfulChange: resolved.requireMeaningfulChange,
-        deepOptimization: resolved.deepOptimization,
-      };
-    };
 
-    let validation = validateOptimizeResult(
-      optimizationResult,
-      buildValidationConfig(resolved.effectiveTechniques)
-    );
+    let validation = validateOptimizeResult(optimizationResult, {
+      allowedTechniques: resolved.effectiveTechniques,
+      targetFormat: resolved.resolvedFormat,
+    });
 
     if (!validation.ok) {
       const retryPrompt = buildOptimizePrompt(
         resolved.validatedPrompt,
         resolved.resolvedFormat,
         resolved.effectiveTechniques,
-        `${baseRules ?? ''}${STRICT_OPTIMIZE_RULES}`
+        STRICT_OPTIMIZE_RULES
       );
       const retryResult = await runOptimization(
         retryPrompt,
@@ -586,29 +381,10 @@ async function handleOptimizePrompt(
       );
       usedFallback = true;
       optimizationResult = retryResult.result;
-      validation = validateOptimizeResult(
-        optimizationResult,
-        buildValidationConfig(resolved.effectiveTechniques)
-      );
-    }
-
-    if (!validation.ok) {
-      const fallbackPrompt = buildOptimizePrompt(
-        resolved.validatedPrompt,
-        resolved.resolvedFormat,
-        resolved.fallbackTechniques,
-        `${baseRules ?? ''}${STRICT_OPTIMIZE_RULES}`
-      );
-      const fallbackResult = await runOptimization(
-        fallbackPrompt,
-        context.request.signal
-      );
-      usedFallback = true;
-      optimizationResult = fallbackResult.result;
-      validation = validateOptimizeResult(
-        optimizationResult,
-        buildValidationConfig(resolved.fallbackTechniques)
-      );
+      validation = validateOptimizeResult(optimizationResult, {
+        allowedTechniques: resolved.effectiveTechniques,
+        targetFormat: resolved.resolvedFormat,
+      });
     }
 
     if (!validation.ok) {

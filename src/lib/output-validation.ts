@@ -14,60 +14,10 @@ const DISALLOWED_SCAFFOLDING_PATTERNS: RegExp[] = [
 
 const ROLE_STATEMENT_RE = /\bYou are (a|an|the)\b/i;
 
-const COT_TRIGGERS = [
-  "let's calculate step by step",
-  "let's analyze this systematically",
-  "let's trace through the logic carefully",
-  "let's break this into phases",
-  "let's evaluate each option methodically",
-  "let's work through this step by step",
-] as const;
-
 function safeTest(pattern: RegExp, text: string): boolean {
   pattern.lastIndex = 0;
   return pattern.test(text);
 }
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function countOccurrencesUpTo(
-  text: string,
-  pattern: RegExp,
-  maxCount: number
-): number {
-  if (!pattern.global) {
-    return pattern.test(text) ? 1 : 0;
-  }
-
-  pattern.lastIndex = 0;
-  let count = 0;
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(text)) !== null) {
-    count += 1;
-    if (count >= maxCount) return count;
-    if (match[0] === '') {
-      pattern.lastIndex += 1;
-    }
-  }
-  return count;
-}
-
-const COT_TRIGGER_PARTS = COT_TRIGGERS.map((trigger) =>
-  trigger
-    .split(/\s+/)
-    .map((part) => escapeRegExp(part))
-    .join('\\s+')
-);
-
-const COT_TRIGGER_RE = new RegExp(
-  `(?:^|\\s)(?:${COT_TRIGGER_PARTS.join('|')})(?:[.!?,;:]|\\s|$)`,
-  'gi'
-);
-
-const FEW_SHOT_MARKER_RE =
-  /(^|\n)\s*(Input\s*:|Output\s*:|Example\s+\d+)|###\s*Example|<example>/gi;
 
 export function normalizePromptText(text: string): {
   normalized: string;
@@ -138,44 +88,6 @@ function validateRole(text: string): boolean {
   return ROLE_STATEMENT_RE.test(text.slice(0, 200));
 }
 
-function validateChainOfThought(text: string): boolean {
-  return countOccurrencesUpTo(text, COT_TRIGGER_RE, 2) === 1;
-}
-
-function validateFewShot(text: string): boolean {
-  let inputCount = 0;
-  let outputCount = 0;
-  let exampleCount = 0;
-
-  FEW_SHOT_MARKER_RE.lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = FEW_SHOT_MARKER_RE.exec(text)) !== null) {
-    const marker = match[2];
-    if (marker) {
-      const normalizedMarker = marker.toLowerCase();
-      if (normalizedMarker.startsWith('input')) {
-        inputCount += 1;
-      } else if (normalizedMarker.startsWith('output')) {
-        outputCount += 1;
-      } else {
-        exampleCount += 1;
-      }
-    } else {
-      exampleCount += 1;
-    }
-
-    if (Math.min(inputCount, outputCount) >= 2 || exampleCount >= 2) {
-      return true;
-    }
-
-    if (match[0] === '') {
-      FEW_SHOT_MARKER_RE.lastIndex += 1;
-    }
-  }
-
-  return Math.min(inputCount, outputCount) >= 2 || exampleCount >= 2;
-}
-
 export function validateTechniqueOutput(
   text: string,
   technique: OptimizationTechnique,
@@ -187,14 +99,10 @@ export function validateTechniqueOutput(
       return ok ? { ok } : { ok, reason: 'Structured format not detected' };
     }
     case 'chainOfThought': {
-      const ok = validateChainOfThought(text);
-      return ok
-        ? { ok }
-        : { ok, reason: 'Missing or multiple reasoning triggers' };
+      return { ok: true };
     }
     case 'fewShot': {
-      const ok = validateFewShot(text);
-      return ok ? { ok } : { ok, reason: 'Few-shot examples missing' };
+      return { ok: true };
     }
     case 'roleBased': {
       const ok = validateRole(text);

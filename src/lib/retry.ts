@@ -22,15 +22,7 @@ const RETRYABLE_ERROR_CODES = new Set([
   'service_unavailable',
 ]);
 
-const RETRYABLE_HTTP_CODES = new Set(['429', '500', '502', '503', '504']);
-
-const RETRYABLE_ERROR_CODES_LOWER = new Set(
-  Array.from(RETRYABLE_ERROR_CODES, (code) => code.toLowerCase())
-);
-
-const RETRYABLE_HTTP_CODES_LOWER = new Set(
-  Array.from(RETRYABLE_HTTP_CODES, (code) => code.toLowerCase())
-);
+const RETRYABLE_HTTP_STATUS = new Set([429, 500, 502, 503, 504]);
 
 const NON_RETRYABLE_MCP_CODES = new Set<string>([
   ErrorCode.E_LLM_AUTH_FAILED,
@@ -41,18 +33,6 @@ const RETRYABLE_MCP_CODES = new Set<string>([
   ErrorCode.E_LLM_RATE_LIMITED,
   ErrorCode.E_TIMEOUT,
 ]);
-
-interface AttemptSuccess<T> {
-  ok: true;
-  value: T;
-}
-
-interface AttemptFailure {
-  ok: false;
-  error: unknown;
-}
-
-type AttemptResult<T> = AttemptSuccess<T> | AttemptFailure;
 
 function createAbortError(reason: unknown): Error {
   if (reason instanceof Error) return reason;
@@ -80,15 +60,12 @@ function getErrorCode(error: unknown): string | null {
   return null;
 }
 
-function getErrorMessageLower(error: unknown): string {
-  return (error instanceof Error ? error.message : String(error)).toLowerCase();
-}
-
-function containsAny(haystack: string, needles: Iterable<string>): boolean {
-  for (const needle of needles) {
-    if (haystack.includes(needle)) return true;
+function getErrorStatus(error: unknown): number | null {
+  if (typeof error === 'object' && error !== null && 'status' in error) {
+    const { status } = error as { status?: unknown };
+    if (typeof status === 'number') return status;
   }
-  return false;
+  return null;
 }
 
 function isRetryableError(error: unknown): boolean {
@@ -98,11 +75,10 @@ function isRetryableError(error: unknown): boolean {
   const code = getErrorCode(error);
   if (code && RETRYABLE_ERROR_CODES.has(code)) return true;
 
-  const errorMessage = getErrorMessageLower(error);
-  return (
-    containsAny(errorMessage, RETRYABLE_ERROR_CODES_LOWER) ||
-    containsAny(errorMessage, RETRYABLE_HTTP_CODES_LOWER)
-  );
+  const status = getErrorStatus(error);
+  if (status && RETRYABLE_HTTP_STATUS.has(status)) return true;
+
+  return false;
 }
 
 function calculateDelay(
@@ -156,73 +132,6 @@ function logRetryAttempt(
   );
 }
 
-async function attemptHandler<T>(
-  handler: () => Promise<T>,
-  startTime: number,
-  totalTimeoutMs: number,
-  signal?: AbortSignal
-): Promise<AttemptResult<T>> {
-  ensureWithinTotalTimeout(startTime, totalTimeoutMs);
-  throwIfAborted(signal);
-  try {
-    const value = await handler();
-    return { ok: true, value };
-  } catch (error) {
-    return { ok: false, error };
-  }
-}
-
-function resolveRetryDelay(
-  attempt: number,
-  options: Required<RetryOptions>,
-  startTime: number,
-  lastError: unknown,
-  signal?: AbortSignal
-): number | null {
-  if (shouldStopRetry(attempt, options, lastError, signal)) return null;
-
-  const delayMs = calculateDelay(
-    attempt,
-    options.baseDelayMs,
-    options.maxDelayMs
-  );
-  if (wouldExceedTotalTimeout(startTime, options.totalTimeoutMs, delayMs)) {
-    logger.warn('Retry loop would exceed total timeout, aborting');
-    return null;
-  }
-
-  return delayMs;
-}
-
-function shouldStopRetry(
-  attempt: number,
-  options: Required<RetryOptions>,
-  lastError: unknown,
-  signal?: AbortSignal
-): boolean {
-  if (signal?.aborted) return true;
-  if (attempt >= options.maxRetries) return true;
-  if (!isRetryableError(lastError)) {
-    logNonRetryable(lastError);
-    return true;
-  }
-  return false;
-}
-
-async function waitForRetry(
-  attempt: number,
-  options: Required<RetryOptions>,
-  lastError: unknown,
-  delayMs: number,
-  startTime: number,
-  signal?: AbortSignal
-): Promise<void> {
-  throwIfAborted(signal);
-  logRetryAttempt(attempt, options.maxRetries, lastError, delayMs);
-  await setTimeout(delayMs, undefined, { signal });
-  ensureWithinTotalTimeout(startTime, options.totalTimeoutMs);
-}
-
 function logRetriesExhausted(
   options: Required<RetryOptions>,
   lastError: unknown
@@ -244,26 +153,31 @@ export async function withRetry<T>(
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= opts.maxRetries; attempt++) {
-    const result = await attemptHandler(
-      handler,
-      startTime,
-      opts.totalTimeoutMs,
-      signal
-    );
-    if (result.ok) return result.value;
-    lastError = result.error;
+    ensureWithinTotalTimeout(startTime, opts.totalTimeoutMs);
+    throwIfAborted(signal);
+    try {
+      return await handler();
+    } catch (error) {
+      lastError = error;
+    }
 
     throwIfAborted(signal);
 
-    const delayMs = resolveRetryDelay(
-      attempt,
-      opts,
-      startTime,
-      lastError,
-      signal
-    );
-    if (delayMs === null) break;
-    await waitForRetry(attempt, opts, lastError, delayMs, startTime, signal);
+    if (attempt >= opts.maxRetries) break;
+    if (!isRetryableError(lastError)) {
+      logNonRetryable(lastError);
+      break;
+    }
+
+    const delayMs = calculateDelay(attempt, opts.baseDelayMs, opts.maxDelayMs);
+    if (wouldExceedTotalTimeout(startTime, opts.totalTimeoutMs, delayMs)) {
+      logger.warn('Retry loop would exceed total timeout, aborting');
+      break;
+    }
+
+    logRetryAttempt(attempt, opts.maxRetries, lastError, delayMs);
+    await setTimeout(delayMs, undefined, { signal });
+    ensureWithinTotalTimeout(startTime, opts.totalTimeoutMs);
   }
 
   logRetriesExhausted(opts, lastError);

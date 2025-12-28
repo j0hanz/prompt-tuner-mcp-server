@@ -74,39 +74,6 @@ const ERROR_CODE_PATTERNS = {
   authFailed: ['invalid_api_key', 'authentication_error'],
 } as const;
 
-const MESSAGE_PATTERNS: {
-  keywords: readonly string[];
-  code: ErrorCodeType;
-  messageTemplate: (provider: LLMProvider, message: string) => string;
-  recoveryHint?: string;
-}[] = [
-  {
-    keywords: ['rate', '429', 'too many requests', 'quota'],
-    code: ErrorCode.E_LLM_RATE_LIMITED,
-    messageTemplate: (p, m) => `Rate limited by ${p}: ${m}`,
-  },
-  {
-    keywords: ['auth', '401', '403', 'invalid api key', 'permission'],
-    code: ErrorCode.E_LLM_AUTH_FAILED,
-    messageTemplate: (p, m) => `Authentication failed for ${p}: ${m}`,
-  },
-  {
-    keywords: ['context', 'token', 'too long', 'maximum'],
-    code: ErrorCode.E_LLM_FAILED,
-    messageTemplate: (p, m) => `Context length exceeded for ${p}: ${m}`,
-  },
-  {
-    keywords: ['content', 'filter', 'safety', 'blocked', 'policy'],
-    code: ErrorCode.E_LLM_FAILED,
-    messageTemplate: (p, m) => `Content filtered by ${p}: ${m}`,
-  },
-  {
-    keywords: ['503', '502', '500', 'unavailable', 'overloaded'],
-    code: ErrorCode.E_LLM_FAILED,
-    messageTemplate: (p, m) => `Service unavailable: ${p}: ${m}`,
-  },
-];
-
 function classifyByHttpStatus(
   status: number | undefined,
   provider: LLMProvider,
@@ -166,28 +133,6 @@ function classifyByErrorCode(
   return null;
 }
 
-function classifyByMessage(
-  message: string,
-  provider: LLMProvider,
-  llmError: LLMError
-): McpError | null {
-  const lowerMessage = message.toLowerCase();
-
-  for (const pattern of MESSAGE_PATTERNS) {
-    if (pattern.keywords.some((keyword) => lowerMessage.includes(keyword))) {
-      return new McpError(
-        pattern.code,
-        pattern.messageTemplate(provider, message),
-        undefined,
-        { provider, ...getSafeErrorDetails(llmError) },
-        pattern.recoveryHint
-      );
-    }
-  }
-
-  return null;
-}
-
 function classifyLLMError(error: unknown, provider: LLMProvider): McpError {
   const llmError = error as LLMError;
   const message = getErrorMessage(error);
@@ -197,9 +142,6 @@ function classifyLLMError(error: unknown, provider: LLMProvider): McpError {
 
   const codeError = classifyByErrorCode(llmError.code, provider, llmError);
   if (codeError) return codeError;
-
-  const messageError = classifyByMessage(message, provider, llmError);
-  if (messageError) return messageError;
 
   return new McpError(
     ErrorCode.E_LLM_FAILED,
