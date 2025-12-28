@@ -22,24 +22,17 @@ import {
 } from './llm-providers/helpers.js';
 import { runGeneration } from './llm-runtime.js';
 
-abstract class BaseCompletionClient<TRequest, TResponse> implements LLMClient {
-  protected abstract readonly provider: LLMProvider;
-  protected readonly model: string;
+class OpenAIClient implements LLMClient {
+  private readonly client: OpenAI;
+  private readonly model: string;
+  private readonly provider: LLMProvider = 'openai';
 
-  protected constructor(model: string) {
+  constructor(apiKey: string, model: string) {
+    this.client = new OpenAI({ apiKey });
     this.model = model;
   }
 
-  protected abstract buildRequest(prompt: string, maxTokens: number): TRequest;
-
-  protected abstract createRequest(
-    request: TRequest,
-    requestOptions: { timeout: number; signal?: AbortSignal }
-  ): Promise<TResponse>;
-
-  protected abstract extractText(response: TResponse): string;
-
-  async generateText(
+  generateText(
     prompt: string,
     maxTokens = LLM_MAX_TOKENS,
     options?: LLMRequestOptions
@@ -50,11 +43,11 @@ abstract class BaseCompletionClient<TRequest, TResponse> implements LLMClient {
         createCompletion(
           options,
           (requestOptions) =>
-            this.createRequest(
-              this.buildRequest(prompt, maxTokens),
+            this.client.chat.completions.create(
+              buildOpenAIRequest(this.model, prompt, maxTokens),
               requestOptions
-            ),
-          (response) => this.extractText(response)
+            ) as Promise<OpenAI.Chat.Completions.ChatCompletion>,
+          (response) => extractOpenAIText(response)
         ),
       options?.signal
     );
@@ -69,73 +62,43 @@ abstract class BaseCompletionClient<TRequest, TResponse> implements LLMClient {
   }
 }
 
-class OpenAIClient extends BaseCompletionClient<
-  OpenAI.Chat.Completions.ChatCompletionCreateParams,
-  OpenAI.Chat.Completions.ChatCompletion
-> {
-  private readonly client: OpenAI;
-  protected readonly provider: LLMProvider = 'openai';
-
-  constructor(apiKey: string, model: string) {
-    super(model);
-    this.client = new OpenAI({ apiKey });
-  }
-
-  protected buildRequest(
-    prompt: string,
-    maxTokens: number
-  ): OpenAI.Chat.Completions.ChatCompletionCreateParams {
-    return buildOpenAIRequest(this.model, prompt, maxTokens);
-  }
-
-  protected createRequest(
-    request: OpenAI.Chat.Completions.ChatCompletionCreateParams,
-    requestOptions: { timeout: number; signal?: AbortSignal }
-  ): Promise<OpenAI.Chat.Completions.ChatCompletion> {
-    return this.client.chat.completions.create(
-      request,
-      requestOptions
-    ) as Promise<OpenAI.Chat.Completions.ChatCompletion>;
-  }
-
-  protected extractText(
-    response: OpenAI.Chat.Completions.ChatCompletion
-  ): string {
-    return extractOpenAIText(response);
-  }
-}
-
-class AnthropicClient extends BaseCompletionClient<
-  Anthropic.Messages.MessageCreateParams,
-  Anthropic.Messages.Message
-> {
+class AnthropicClient implements LLMClient {
   private readonly client: Anthropic;
-  protected readonly provider: LLMProvider = 'anthropic';
+  private readonly model: string;
+  private readonly provider: LLMProvider = 'anthropic';
 
   constructor(apiKey: string, model: string) {
-    super(model);
     this.client = new Anthropic({ apiKey });
+    this.model = model;
   }
 
-  protected buildRequest(
+  generateText(
     prompt: string,
-    maxTokens: number
-  ): Anthropic.Messages.MessageCreateParams {
-    return buildAnthropicRequest(this.model, prompt, maxTokens);
+    maxTokens = LLM_MAX_TOKENS,
+    options?: LLMRequestOptions
+  ): Promise<string> {
+    return runGeneration(
+      this.provider,
+      () =>
+        createCompletion(
+          options,
+          (requestOptions) =>
+            this.client.messages.create(
+              buildAnthropicRequest(this.model, prompt, maxTokens),
+              requestOptions
+            ) as Promise<Anthropic.Messages.Message>,
+          (response) => extractAnthropicText(response)
+        ),
+      options?.signal
+    );
   }
 
-  protected createRequest(
-    request: Anthropic.Messages.MessageCreateParams,
-    requestOptions: { timeout: number; signal?: AbortSignal }
-  ): Promise<Anthropic.Messages.Message> {
-    return this.client.messages.create(
-      request,
-      requestOptions
-    ) as Promise<Anthropic.Messages.Message>;
+  getProvider(): LLMProvider {
+    return this.provider;
   }
 
-  protected extractText(response: Anthropic.Messages.Message): string {
-    return extractAnthropicText(response);
+  getModel(): string {
+    return this.model;
   }
 }
 

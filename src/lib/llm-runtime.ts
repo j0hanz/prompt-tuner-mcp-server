@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { performance } from 'node:perf_hooks';
+import { setTimeout } from 'node:timers/promises';
 
+import { config } from '../config/env.js';
 import type {
   ErrorCodeType,
   LLMError,
@@ -9,7 +11,6 @@ import type {
   ValidProvider,
 } from '../config/types.js';
 import { ErrorCode, logger, McpError } from './errors.js';
-import { withRetry } from './retry.js';
 
 const PROVIDER_ENV_KEYS = {
   openai: 'OPENAI_API_KEY',
@@ -73,6 +74,28 @@ const ERROR_CODE_PATTERNS = {
   rateLimited: ['rate_limit_exceeded', 'insufficient_quota'],
   authFailed: ['invalid_api_key', 'authentication_error'],
 } as const;
+
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+const NON_RETRYABLE_CODES = new Set<ErrorCodeType>([
+  ErrorCode.E_LLM_AUTH_FAILED,
+  ErrorCode.E_INVALID_INPUT,
+]);
+
+interface RetrySettings {
+  maxRetries: number;
+  baseDelayMs: number;
+  maxDelayMs: number;
+  totalTimeoutMs: number;
+}
+
+function resolveRetrySettings(): RetrySettings {
+  return {
+    maxRetries: config.RETRY_MAX_ATTEMPTS,
+    baseDelayMs: config.RETRY_BASE_DELAY_MS,
+    maxDelayMs: config.RETRY_MAX_DELAY_MS,
+    totalTimeoutMs: config.RETRY_TOTAL_TIMEOUT_MS,
+  };
+}
 
 function classifyByHttpStatus(
   status: number | undefined,
@@ -152,33 +175,113 @@ function classifyLLMError(error: unknown, provider: LLMProvider): McpError {
   );
 }
 
+function coerceMcpError(error: unknown, provider: LLMProvider): McpError {
+  if (error instanceof McpError) return error;
+  return classifyLLMError(error, provider);
+}
+
+function isRetryable(error: McpError): boolean {
+  if (NON_RETRYABLE_CODES.has(error.code)) return false;
+  if (error.code === ErrorCode.E_LLM_RATE_LIMITED) return true;
+
+  const status = error.details?.status;
+  return typeof status === 'number' && RETRYABLE_STATUS.has(status);
+}
+
+function calculateDelay(attempt: number, settings: RetrySettings): number {
+  const exponentialDelay = settings.baseDelayMs * Math.pow(2, attempt);
+  return Math.min(exponentialDelay, settings.maxDelayMs);
+}
+
+function ensureWithinTotalTimeout(
+  startTime: number,
+  settings: RetrySettings
+): void {
+  if (Date.now() - startTime <= settings.totalTimeoutMs) return;
+  throw new McpError(
+    ErrorCode.E_TIMEOUT,
+    `Total retry timeout exceeded (${settings.totalTimeoutMs}ms)`
+  );
+}
+
+function resolveDelay(
+  attempt: number,
+  settings: RetrySettings,
+  startTime: number
+): number | null {
+  if (attempt >= settings.maxRetries) return null;
+  const delayMs = calculateDelay(attempt, settings);
+  if (Date.now() - startTime + delayMs > settings.totalTimeoutMs) {
+    logger.warn('Retry loop would exceed total timeout, aborting');
+    return null;
+  }
+  return delayMs;
+}
+
+type AttemptOutcome =
+  | { type: 'success'; content: string }
+  | { type: 'retry'; delayMs: number }
+  | { type: 'fail'; error: McpError };
+
+async function attemptGeneration(
+  provider: LLMProvider,
+  requestFn: () => Promise<string>,
+  signal: AbortSignal | undefined,
+  settings: RetrySettings,
+  startTime: number,
+  attempt: number
+): Promise<AttemptOutcome> {
+  ensureWithinTotalTimeout(startTime, settings);
+  signal?.throwIfAborted();
+  const attemptStart = performance.now();
+
+  try {
+    const content = await requestFn();
+    assert.ok(
+      content,
+      'LLM returned empty response (possibly blocked or filtered)'
+    );
+    logger.debug(
+      `LLM generation (${provider}) took ${(performance.now() - attemptStart).toFixed(2)}ms`
+    );
+    return { type: 'success', content };
+  } catch (error) {
+    const mcpError = coerceMcpError(error, provider);
+    if (!isRetryable(mcpError)) return { type: 'fail', error: mcpError };
+    const delayMs = resolveDelay(attempt, settings, startTime);
+    if (delayMs === null) return { type: 'fail', error: mcpError };
+    logger.warn(
+      `Retry ${attempt + 1}/${settings.maxRetries + 1} in ${Math.round(delayMs)}ms: ${mcpError.message}`
+    );
+    return { type: 'retry', delayMs };
+  }
+}
+
 export async function runGeneration(
   provider: LLMProvider,
   requestFn: () => Promise<string>,
   signal?: AbortSignal
 ): Promise<string> {
-  return withRetry(
-    async () => {
-      signal?.throwIfAborted();
-      const start = performance.now();
-      try {
-        const content = await requestFn();
-        assert.ok(
-          content,
-          'LLM returned empty response (possibly blocked or filtered)'
-        );
+  const settings = resolveRetrySettings();
+  const startTime = Date.now();
 
-        const durationMs = performance.now() - start;
-        logger.debug(
-          `LLM generation (${provider}) took ${durationMs.toFixed(2)}ms`
-        );
+  for (let attempt = 0; attempt <= settings.maxRetries; attempt++) {
+    const outcome = await attemptGeneration(
+      provider,
+      requestFn,
+      signal,
+      settings,
+      startTime,
+      attempt
+    );
 
-        return content;
-      } catch (error) {
-        throw classifyLLMError(error, provider);
-      }
-    },
-    {},
-    signal
+    if (outcome.type === 'success') return outcome.content;
+    if (outcome.type === 'fail') throw outcome.error;
+    await setTimeout(outcome.delayMs, undefined, { signal });
+  }
+
+  throw new McpError(
+    ErrorCode.E_LLM_FAILED,
+    `LLM request failed (${provider}): Unknown error`
   );
 }
