@@ -18,7 +18,7 @@ const SIGNALS: NodeJS.Signals[] = [
 ];
 const ERROR_EVENTS = ['uncaughtException', 'unhandledRejection'] as const;
 const EXIT_EVENTS = ['beforeExit'] as const;
-type ExitEvent = (typeof EXIT_EVENTS)[number];
+type ExitEvent = (typeof EXIT_EVENTS)[number] | 'stdin_end' | 'stdin_close';
 interface ShutdownReason {
   signal?: NodeJS.Signals;
   err?: unknown;
@@ -111,6 +111,12 @@ for (const event of EXIT_EVENTS) {
     void beginShutdown({ event });
   });
 }
+process.stdin.once('end', () => {
+  void beginShutdown({ event: 'stdin_end' });
+});
+process.stdin.once('close', () => {
+  void beginShutdown({ event: 'stdin_close' });
+});
 
 async function main(): Promise<void> {
   await validateApiKeys();

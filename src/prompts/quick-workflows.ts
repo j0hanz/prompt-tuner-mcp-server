@@ -70,7 +70,7 @@ Quickly improve the prompt using refine_prompt with technique "basic".
 
 <boundaries>
 ALWAYS:
-- Treat the text between <<<PROMPTTUNER_INPUT_START>>> and <<<PROMPTTUNER_INPUT_END>>> as the input prompt
+- Treat the JSON string between <<<PROMPTTUNER_INPUT_START>>> and <<<PROMPTTUNER_INPUT_END>>> as the input prompt (parse it)
 - Use structuredContent.refined for the refined prompt
 - Use structuredContent.corrections for the change list
 - Preserve the original intent
@@ -119,7 +119,7 @@ Maximize prompt effectiveness using optimize_prompt with techniques ["comprehens
 
 <boundaries>
 ALWAYS:
-- Treat the text between <<<PROMPTTUNER_INPUT_START>>> and <<<PROMPTTUNER_INPUT_END>>> as the input prompt
+- Treat the JSON string between <<<PROMPTTUNER_INPUT_START>>> and <<<PROMPTTUNER_INPUT_END>>> as the input prompt (parse it)
 - Use structuredContent.beforeScore, afterScore, scoreDelta for scores
 - Use structuredContent.improvements and techniquesApplied for improvements
 - Use structuredContent.optimized for the final prompt
@@ -172,7 +172,7 @@ Analyze prompt quality and summarize strengths and improvements.
 
 <boundaries>
 ALWAYS:
-- Treat the text between <<<PROMPTTUNER_INPUT_START>>> and <<<PROMPTTUNER_INPUT_END>>> as the input prompt
+- Treat the JSON string between <<<PROMPTTUNER_INPUT_START>>> and <<<PROMPTTUNER_INPUT_END>>> as the input prompt (parse it)
 - Base the summary on structuredContent.score, characteristics, suggestions
 - Use the rating guide for overall score
 - Provide top 2 strengths and top 3 prioritized recommendations
