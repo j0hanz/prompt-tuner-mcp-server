@@ -9,7 +9,6 @@ import type { ErrorResponse, OptimizeResponse } from '../config/types.js';
 import { createErrorResponse, ErrorCode, McpError } from '../lib/errors.js';
 import { getProviderInfo } from '../lib/llm-client.js';
 import { normalizeScore } from '../lib/output-normalization.js';
-import { getToolContext } from '../lib/tool-context.js';
 import {
   OptimizePromptInputSchema,
   OptimizePromptOutputSchema,
@@ -127,14 +126,12 @@ async function handleOptimizePrompt(
   input: OptimizePromptInput,
   extra: RequestHandlerExtra<ServerRequest, ServerNotification>
 ): Promise<ReturnType<typeof buildOptimizeResponse> | ErrorResponse> {
-  const context = getToolContext(extra);
-
   try {
     const parsed = parseOptimizeInput(input);
     const resolved = resolveOptimizeInputs(parsed);
     const { result, usedFallback } = await runValidatedOptimization(
       resolved,
-      context.request.signal
+      extra.signal
     );
     const normalized = normalizeOptimizationScores(result);
     const provider = await getProviderInfo();

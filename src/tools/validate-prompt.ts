@@ -19,7 +19,6 @@ import {
 } from '../lib/errors.js';
 import { getProviderInfo } from '../lib/llm-client.js';
 import { wrapPromptData } from '../lib/prompt-policy.js';
-import { getToolContext } from '../lib/tool-context.js';
 import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
 import {
   ValidatePromptInputSchema,
@@ -183,16 +182,11 @@ async function handleValidatePrompt(
   input: ValidatePromptInput,
   extra: RequestHandlerExtra<ServerRequest, ServerNotification>
 ): Promise<ReturnType<typeof createSuccessResponse> | ErrorResponse> {
-  const context = getToolContext(extra);
-
   try {
     const parsed = parseValidateInput(input);
     const { targetModel, checkInjection, validationPrompt } =
       resolveValidationInputs(parsed);
-    const validation = await requestValidation(
-      validationPrompt,
-      context.request.signal
-    );
+    const validation = await requestValidation(validationPrompt, extra.signal);
     const tokenLimit = resolveModelTokenLimit(targetModel);
     const provider = await getProviderInfo();
     return buildValidationResponse(

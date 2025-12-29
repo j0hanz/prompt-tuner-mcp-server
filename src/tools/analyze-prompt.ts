@@ -22,7 +22,6 @@ import {
   INPUT_HANDLING_SECTION,
   wrapPromptData,
 } from '../lib/prompt-policy.js';
-import { getToolContext, type ToolContext } from '../lib/tool-context.js';
 import {
   asBulletList,
   asNumberedList,
@@ -182,7 +181,7 @@ function normalizeAnalysisResult(
 }
 
 async function sendProgress(
-  context: ToolContext,
+  context: RequestHandlerExtra<ServerRequest, ServerNotification>,
   message: string,
   progress: number
 ): Promise<void> {
@@ -260,20 +259,18 @@ async function handleAnalyzePrompt(
   input: AnalyzePromptInput,
   extra: RequestHandlerExtra<ServerRequest, ServerNotification>
 ): Promise<ReturnType<typeof createSuccessResponse> | ErrorResponse> {
-  const context = getToolContext(extra);
-
   try {
     const parsed = parseAnalyzeInput(input);
     logger.info(
-      { sessionId: context.sessionId, promptLength: parsed.prompt.length },
+      { sessionId: extra.sessionId, promptLength: parsed.prompt.length },
       `${TOOL_NAME} called`
     );
-    await sendProgress(context, 'started', 0);
+    await sendProgress(extra, 'started', 0);
 
     const analysisPrompt = buildAnalysisPrompt(parsed.prompt);
     const { result, usedFallback } = await runAnalysis(
       analysisPrompt,
-      context.request.signal
+      extra.signal
     );
     const normalized = normalizeAnalysisResult(result, parsed.prompt);
     const provider = await getProviderInfo();
@@ -286,7 +283,7 @@ async function handleAnalyzePrompt(
         overallSource: normalized.overallSource,
       }
     );
-    await sendProgress(context, 'completed', 100);
+    await sendProgress(extra, 'completed', 100);
     return response;
   } catch (error) {
     return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);

@@ -21,7 +21,6 @@ import {
   validateTechniqueOutput,
 } from '../lib/output-validation.js';
 import { resolveFormat } from '../lib/prompt-analysis.js';
-import { getToolContext } from '../lib/tool-context.js';
 import {
   RefinePromptInputSchema,
   RefinePromptOutputSchema,
@@ -225,12 +224,10 @@ async function handleRefinePrompt(
   input: RefinePromptInput,
   extra: RequestHandlerExtra<ServerRequest, ServerNotification>
 ): Promise<ReturnType<typeof createSuccessResponse> | ErrorResponse> {
-  const context = getToolContext(extra);
-
   try {
     const resolved = resolveInputs(input);
     const { refined, corrections, techniqueUsed, usedFallback } =
-      await refineWithLLM(resolved, context.request.signal);
+      await refineWithLLM(resolved, extra.signal);
     const provider = await getProviderInfo();
     return buildRefineResponse(
       refined,
