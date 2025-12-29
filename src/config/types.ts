@@ -2,40 +2,31 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 export type ToolRegistrar = (server: McpServer) => void;
 
-interface TextContentBlock {
-  type: 'text';
+interface ResourceTextPayload {
+  uri: string;
   text: string;
+  mimeType?: string;
 }
 
-interface TextResourcePayload {
+interface ResourceBlobPayload {
   uri: string;
-  mimeType?: string;
-  text: string;
-}
-
-interface BlobResourcePayload {
-  uri: string;
-  mimeType?: string;
   blob: string;
-}
-
-interface ResourceContentBlock {
-  type: 'resource';
-  resource: TextResourcePayload | BlobResourcePayload;
-}
-
-interface ResourceLinkContentBlock {
-  type: 'resource_link';
-  uri: string;
-  name: string;
-  description?: string;
   mimeType?: string;
 }
 
 export type ContentBlock =
-  | TextContentBlock
-  | ResourceContentBlock
-  | ResourceLinkContentBlock;
+  | { type: 'text'; text: string }
+  | {
+      type: 'resource';
+      resource: ResourceTextPayload | ResourceBlobPayload;
+    }
+  | {
+      type: 'resource_link';
+      uri: string;
+      name: string;
+      description?: string;
+      mimeType?: string;
+    };
 
 export interface ErrorResponse {
   [key: string]: unknown;
@@ -113,8 +104,6 @@ export interface FormatResult {
 }
 
 export type LLMProvider = 'openai' | 'anthropic' | 'google';
-
-export type ValidProvider = 'openai' | 'anthropic' | 'google';
 
 export interface SafeErrorDetails {
   status?: number;

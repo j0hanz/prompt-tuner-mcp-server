@@ -8,15 +8,14 @@ import type {
   LLMError,
   LLMProvider,
   SafeErrorDetails,
-  ValidProvider,
 } from '../config/types.js';
 import { ErrorCode, logger, McpError } from './errors.js';
 
-const PROVIDER_ENV_KEYS = {
+const PROVIDER_ENV_KEYS: Record<LLMProvider, string> = {
   openai: 'OPENAI_API_KEY',
   anthropic: 'ANTHROPIC_API_KEY',
   google: 'GOOGLE_API_KEY',
-} as const;
+};
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -42,8 +41,7 @@ interface HttpStatusClassification {
 const AUTH_FAILURE_CLASSIFICATION: HttpStatusClassification = {
   code: ErrorCode.E_LLM_AUTH_FAILED,
   messageTemplate: (p, s) => `Authentication failed for ${p} (HTTP ${s})`,
-  recoveryHint: (p) =>
-    `Check ${PROVIDER_ENV_KEYS[p as ValidProvider]} environment variable`,
+  recoveryHint: (p) => `Check ${PROVIDER_ENV_KEYS[p]} environment variable`,
 };
 
 const SERVICE_UNAVAILABLE_CLASSIFICATION: HttpStatusClassification = {
@@ -149,7 +147,7 @@ function classifyByErrorCode(
       `Authentication failed for ${provider}: ${code}`,
       undefined,
       { provider, ...getSafeErrorDetails(llmError) },
-      `Check ${PROVIDER_ENV_KEYS[provider as ValidProvider]} environment variable`
+      `Check ${PROVIDER_ENV_KEYS[provider]} environment variable`
     );
   }
 

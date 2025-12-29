@@ -1,95 +1,85 @@
-import type {
-  ErrorCodeType,
-  LLMClient,
-  LLMToolOptions,
-} from '../config/types.js';
+import type { ErrorCodeType, LLMToolOptions } from '../config/types.js';
 import { buildAbortSignal } from './abort-signals.js';
 import { McpError } from './errors.js';
 import { getLLMClient } from './llm-client.js';
 import { parseJsonFromLlmResponse } from './llm-json.js';
 
-const DEFAULT_LLM_OPTIONS: Required<Omit<LLMToolOptions, 'signal'>> = {
-  maxTokens: 1500,
-  timeoutMs: 60000,
-};
-
+const DEFAULT_MAX_TOKENS = 1500;
+const DEFAULT_TIMEOUT_MS = 60000;
 const STRICT_JSON_SUFFIX =
   '\n\nSTRICT JSON: Return only valid JSON. Do not include explanations, headers, or code fences.';
 
-export interface JsonResponseResult<T> {
-  value: T;
-  usedFallback: boolean;
+interface RequestContext {
+  maxTokens: number;
+  timeoutMs: number;
+  signal?: AbortSignal;
+}
+
+interface ParseContext {
+  errorCode: ErrorCodeType;
+  debugLabel: string;
 }
 
 export function extractPromptFromInput(input: unknown): string | undefined {
   if (typeof input !== 'object' || input === null) return undefined;
-  if (!('prompt' in input)) return undefined;
   const { prompt } = input as { prompt?: unknown };
   return typeof prompt === 'string' ? prompt : undefined;
 }
 
-interface ResolvedContext extends Required<Omit<LLMToolOptions, 'signal'>> {
-  retryOnParseFailure: boolean;
-  retryPromptSuffix: string;
-}
-
-function withDefault<T>(value: T | undefined, fallback: T): T {
-  return value ?? fallback;
-}
-
-function createRequestOptions(
-  ctx: ResolvedContext,
-  signal?: AbortSignal
-): {
-  maxTokens: number;
-  timeoutMs: number;
-  signal: AbortSignal;
-} {
-  return {
-    maxTokens: ctx.maxTokens,
-    timeoutMs: ctx.timeoutMs,
-    signal: buildAbortSignal(ctx.timeoutMs, signal),
-  };
-}
-
-function resolveContext(
+function buildRequestContext(
   options: LLMToolOptions & {
     retryOnParseFailure?: boolean;
     retryPromptSuffix?: string;
-  } = {}
-): ResolvedContext {
+  }
+): {
+  ctx: RequestContext;
+  retryOnParseFailure: boolean;
+  retryPromptSuffix: string;
+} {
+  const {
+    maxTokens = DEFAULT_MAX_TOKENS,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    signal,
+    retryOnParseFailure = false,
+    retryPromptSuffix = STRICT_JSON_SUFFIX,
+  } = options;
+
   return {
-    maxTokens: withDefault(options.maxTokens, DEFAULT_LLM_OPTIONS.maxTokens),
-    timeoutMs: withDefault(options.timeoutMs, DEFAULT_LLM_OPTIONS.timeoutMs),
-    retryOnParseFailure: withDefault(options.retryOnParseFailure, false),
-    retryPromptSuffix: withDefault(
-      options.retryPromptSuffix,
-      STRICT_JSON_SUFFIX
-    ),
+    ctx: {
+      maxTokens,
+      timeoutMs,
+      signal: buildAbortSignal(timeoutMs, signal),
+    },
+    retryOnParseFailure,
+    retryPromptSuffix,
   };
 }
 
-async function attemptRequest<T>(
-  client: LLMClient,
+async function runAndParse<T>(
   prompt: string,
-  options: { maxTokens: number; timeoutMs: number; signal: AbortSignal },
-  parseSchema: (value: unknown) => T,
-  context: { errorCode: ErrorCodeType; debugLabel: string }
+  client: Awaited<ReturnType<typeof getLLMClient>>,
+  request: RequestContext,
+  parseCtx: ParseContext,
+  parseSchema: (value: unknown) => T
 ): Promise<T> {
-  const response = await client.generateText(prompt, options.maxTokens, {
-    timeoutMs: options.timeoutMs,
-    signal: options.signal,
-  });
+  const response = await client.generateText(
+    prompt,
+    request.maxTokens,
+    request
+  );
+
   return parseJsonFromLlmResponse<T>(response, parseSchema, {
-    errorCode: context.errorCode,
+    errorCode: parseCtx.errorCode,
     maxPreviewChars: 500,
-    debugLabel: context.debugLabel,
+    debugLabel: parseCtx.debugLabel,
   });
 }
 
-function shouldRetry(error: unknown, retry: boolean): boolean {
+function shouldRetryParse(error: unknown, allowRetry: boolean): boolean {
   return (
-    retry && error instanceof McpError && error.details?.parseFailed === true
+    allowRetry &&
+    error instanceof McpError &&
+    error.details?.parseFailed === true
   );
 }
 
@@ -98,34 +88,28 @@ export async function executeLLMWithJsonResponse<T>(
   parseSchema: (value: unknown) => T,
   errorCode: ErrorCodeType,
   debugLabel: string,
-  options?: LLMToolOptions & {
+  options: LLMToolOptions & {
     retryOnParseFailure?: boolean;
     retryPromptSuffix?: string;
-  }
-): Promise<JsonResponseResult<T>> {
-  const ctx = resolveContext(options);
+  } = {}
+): Promise<{ value: T; usedFallback: boolean }> {
+  const { ctx, retryOnParseFailure, retryPromptSuffix } =
+    buildRequestContext(options);
+  const parseCtx: ParseContext = { errorCode, debugLabel };
   const client = await getLLMClient();
-  const parseCtx = { errorCode, debugLabel };
-  const requestOptions = (): {
-    maxTokens: number;
-    timeoutMs: number;
-    signal: AbortSignal;
-  } => createRequestOptions(ctx, options?.signal);
-  const attempt = (requestPrompt: string): Promise<T> =>
-    attemptRequest(
-      client,
-      requestPrompt,
-      requestOptions(),
-      parseSchema,
-      parseCtx
-    );
 
   try {
-    const value = await attempt(prompt);
+    const value = await runAndParse(prompt, client, ctx, parseCtx, parseSchema);
     return { value, usedFallback: false };
   } catch (error) {
-    if (!shouldRetry(error, ctx.retryOnParseFailure)) throw error;
-    const value = await attempt(prompt + ctx.retryPromptSuffix);
+    if (!shouldRetryParse(error, retryOnParseFailure)) throw error;
+    const value = await runAndParse(
+      prompt + retryPromptSuffix,
+      client,
+      ctx,
+      parseCtx,
+      parseSchema
+    );
     return { value, usedFallback: true };
   }
 }
