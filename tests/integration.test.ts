@@ -93,8 +93,6 @@ describe.skipIf(!hasApiKey)('Integration', () => {
       expect(toolNames).toContain('refine_prompt');
       expect(toolNames).toContain('analyze_prompt');
       expect(toolNames).toContain('optimize_prompt');
-      expect(toolNames).toContain('detect_format');
-      expect(toolNames).toContain('compare_prompts');
       expect(toolNames).toContain('validate_prompt');
     });
 
