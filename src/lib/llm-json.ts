@@ -135,40 +135,55 @@ function shouldTryRawParse(text: string): boolean {
   return !text.startsWith('```') && isJsonStart(text);
 }
 
-function buildParseCandidates(
-  text: string
-): { label: string; payload: string }[] {
-  const candidates: { label: string; payload: string }[] = [];
-  if (shouldTryRawParse(text)) {
-    candidates.push({ label: 'raw', payload: text });
-  }
-  candidates.push({
-    label: 'stripped markers',
-    payload: stripCodeBlockMarkers(text),
-  });
-
-  const extracted = extractFirstJsonFragment(text);
-  if (extracted) {
-    candidates.push({ label: 'extracted fragment', payload: extracted });
-  }
-  return candidates;
-}
-
-function parseFromCandidates<T>(
-  candidates: { label: string; payload: string }[],
+function attemptParse<T>(
+  payload: string,
+  label: string,
   parse: (value: unknown) => T,
   debugLabel: string | undefined
 ): T | null {
-  for (const candidate of candidates) {
-    const attempt = tryParseJson(
-      candidate.payload,
-      parse,
-      debugLabel,
-      candidate.label
-    );
-    if (attempt.success) return attempt.value;
-  }
-  return null;
+  const attempt = tryParseJson(payload, parse, debugLabel, label);
+  return attempt.success ? attempt.value : null;
+}
+
+function parseRawCandidate<T>(
+  text: string,
+  parse: (value: unknown) => T,
+  debugLabel: string | undefined
+): T | null {
+  if (!shouldTryRawParse(text)) return null;
+  return attemptParse(text, 'raw', parse, debugLabel);
+}
+
+function parseStrippedCandidate<T>(
+  text: string,
+  parse: (value: unknown) => T,
+  debugLabel: string | undefined
+): T | null {
+  const stripped = stripCodeBlockMarkers(text);
+  if (shouldTryRawParse(text) && stripped === text) return null;
+  return attemptParse(stripped, 'stripped markers', parse, debugLabel);
+}
+
+function parseExtractedCandidate<T>(
+  text: string,
+  parse: (value: unknown) => T,
+  debugLabel: string | undefined
+): T | null {
+  const extracted = extractFirstJsonFragment(text);
+  if (!extracted) return null;
+  return attemptParse(extracted, 'extracted fragment', parse, debugLabel);
+}
+
+function parseJsonCandidates<T>(
+  text: string,
+  parse: (value: unknown) => T,
+  debugLabel: string | undefined
+): T | null {
+  return (
+    parseRawCandidate(text, parse, debugLabel) ??
+    parseStrippedCandidate(text, parse, debugLabel) ??
+    parseExtractedCandidate(text, parse, debugLabel)
+  );
 }
 
 export function parseJsonFromLlmResponse<T>(
@@ -189,12 +204,7 @@ export function parseJsonFromLlmResponse<T>(
   );
 
   const jsonStr = llmResponseText.trim();
-  const candidates = buildParseCandidates(jsonStr);
-  const parsed = parseFromCandidates(
-    candidates,
-    parse,
-    parseOptions.debugLabel
-  );
+  const parsed = parseJsonCandidates(jsonStr, parse, parseOptions.debugLabel);
   if (parsed !== null) return parsed;
 
   return throwParseFailure(

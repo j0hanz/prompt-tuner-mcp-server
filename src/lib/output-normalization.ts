@@ -1,4 +1,4 @@
-import { PATTERNS, SCORING_WEIGHTS } from '../config/constants.js';
+import { SCORING_WEIGHTS } from '../config/constants.js';
 import type {
   AnalysisCharacteristics,
   OptimizeScore,
@@ -23,11 +23,6 @@ const WEIGHTED_SCORE_KEYS = [
 
 function clampScore(value: number): number {
   return Math.min(100, Math.max(0, Math.round(value)));
-}
-
-function safeTest(pattern: RegExp, text: string): boolean {
-  pattern.lastIndex = 0;
-  return pattern.test(text);
 }
 
 function countWords(text: string): number {
@@ -75,16 +70,14 @@ export function mergeCharacteristics(
   const patternCache = buildPatternCache(prompt);
   const derivedFormat = detectTargetFormat(prompt, patternCache).format;
   const derivedWordCount = countWords(prompt);
-  const derivedHasRole = safeTest(PATTERNS.hasRole, prompt);
-  const derivedHasExamples =
-    safeTest(PATTERNS.exampleIndicators, prompt) ||
-    safeTest(PATTERNS.fewShotStructure, prompt);
+  const derivedHasRole = patternCache.hasRole;
+  const derivedHasExamples = patternCache.hasExamples;
   const derivedHasStructure =
     patternCache.hasXmlStructure ||
     patternCache.hasMarkdownStructure ||
     patternCache.hasJsonStructure;
-  const derivedHasStepByStep = safeTest(PATTERNS.stepByStepIndicators, prompt);
-  const derivedIsVague = base.isVague || safeTest(PATTERNS.vagueWords, prompt);
+  const derivedHasStepByStep = patternCache.hasStepByStep;
+  const derivedIsVague = base.isVague || patternCache.isVague;
 
   const characteristics: AnalysisCharacteristics = {
     ...base,

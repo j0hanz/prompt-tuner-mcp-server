@@ -6,17 +6,28 @@ import type {
   TargetFormat,
 } from '../../config/types.js';
 
+function safeTest(pattern: RegExp, text: string): boolean {
+  pattern.lastIndex = 0;
+  return pattern.test(text);
+}
+
 // Caches pattern detection results for format scoring
 export function buildPatternCache(prompt: string): PatternCache {
   return {
-    hasClaudePatterns: PATTERNS.claudePatterns.test(prompt),
-    hasXmlStructure: PATTERNS.xmlStructure.test(prompt),
-    hasMarkdownStructure: PATTERNS.markdownStructure.test(prompt),
-    hasGptPatterns: PATTERNS.gptPatterns.test(prompt),
-    hasJsonStructure: PATTERNS.jsonStructure.test(prompt),
+    hasClaudePatterns: safeTest(PATTERNS.claudePatterns, prompt),
+    hasXmlStructure: safeTest(PATTERNS.xmlStructure, prompt),
+    hasMarkdownStructure: safeTest(PATTERNS.markdownStructure, prompt),
+    hasGptPatterns: safeTest(PATTERNS.gptPatterns, prompt),
+    hasJsonStructure: safeTest(PATTERNS.jsonStructure, prompt),
     hasBoldOrHeaders: prompt.includes('**') || prompt.includes('##'),
     hasAngleBrackets: prompt.includes('<') && prompt.includes('>'),
     hasJsonChars: prompt.includes('"') && prompt.includes(':'),
+    hasRole: safeTest(PATTERNS.hasRole, prompt),
+    hasExamples:
+      safeTest(PATTERNS.exampleIndicators, prompt) ||
+      safeTest(PATTERNS.fewShotStructure, prompt),
+    hasStepByStep: safeTest(PATTERNS.stepByStepIndicators, prompt),
+    isVague: safeTest(PATTERNS.vagueWords, prompt),
   };
 }
 

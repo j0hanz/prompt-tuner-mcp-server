@@ -94,6 +94,10 @@ export interface PatternCache {
   hasBoldOrHeaders: boolean;
   hasAngleBrackets: boolean;
   hasJsonChars: boolean;
+  hasRole: boolean;
+  hasExamples: boolean;
+  hasStepByStep: boolean;
+  isVague: boolean;
 }
 
 export interface FormatScoringConfig {
