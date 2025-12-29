@@ -151,13 +151,6 @@ export interface LLMToolOptions {
   signal?: AbortSignal;
 }
 
-export interface RetryOptions {
-  maxRetries?: number;
-  baseDelayMs?: number;
-  maxDelayMs?: number;
-  totalTimeoutMs?: number;
-}
-
 export interface McpErrorOptions {
   context?: string;
   details?: Record<string, unknown>;

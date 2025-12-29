@@ -1,4 +1,8 @@
-import type { ErrorCodeType, LLMToolOptions } from '../config/types.js';
+import type {
+  ErrorCodeType,
+  LLMClient,
+  LLMToolOptions,
+} from '../config/types.js';
 import { buildAbortSignal } from './abort-signals.js';
 import { McpError } from './errors.js';
 import { getLLMClient } from './llm-client.js';
@@ -24,122 +28,59 @@ export function extractPromptFromInput(input: unknown): string | undefined {
   return typeof prompt === 'string' ? prompt : undefined;
 }
 
-function resolveOptions(
-  options?: LLMToolOptions
-): Required<Omit<LLMToolOptions, 'signal'>> {
-  return { ...DEFAULT_LLM_OPTIONS, ...options };
+interface ResolvedContext extends Required<Omit<LLMToolOptions, 'signal'>> {
+  signal: AbortSignal;
+  retryOnParseFailure: boolean;
+  retryPromptSuffix: string;
 }
 
-function buildRequest(
-  client: Awaited<ReturnType<typeof getLLMClient>>,
-  maxTokens: number,
-  timeoutMs: number,
-  signal: AbortSignal
-): (requestPrompt: string) => Promise<string> {
-  return (requestPrompt: string): Promise<string> =>
-    client.generateText(requestPrompt, maxTokens, {
-      timeoutMs,
-      signal,
-    });
+function resolveContext(
+  options: LLMToolOptions & {
+    retryOnParseFailure?: boolean;
+    retryPromptSuffix?: string;
+  } = {}
+): ResolvedContext {
+  const merged = Object.assign(
+    {},
+    DEFAULT_LLM_OPTIONS,
+    {
+      retryOnParseFailure: false,
+      retryPromptSuffix: STRICT_JSON_SUFFIX,
+    },
+    options
+  );
+
+  return {
+    maxTokens: merged.maxTokens,
+    timeoutMs: merged.timeoutMs,
+    signal: buildAbortSignal(merged.timeoutMs, options.signal),
+    retryOnParseFailure: merged.retryOnParseFailure,
+    retryPromptSuffix: merged.retryPromptSuffix,
+  };
 }
 
-function parseResponse<T>(
-  response: string,
+async function attemptRequest<T>(
+  client: LLMClient,
+  prompt: string,
+  options: { maxTokens: number; timeoutMs: number; signal: AbortSignal },
   parseSchema: (value: unknown) => T,
-  errorCode: ErrorCodeType,
-  debugLabel: string
-): T {
+  context: { errorCode: ErrorCodeType; debugLabel: string }
+): Promise<T> {
+  const response = await client.generateText(prompt, options.maxTokens, {
+    timeoutMs: options.timeoutMs,
+    signal: options.signal,
+  });
   return parseJsonFromLlmResponse<T>(response, parseSchema, {
-    errorCode,
+    errorCode: context.errorCode,
     maxPreviewChars: 500,
-    debugLabel,
+    debugLabel: context.debugLabel,
   });
 }
 
-function shouldRetryParseFailure(
-  error: unknown,
-  retryOnParseFailure: boolean
-): boolean {
+function shouldRetry(error: unknown, retry: boolean): boolean {
   return (
-    retryOnParseFailure &&
-    error instanceof McpError &&
-    error.details?.parseFailed === true
+    retry && error instanceof McpError && error.details?.parseFailed === true
   );
-}
-
-async function requestAndParse<T>(
-  request: (prompt: string) => Promise<string>,
-  prompt: string,
-  parseSchema: (value: unknown) => T,
-  errorCode: ErrorCodeType,
-  debugLabel: string
-): Promise<T> {
-  const response = await request(prompt);
-  return parseResponse(response, parseSchema, errorCode, debugLabel);
-}
-
-async function executeWithOptionalRetry<T>(
-  request: (prompt: string) => Promise<string>,
-  prompt: string,
-  parseSchema: (value: unknown) => T,
-  errorCode: ErrorCodeType,
-  debugLabel: string,
-  retryConfig: { retryOnParseFailure: boolean; retryPromptSuffix: string }
-): Promise<JsonResponseResult<T>> {
-  try {
-    const value = await requestAndParse(
-      request,
-      prompt,
-      parseSchema,
-      errorCode,
-      debugLabel
-    );
-    return { value, usedFallback: false };
-  } catch (error) {
-    if (!shouldRetryParseFailure(error, retryConfig.retryOnParseFailure)) {
-      throw error;
-    }
-
-    const value = await requestAndParse(
-      request,
-      `${prompt}${retryConfig.retryPromptSuffix}`,
-      parseSchema,
-      errorCode,
-      debugLabel
-    );
-    return { value, usedFallback: true };
-  }
-}
-
-function resolveRetryConfig(options?: {
-  retryOnParseFailure?: boolean;
-  retryPromptSuffix?: string;
-}): { retryOnParseFailure: boolean; retryPromptSuffix: string } {
-  return {
-    retryOnParseFailure: options?.retryOnParseFailure ?? false,
-    retryPromptSuffix: options?.retryPromptSuffix ?? STRICT_JSON_SUFFIX,
-  };
-}
-
-function resolveExecutionContext(
-  options?: LLMToolOptions & {
-    retryOnParseFailure?: boolean;
-    retryPromptSuffix?: string;
-  }
-): {
-  resolvedOptions: Required<Omit<LLMToolOptions, 'signal'>>;
-  combinedSignal: AbortSignal;
-  retryConfig: { retryOnParseFailure: boolean; retryPromptSuffix: string };
-} {
-  const resolvedOptions = resolveOptions(options);
-  return {
-    resolvedOptions,
-    combinedSignal: buildAbortSignal(
-      resolvedOptions.timeoutMs,
-      options?.signal
-    ),
-    retryConfig: resolveRetryConfig(options),
-  };
 }
 
 export async function executeLLMWithJsonResponse<T>(
@@ -152,21 +93,35 @@ export async function executeLLMWithJsonResponse<T>(
     retryPromptSuffix?: string;
   }
 ): Promise<JsonResponseResult<T>> {
-  const { resolvedOptions, combinedSignal, retryConfig } =
-    resolveExecutionContext(options);
+  const ctx = resolveContext(options);
   const client = await getLLMClient();
-  const request = buildRequest(
-    client,
-    resolvedOptions.maxTokens,
-    resolvedOptions.timeoutMs,
-    combinedSignal
-  );
-  return executeWithOptionalRetry(
-    request,
-    prompt,
-    parseSchema,
-    errorCode,
-    debugLabel,
-    retryConfig
-  );
+  const reqOptions = {
+    maxTokens: ctx.maxTokens,
+    timeoutMs: ctx.timeoutMs,
+    signal: ctx.signal,
+  };
+  const parseCtx = { errorCode, debugLabel };
+
+  try {
+    const value = await attemptRequest(
+      client,
+      prompt,
+      reqOptions,
+      parseSchema,
+      parseCtx
+    );
+    return { value, usedFallback: false };
+  } catch (error) {
+    if (shouldRetry(error, ctx.retryOnParseFailure)) {
+      const value = await attemptRequest(
+        client,
+        prompt + ctx.retryPromptSuffix,
+        reqOptions,
+        parseSchema,
+        parseCtx
+      );
+      return { value, usedFallback: true };
+    }
+    throw error;
+  }
 }
