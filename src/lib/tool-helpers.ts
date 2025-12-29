@@ -29,9 +29,27 @@ export function extractPromptFromInput(input: unknown): string | undefined {
 }
 
 interface ResolvedContext extends Required<Omit<LLMToolOptions, 'signal'>> {
-  signal: AbortSignal;
   retryOnParseFailure: boolean;
   retryPromptSuffix: string;
+}
+
+function withDefault<T>(value: T | undefined, fallback: T): T {
+  return value ?? fallback;
+}
+
+function createRequestOptions(
+  ctx: ResolvedContext,
+  signal?: AbortSignal
+): {
+  maxTokens: number;
+  timeoutMs: number;
+  signal: AbortSignal;
+} {
+  return {
+    maxTokens: ctx.maxTokens,
+    timeoutMs: ctx.timeoutMs,
+    signal: buildAbortSignal(ctx.timeoutMs, signal),
+  };
 }
 
 function resolveContext(
@@ -40,22 +58,14 @@ function resolveContext(
     retryPromptSuffix?: string;
   } = {}
 ): ResolvedContext {
-  const merged = Object.assign(
-    {},
-    DEFAULT_LLM_OPTIONS,
-    {
-      retryOnParseFailure: false,
-      retryPromptSuffix: STRICT_JSON_SUFFIX,
-    },
-    options
-  );
-
   return {
-    maxTokens: merged.maxTokens,
-    timeoutMs: merged.timeoutMs,
-    signal: buildAbortSignal(merged.timeoutMs, options.signal),
-    retryOnParseFailure: merged.retryOnParseFailure,
-    retryPromptSuffix: merged.retryPromptSuffix,
+    maxTokens: withDefault(options.maxTokens, DEFAULT_LLM_OPTIONS.maxTokens),
+    timeoutMs: withDefault(options.timeoutMs, DEFAULT_LLM_OPTIONS.timeoutMs),
+    retryOnParseFailure: withDefault(options.retryOnParseFailure, false),
+    retryPromptSuffix: withDefault(
+      options.retryPromptSuffix,
+      STRICT_JSON_SUFFIX
+    ),
   };
 }
 
@@ -95,33 +105,27 @@ export async function executeLLMWithJsonResponse<T>(
 ): Promise<JsonResponseResult<T>> {
   const ctx = resolveContext(options);
   const client = await getLLMClient();
-  const reqOptions = {
-    maxTokens: ctx.maxTokens,
-    timeoutMs: ctx.timeoutMs,
-    signal: ctx.signal,
-  };
   const parseCtx = { errorCode, debugLabel };
-
-  try {
-    const value = await attemptRequest(
+  const requestOptions = (): {
+    maxTokens: number;
+    timeoutMs: number;
+    signal: AbortSignal;
+  } => createRequestOptions(ctx, options?.signal);
+  const attempt = (requestPrompt: string): Promise<T> =>
+    attemptRequest(
       client,
-      prompt,
-      reqOptions,
+      requestPrompt,
+      requestOptions(),
       parseSchema,
       parseCtx
     );
+
+  try {
+    const value = await attempt(prompt);
     return { value, usedFallback: false };
   } catch (error) {
-    if (shouldRetry(error, ctx.retryOnParseFailure)) {
-      const value = await attemptRequest(
-        client,
-        prompt + ctx.retryPromptSuffix,
-        reqOptions,
-        parseSchema,
-        parseCtx
-      );
-      return { value, usedFallback: true };
-    }
-    throw error;
+    if (!shouldRetry(error, ctx.retryOnParseFailure)) throw error;
+    const value = await attempt(prompt + ctx.retryPromptSuffix);
+    return { value, usedFallback: true };
   }
 }
