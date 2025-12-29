@@ -6,11 +6,10 @@ import type {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { LLM_TIMEOUT_MS, OPTIMIZE_MAX_TOKENS } from '../config/constants.js';
-import {
-  OPTIMIZATION_TECHNIQUES,
-  type OptimizationTechnique,
-  type OptimizeResponse,
-  type TargetFormat,
+import type {
+  OptimizationTechnique,
+  OptimizeResponse,
+  TargetFormat,
 } from '../config/types.js';
 import type { ErrorResponse } from '../config/types.js';
 import {
@@ -146,10 +145,6 @@ const OPTIMIZE_PROMPT_TOOL = {
   },
 };
 
-function parseOptimizeInput(input: OptimizePromptInput): OptimizePromptInput {
-  return OptimizePromptInputSchema.parse(input);
-}
-
 function isConcreteTechnique(
   technique: OptimizationTechnique
 ): technique is ConcreteTechnique {
@@ -165,25 +160,16 @@ function resolveTechniques(
 function resolveOptimizeInputs(
   input: OptimizePromptInput
 ): ResolvedOptimizeInputs {
-  const requested = resolveTechniques(input.techniques);
-  const deep = requested.includes('comprehensive');
-  const effectiveTechniques = deep
+  const parsed = OptimizePromptInputSchema.parse(input);
+  const requested = resolveTechniques(parsed.techniques);
+  const effectiveTechniques = requested.includes('comprehensive')
     ? [...COMPREHENSIVE_TECHNIQUE_ORDER]
     : requested.filter(isConcreteTechnique);
 
   return {
-    validatedPrompt: input.prompt,
+    validatedPrompt: parsed.prompt,
     effectiveTechniques,
-    resolvedFormat: resolveFormat(input.targetFormat ?? 'auto', input.prompt),
-  };
-}
-
-function buildValidationConfig(
-  resolved: ResolvedOptimizeInputs
-): OptimizeValidationConfig {
-  return {
-    allowedTechniques: resolved.effectiveTechniques,
-    targetFormat: resolved.resolvedFormat,
+    resolvedFormat: resolveFormat(parsed.targetFormat, parsed.prompt),
   };
 }
 
@@ -234,19 +220,13 @@ async function optimizeOnce(
   return runOptimization(optimizePrompt, signal);
 }
 
-function normalizeTechniques(
-  techniques: OptimizationTechnique[]
-): OptimizationTechnique[] {
-  return Array.from(new Set(techniques));
-}
-
 function normalizeOptimizeResult(result: OptimizeResponse): {
   normalized: OptimizeResponse;
   techniquesApplied: OptimizationTechnique[];
   appliedConcrete: ConcreteTechnique[];
 } {
   const { normalized } = normalizePromptText(result.optimized);
-  const techniquesApplied = normalizeTechniques(result.techniquesApplied);
+  const techniquesApplied = Array.from(new Set(result.techniquesApplied));
   const appliedConcrete = techniquesApplied.filter(isConcreteTechnique);
   return {
     normalized: { ...result, optimized: normalized, techniquesApplied },
@@ -308,23 +288,23 @@ function validateTechniqueOutputs(
   return null;
 }
 
-function buildFailure(
-  normalized: OptimizeResponse,
-  reason: string
-): { ok: false; result: OptimizeResponse; reason: string } {
-  return { ok: false, result: normalized, reason };
-}
-
 function validateOptimizeResult(
   result: OptimizeResponse,
   config: OptimizeValidationConfig
 ): { ok: boolean; result: OptimizeResponse; reason?: string } {
   const normalizedResult = normalizeOptimizeResult(result);
   const allowedSet = new Set(config.allowedTechniques);
+  const fail = (
+    reason: string
+  ): { ok: false; result: OptimizeResponse; reason: string } => ({
+    ok: false,
+    result: normalizedResult.normalized,
+    reason,
+  });
 
   const textIssue = validateOptimizedText(normalizedResult.normalized);
   if (textIssue) {
-    return buildFailure(normalizedResult.normalized, textIssue);
+    return fail(textIssue);
   }
 
   const techniqueIssue = validateAppliedTechniques(
@@ -333,7 +313,7 @@ function validateOptimizeResult(
     allowedSet
   );
   if (techniqueIssue) {
-    return buildFailure(normalizedResult.normalized, techniqueIssue);
+    return fail(techniqueIssue);
   }
 
   const outputIssue = validateTechniqueOutputs(
@@ -342,7 +322,7 @@ function validateOptimizeResult(
     config.targetFormat
   );
   if (outputIssue) {
-    return buildFailure(normalizedResult.normalized, outputIssue);
+    return fail(outputIssue);
   }
 
   return { ok: true, result: normalizedResult.normalized };
@@ -352,7 +332,10 @@ async function runValidatedOptimization(
   resolved: ResolvedOptimizeInputs,
   signal: AbortSignal
 ): Promise<{ result: OptimizeResponse; usedFallback: boolean }> {
-  const validationConfig = buildValidationConfig(resolved);
+  const validationConfig: OptimizeValidationConfig = {
+    allowedTechniques: resolved.effectiveTechniques,
+    targetFormat: resolved.resolvedFormat,
+  };
   const primary = await optimizeOnce(resolved, signal);
   const primaryValidation = validateOptimizeResult(
     primary.result,
@@ -402,101 +385,9 @@ function normalizeOptimizationScores(result: OptimizeResponse): {
   };
 }
 
-const VALID_TECHNIQUES = new Set(OPTIMIZATION_TECHNIQUES);
-const TECHNIQUE_DISPLAY_ORDER = [
-  ...OPTIMIZATION_TECHNIQUES,
-  'general',
-] as const;
-const TECHNIQUE_TAG_PATTERN = /^([a-zA-Z]+)\s*:\s*(.+)$/;
-
-function normalizeTechniqueName(value: string): OptimizationTechnique | null {
-  const normalized = value.toLowerCase();
-  return VALID_TECHNIQUES.has(normalized as OptimizationTechnique)
-    ? (normalized as OptimizationTechnique)
-    : null;
-}
-
-function resolveTechnique(value?: string): OptimizationTechnique | null {
-  if (!value) return null;
-  return normalizeTechniqueName(value);
-}
-
-function resolveDetail(value?: string): string | null {
-  const detail = value?.trim();
-  if (!detail) return null;
-  return detail;
-}
-
-function extractTechniqueMatch(trimmed: string): {
-  technique: OptimizationTechnique | null;
-  detail: string | null;
-} | null {
-  const match = TECHNIQUE_TAG_PATTERN.exec(trimmed);
-  if (!match) return null;
-
-  const technique = resolveTechnique(match[1]);
-  const detail = resolveDetail(match[2]);
-  return { technique, detail };
-}
-
-function splitTechniqueTag(improvement: string): {
-  bucket: string;
-  detail: string;
-} {
-  const trimmed = improvement.trim();
-  if (!trimmed) return { bucket: 'general', detail: trimmed };
-
-  const match = extractTechniqueMatch(trimmed);
-  if (!match?.detail || !match.technique) {
-    return { bucket: 'general', detail: trimmed };
-  }
-  return { bucket: match.technique, detail: match.detail };
-}
-
-function groupImprovementsByTechnique(
-  improvements: string[]
-): Map<string, string[]> {
-  const groups = new Map<string, string[]>();
-  for (const improvement of improvements) {
-    const { bucket, detail } = splitTechniqueTag(improvement);
-    if (!detail) continue;
-
-    const existing = groups.get(bucket);
-    if (existing) {
-      existing.push(detail);
-    } else {
-      groups.set(bucket, [detail]);
-    }
-  }
-  return groups;
-}
-
-function isGeneralOnly(groups: Map<string, string[]>): boolean {
-  return groups.size === 1 && groups.has('general');
-}
-
-function pushTechniqueGroup(
-  lines: string[],
-  technique: string,
-  items: string[]
-): void {
-  lines.push(`Technique: ${technique}`);
-  lines.push(...asBulletList(items));
-}
-
 function formatImprovements(improvements: string[]): string[] {
-  const groups = groupImprovementsByTechnique(improvements);
-  if (isGeneralOnly(groups)) {
-    return asBulletList(improvements.map((item) => item.trim()));
-  }
-
-  const lines: string[] = [];
-  for (const technique of TECHNIQUE_DISPLAY_ORDER) {
-    const items = groups.get(technique);
-    if (!items?.length) continue;
-    pushTechniqueGroup(lines, technique, items);
-  }
-  return lines;
+  const cleaned = improvements.map((item) => item.trim()).filter(Boolean);
+  return asBulletList(cleaned);
 }
 
 function formatScoreLines(
@@ -591,8 +482,7 @@ async function handleOptimizePrompt(
   extra: RequestHandlerExtra<ServerRequest, ServerNotification>
 ): Promise<ReturnType<typeof createSuccessResponse> | ErrorResponse> {
   try {
-    const parsed = parseOptimizeInput(input);
-    const resolved = resolveOptimizeInputs(parsed);
+    const resolved = resolveOptimizeInputs(input);
     const { result, usedFallback } = await runValidatedOptimization(
       resolved,
       extra.signal

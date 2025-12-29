@@ -102,7 +102,6 @@ class AnthropicClient implements LLMClient {
   }
 }
 
-// Google safety categories for content filtering
 const GOOGLE_SAFETY_CATEGORIES = [
   HarmCategory.HARM_CATEGORY_HATE_SPEECH,
   HarmCategory.HARM_CATEGORY_HARASSMENT,
@@ -165,8 +164,6 @@ class GoogleClient implements LLMClient {
     category: HarmCategory;
     threshold: HarmBlockThreshold;
   }[] {
-    // WARNING: Disabling safety settings can expose the application to harmful content.
-    // Use with caution and only in trusted environments.
     const disabled = config.GOOGLE_SAFETY_DISABLED;
     if (this.safetySettingsCache?.disabled === disabled) {
       return this.safetySettingsCache.settings;

@@ -11,7 +11,6 @@ function safeTest(pattern: RegExp, text: string): boolean {
   return pattern.test(text);
 }
 
-// Caches pattern detection results for format scoring
 export function buildPatternCache(prompt: string): PatternCache {
   return {
     hasClaudePatterns: safeTest(PATTERNS.claudePatterns, prompt),
@@ -75,7 +74,6 @@ const FORMAT_RECOMMENDATIONS: Record<'claude' | 'gpt' | 'json', string> = {
   json: 'JSON structure detected. Good for structured data extraction.',
 };
 
-// Calculates format score based on pattern weights
 function calculateFormatScore(
   cache: PatternCache,
   config: FormatScoringConfig
@@ -126,7 +124,6 @@ function calculateConfidence(
   return Math.min(100, Math.max(20, winner.rawScore + 20 - conflictPenalty));
 }
 
-// Detects target format and confidence level
 export function detectTargetFormat(
   prompt: string,
   cache?: PatternCache
@@ -157,7 +154,6 @@ export function detectTargetFormat(
   };
 }
 
-// Resolves target format, defaulting to GPT if auto-detection fails
 export function resolveFormat(
   format: TargetFormat,
   prompt: string

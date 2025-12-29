@@ -14,8 +14,6 @@ export const SCORING_WEIGHTS = {
 
 export const SERVER_NAME = 'prompttuner-mcp';
 export const SERVER_VERSION = packageJson.version;
-
-// Configurable via environment variables
 const {
   MAX_PROMPT_LENGTH: ENV_MAX_PROMPT_LENGTH,
   LLM_TIMEOUT_MS: ENV_LLM_TIMEOUT_MS,

@@ -18,12 +18,10 @@ const numberString = (
     .refine((n) => n >= min, { message: `Must be >= ${min}` });
 
 const envSchema = z.object({
-  // Server
   LOG_FORMAT: z.enum(['json', 'text']).optional().default('text'),
   DEBUG: booleanString,
   INCLUDE_ERROR_CONTEXT: booleanString,
 
-  // LLM
   LLM_PROVIDER: z
     .enum(['openai', 'anthropic', 'google'])
     .optional()
@@ -37,15 +35,12 @@ const envSchema = z.object({
     .default('false')
     .transform((v) => v === 'true'),
 
-  // Keys
   OPENAI_API_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   GOOGLE_API_KEY: z.string().optional(),
 
-  // Constraints
   MAX_PROMPT_LENGTH: numberString(10000, 1),
 
-  // Retry
   RETRY_MAX_ATTEMPTS: numberString(3, 0),
   RETRY_BASE_DELAY_MS: numberString(1000, 100),
   RETRY_MAX_DELAY_MS: numberString(10000, 1000),

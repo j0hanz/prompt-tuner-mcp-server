@@ -1,16 +1,10 @@
 import type { ContentBlock } from '../config/types.js';
 
-const MARKDOWN_MIME_TYPE = 'text/markdown';
-
 function sanitizeFilename(value: string): string {
   return value
     .trim()
     .replace(/\s+/g, '-')
     .replace(/[^A-Za-z0-9._-]/g, '-');
-}
-
-function buildFileUri(filename: string): string {
-  return `file:///${filename}`;
 }
 
 export function buildPromptResourceBlock(
@@ -23,8 +17,8 @@ export function buildPromptResourceBlock(
   return {
     type: 'resource',
     resource: {
-      uri: buildFileUri(filename),
-      mimeType: MARKDOWN_MIME_TYPE,
+      uri: `file:///${filename}`,
+      mimeType: 'text/markdown',
       text: prompt,
     },
   };

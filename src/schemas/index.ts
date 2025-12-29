@@ -1,5 +1,3 @@
-// Schema exports for PromptTuner MCP
-
 export {
   RefinePromptInputSchema,
   AnalyzePromptInputSchema,

@@ -15,11 +15,6 @@ interface RequestContext {
   signal?: AbortSignal;
 }
 
-interface ParseContext {
-  errorCode: ErrorCodeType;
-  debugLabel: string;
-}
-
 export function extractPromptFromInput(input: unknown): string | undefined {
   if (typeof input !== 'object' || input === null) return undefined;
   const { prompt } = input as { prompt?: unknown };
@@ -59,8 +54,9 @@ async function runAndParse<T>(
   prompt: string,
   client: Awaited<ReturnType<typeof getLLMClient>>,
   request: RequestContext,
-  parseCtx: ParseContext,
-  parseSchema: (value: unknown) => T
+  parseSchema: (value: unknown) => T,
+  errorCode: ErrorCodeType,
+  debugLabel: string
 ): Promise<T> {
   const response = await client.generateText(
     prompt,
@@ -69,9 +65,9 @@ async function runAndParse<T>(
   );
 
   return parseJsonFromLlmResponse<T>(response, parseSchema, {
-    errorCode: parseCtx.errorCode,
+    errorCode,
     maxPreviewChars: 500,
-    debugLabel: parseCtx.debugLabel,
+    debugLabel,
   });
 }
 
@@ -95,11 +91,17 @@ export async function executeLLMWithJsonResponse<T>(
 ): Promise<{ value: T; usedFallback: boolean }> {
   const { ctx, retryOnParseFailure, retryPromptSuffix } =
     buildRequestContext(options);
-  const parseCtx: ParseContext = { errorCode, debugLabel };
   const client = await getLLMClient();
 
   try {
-    const value = await runAndParse(prompt, client, ctx, parseCtx, parseSchema);
+    const value = await runAndParse(
+      prompt,
+      client,
+      ctx,
+      parseSchema,
+      errorCode,
+      debugLabel
+    );
     return { value, usedFallback: false };
   } catch (error) {
     if (!shouldRetryParse(error, retryOnParseFailure)) throw error;
@@ -107,8 +109,9 @@ export async function executeLLMWithJsonResponse<T>(
       prompt + retryPromptSuffix,
       client,
       ctx,
-      parseCtx,
-      parseSchema
+      parseSchema,
+      errorCode,
+      debugLabel
     );
     return { value, usedFallback: true };
   }

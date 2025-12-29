@@ -1,5 +1,3 @@
-// Shared utilities for parsing JSON from LLM responses
-// Handles common wrapping patterns like ```json code blocks``` and surrounding text.
 import {
   LLM_ERROR_PREVIEW_CHARS,
   LLM_MAX_RESPONSE_LENGTH,
@@ -8,9 +6,7 @@ import type { ErrorCodeType } from '../config/types.js';
 import { logger, McpError } from './errors.js';
 import { extractFirstJsonFragment } from './llm-json/scan.js';
 
-// Matches opening code block: ```json or ``` at start (with optional whitespace/newlines before)
 const CODE_BLOCK_START_RE = /^[\s\n]*```(?:json)?[\s\n]*/i;
-// Matches closing code block at end (with optional whitespace/newlines after)
 const CODE_BLOCK_END_RE = /[\s\n]*```[\s\n]*$/;
 
 interface ParseFailureDetail {
@@ -22,17 +18,14 @@ type ParseAttempt<T> =
   | { success: true; value: T }
   | { success: false; error: ParseFailureDetail };
 
-// Strips code block markers from the start and end of a string
 function stripCodeBlockMarkers(text: string): string {
   let result = text;
 
-  // Remove opening code block marker
   const startMatch = CODE_BLOCK_START_RE.exec(result);
   if (startMatch) {
     result = result.slice(startMatch[0].length);
   }
 
-  // Remove closing code block marker
   const endMatch = CODE_BLOCK_END_RE.exec(result);
   if (endMatch) {
     result = result.slice(0, result.length - endMatch[0].length);
@@ -137,51 +130,10 @@ function resolveParseOptions(options: {
   };
 }
 
-function isJsonStart(text: string): boolean {
+function shouldTryRawParse(text: string): boolean {
+  if (text.startsWith('```')) return false;
   const firstChar = text[0];
   return firstChar === '{' || firstChar === '[';
-}
-
-function shouldTryRawParse(text: string): boolean {
-  return !text.startsWith('```') && isJsonStart(text);
-}
-
-function attemptParse<T>(
-  payload: string,
-  label: string,
-  parse: (value: unknown) => T,
-  debugLabel: string | undefined
-): ParseAttempt<T> {
-  return tryParseJson(payload, parse, debugLabel, label);
-}
-
-function parseRawCandidate<T>(
-  text: string,
-  parse: (value: unknown) => T,
-  debugLabel: string | undefined
-): ParseAttempt<T> | null {
-  if (!shouldTryRawParse(text)) return null;
-  return attemptParse(text, 'raw', parse, debugLabel);
-}
-
-function parseStrippedCandidate<T>(
-  text: string,
-  parse: (value: unknown) => T,
-  debugLabel: string | undefined
-): ParseAttempt<T> | null {
-  const stripped = stripCodeBlockMarkers(text);
-  if (shouldTryRawParse(text) && stripped === text) return null;
-  return attemptParse(stripped, 'stripped markers', parse, debugLabel);
-}
-
-function parseExtractedCandidate<T>(
-  text: string,
-  parse: (value: unknown) => T,
-  debugLabel: string | undefined
-): ParseAttempt<T> | null {
-  const extracted = extractFirstJsonFragment(text);
-  if (!extracted) return null;
-  return attemptParse(extracted, 'extracted fragment', parse, debugLabel);
 }
 
 function parseJsonCandidates<T>(
@@ -189,19 +141,36 @@ function parseJsonCandidates<T>(
   parse: (value: unknown) => T,
   debugLabel: string | undefined
 ): { value: T } | { error: ParseFailureDetail | null } {
-  let lastError: ParseFailureDetail | null = null;
-  const attempts: (ParseAttempt<T> | null)[] = [
-    parseRawCandidate(text, parse, debugLabel),
-    parseStrippedCandidate(text, parse, debugLabel),
-    parseExtractedCandidate(text, parse, debugLabel),
+  const stripped = stripCodeBlockMarkers(text);
+  const extracted = extractFirstJsonFragment(text);
+  const candidates: { label: string; value: string | null }[] = [
+    { label: 'raw', value: shouldTryRawParse(text) ? text : null },
+    {
+      label: 'stripped markers',
+      value: stripped !== text ? stripped : null,
+    },
+    { label: 'extracted fragment', value: extracted },
   ];
+  return parseCandidates(candidates, parse, debugLabel);
+}
 
-  for (const attempt of attempts) {
-    if (!attempt) continue;
+function parseCandidates<T>(
+  candidates: { label: string; value: string | null }[],
+  parse: (value: unknown) => T,
+  debugLabel: string | undefined
+): { value: T } | { error: ParseFailureDetail | null } {
+  let lastError: ParseFailureDetail | null = null;
+  for (const candidate of candidates) {
+    if (!candidate.value) continue;
+    const attempt = tryParseJson(
+      candidate.value,
+      parse,
+      debugLabel,
+      candidate.label
+    );
     if (attempt.success) return { value: attempt.value };
     lastError = attempt.error;
   }
-
   return { error: lastError };
 }
 

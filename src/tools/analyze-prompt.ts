@@ -102,10 +102,6 @@ const ANALYZE_PROMPT_TOOL = {
   },
 };
 
-function formatYesNo(label: string, value: boolean): string {
-  return `${label}: ${value ? 'Yes' : 'No'}`;
-}
-
 function formatScoreLines(score: AnalysisResponse['score']): string[] {
   return asBulletList([
     `Clarity: ${score.clarity}/100`,
@@ -115,6 +111,10 @@ function formatScoreLines(score: AnalysisResponse['score']): string[] {
     `Effectiveness: ${score.effectiveness}/100`,
     `Overall: ${score.overall}/100`,
   ]);
+}
+
+function formatYesNo(label: string, value: boolean): string {
+  return `${label}: ${value ? 'Yes' : 'No'}`;
 }
 
 function formatCharacteristicLines(
@@ -188,10 +188,6 @@ function buildAnalysisPrompt(prompt: string): string {
   )}\n</prompt_to_analyze>`;
 }
 
-function parseAnalyzeInput(input: { prompt: string }): { prompt: string } {
-  return AnalyzePromptInputSchema.parse(input);
-}
-
 async function runAnalysis(
   analysisPrompt: string,
   signal?: AbortSignal
@@ -259,7 +255,7 @@ async function handleAnalyzePrompt(
   extra: RequestHandlerExtra<ServerRequest, ServerNotification>
 ): Promise<ReturnType<typeof createSuccessResponse> | ErrorResponse> {
   try {
-    const parsed = parseAnalyzeInput(input);
+    const parsed = AnalyzePromptInputSchema.parse(input);
     logger.info(
       { sessionId: extra.sessionId, promptLength: parsed.prompt.length },
       `${TOOL_NAME} called`

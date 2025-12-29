@@ -28,11 +28,6 @@ function clampScore(value: number): number {
   return Math.min(100, Math.max(0, Math.round(value)));
 }
 
-function countWords(text: string): number {
-  const trimmed = text.trim();
-  return trimmed ? trimmed.split(/\s+/).length : 0;
-}
-
 export function normalizeScore(score: OptimizeScore): {
   score: OptimizeScore;
   adjusted: boolean;
@@ -62,11 +57,13 @@ export function mergeCharacteristics(
 ): AnalysisCharacteristics {
   const patternCache = buildPatternCache(prompt);
   const derivedFormat = detectTargetFormat(prompt, patternCache).format;
+  const trimmed = prompt.trim();
+  const wordCount = trimmed ? trimmed.split(/\s+/).length : 0;
 
   return {
     ...base,
     detectedFormat: derivedFormat,
-    wordCount: countWords(prompt),
+    wordCount,
     hasRoleContext: patternCache.hasRole,
     hasExamples: patternCache.hasExamples,
     hasStructure:

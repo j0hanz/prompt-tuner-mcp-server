@@ -51,7 +51,6 @@ export class McpError extends Error {
     }
   }
 
-  // Custom inspect output for better console debugging
   [inspect.custom](): string {
     const hint = this.recoveryHint ? ` (Hint: ${this.recoveryHint})` : '';
     const details = this.details ? ` ${JSON.stringify(this.details)}` : '';
@@ -154,17 +153,14 @@ export function createErrorResponse(
   };
 }
 
-// Sanitizes context by removing API keys and truncating prompts
 function sanitizeErrorContext(context?: string): string | undefined {
   if (!context) return undefined;
 
-  // Redact API keys (OpenAI, Anthropic, Google patterns)
   let sanitized = context
     .replace(/sk-[A-Za-z0-9_-]{20,}/g, '[REDACTED_OPENAI_KEY]')
     .replace(/sk-ant-[A-Za-z0-9_-]{20,}/g, '[REDACTED_ANTHROPIC_KEY]')
     .replace(/AIza[A-Za-z0-9_-]{35}/g, '[REDACTED_GOOGLE_KEY]');
 
-  // Truncate to first 200 chars for privacy
   const CONTEXT_MAX_LENGTH = 200;
   if (sanitized.length > CONTEXT_MAX_LENGTH) {
     sanitized = `${sanitized.slice(0, CONTEXT_MAX_LENGTH)}...`;
@@ -187,7 +183,6 @@ function resolveErrorDetails(
   return mcpError?.details;
 }
 
-// Default recovery hints for common error codes
 const DEFAULT_RECOVERY_HINTS: Partial<Record<ErrorCodeType, string>> = {
   E_INVALID_INPUT: 'Check the input parameters and try again.',
   E_LLM_FAILED:

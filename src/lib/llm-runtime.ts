@@ -299,7 +299,6 @@ export async function runGeneration(
       startTime,
       attempt
     );
-
     const content = await handleOutcome(outcome, signal);
     if (content !== null) return content;
   }

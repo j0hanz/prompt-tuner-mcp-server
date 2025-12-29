@@ -17,9 +17,9 @@ function logSecondShutdown(reason: string): void {
 function logShutdown(reason: string, err?: unknown): void {
   if (err) {
     logger.error({ err, reason }, 'Server shutting down due to error');
-    return;
+  } else {
+    logger.info({ reason }, 'Server shutting down');
   }
-  logger.info({ reason }, 'Server shutting down');
 }
 
 function startForcedShutdownTimer(): NodeJS.Timeout {
@@ -32,19 +32,14 @@ function startForcedShutdownTimer(): NodeJS.Timeout {
   }, SHUTDOWN_DELAY_MS);
 }
 
-function resolveExitCode(err?: unknown): number {
-  return err ? 1 : 0;
-}
-
-async function closeServer(exitCode: number): Promise<number> {
-  if (!server?.isConnected()) return exitCode;
-
+async function closeServer(): Promise<boolean> {
+  if (!server?.isConnected()) return true;
   try {
     await server.close();
-    return exitCode;
+    return true;
   } catch (closeError) {
     logger.error({ err: closeError }, 'Error during shutdown');
-    return 1;
+    return false;
   }
 }
 
@@ -59,7 +54,8 @@ async function shutdown(reason: string, err?: unknown): Promise<void> {
   logShutdown(reason, err);
 
   const timeout = startForcedShutdownTimer();
-  const exitCode = await closeServer(resolveExitCode(err));
+  let exitCode = err ? 1 : 0;
+  if (!(await closeServer())) exitCode = 1;
 
   clearTimeout(timeout);
   process.exit(exitCode);

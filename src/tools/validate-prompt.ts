@@ -22,6 +22,7 @@ import {
   asBulletList,
   buildOutput,
   formatProviderLine,
+  type OutputSection,
 } from '../lib/tool-formatters.js';
 import {
   executeLLMWithJsonResponse,
@@ -119,23 +120,6 @@ interface ValidatePromptInput {
   checkInjection?: boolean;
 }
 
-interface ParsedValidatePromptInput {
-  prompt: string;
-  targetModel: ValidationModel;
-  checkInjection: boolean;
-}
-
-interface OutputSection {
-  title: string;
-  lines: string[];
-}
-
-function parseValidateInput(
-  input: ValidatePromptInput
-): ParsedValidatePromptInput {
-  return ValidatePromptInputSchema.parse(input);
-}
-
 function formatIssueLine(issue: ValidationIssue): string {
   if (!issue.suggestion) return issue.message;
   return `${issue.message} | Suggestion: ${issue.suggestion}`;
@@ -229,22 +213,9 @@ async function requestValidation(
   return value;
 }
 
-function resolveModelTokenLimit(targetModel: ValidationModel): number {
-  return TOKEN_LIMITS_BY_MODEL[targetModel];
-}
-
 function issueMentionsInjection(issue: ValidationIssue): boolean {
   const text = `${issue.message} ${issue.suggestion ?? ''}`.toLowerCase();
   return INJECTION_TERMS.some((keyword) => text.includes(keyword));
-}
-
-function buildSecurityFlags(
-  parsed: ValidationResponse,
-  checkInjection: boolean
-): string[] {
-  return checkInjection && parsed.issues.some(issueMentionsInjection)
-    ? ['injection_detected']
-    : [];
 }
 
 function buildValidationResponse(
@@ -260,7 +231,10 @@ function buildValidationResponse(
     tokenLimit,
     provider
   );
-  const securityFlags = buildSecurityFlags(parsed, checkInjection);
+  const securityFlags =
+    checkInjection && parsed.issues.some(issueMentionsInjection)
+      ? ['injection_detected']
+      : [];
   const tokenUtilization = Math.round(
     (parsed.tokenEstimate / tokenLimit) * 100
   );
@@ -286,14 +260,14 @@ async function handleValidatePrompt(
   extra: RequestHandlerExtra<ServerRequest, ServerNotification>
 ): Promise<ReturnType<typeof createSuccessResponse> | ErrorResponse> {
   try {
-    const parsed = parseValidateInput(input);
+    const parsed = ValidatePromptInputSchema.parse(input);
     const validationPrompt = buildValidationPrompt(
       parsed.prompt,
       parsed.targetModel,
       parsed.checkInjection
     );
     const validation = await requestValidation(validationPrompt, extra.signal);
-    const tokenLimit = resolveModelTokenLimit(parsed.targetModel);
+    const tokenLimit = TOKEN_LIMITS_BY_MODEL[parsed.targetModel];
     const provider = await getProviderInfo();
 
     return buildValidationResponse(

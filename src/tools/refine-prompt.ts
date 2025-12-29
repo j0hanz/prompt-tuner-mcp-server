@@ -11,8 +11,12 @@ import type {
   OptimizationTechnique,
   TargetFormat,
 } from '../config/types.js';
-import { createErrorResponse, ErrorCode, McpError } from '../lib/errors.js';
-import type { createSuccessResponse } from '../lib/errors.js';
+import {
+  createErrorResponse,
+  createSuccessResponse,
+  ErrorCode,
+  McpError,
+} from '../lib/errors.js';
 import { getProviderInfo } from '../lib/llm-client.js';
 import { refineLLM } from '../lib/llm.js';
 import {
@@ -21,21 +25,19 @@ import {
   validateTechniqueOutput,
 } from '../lib/output-validation.js';
 import { resolveFormat } from '../lib/prompt-analysis/format.js';
+import {
+  asBulletList,
+  asCodeBlock,
+  buildOutput,
+  formatProviderLine,
+} from '../lib/tool-formatters.js';
 import { extractPromptFromInput } from '../lib/tool-helpers.js';
+import { buildPromptResourceBlock } from '../lib/tool-resources.js';
 import { validatePrompt } from '../lib/validation.js';
 import {
   RefinePromptInputSchema,
   RefinePromptOutputSchema,
 } from '../schemas/index.js';
-import {
-  buildCorrections,
-  buildRefineResponse,
-} from './refine-prompt/formatters.js';
-import type {
-  RefinementAttemptPlan,
-  RefinePromptInput,
-  ResolvedRefineInputs,
-} from './refine-prompt/types.js';
 
 const REFINE_PROMPT_TOOL = {
   title: 'Refine Prompt',
@@ -54,6 +56,96 @@ const TOOL_NAME = 'refine_prompt' as const;
 const STRICT_REFINEMENT_RULES =
   '\nSTRICT RULES: Return only the refined prompt text. Do not include headings, explanations, or code fences. Ensure the output follows the selected technique and target format.';
 
+interface RefinePromptInput {
+  prompt: string;
+  technique?: string;
+  targetFormat?: string;
+}
+
+interface ResolvedRefineInputs {
+  validatedPrompt: string;
+  validatedTechnique: OptimizationTechnique;
+  resolvedFormat: TargetFormat;
+}
+
+interface RefinementAttemptPlan {
+  technique: OptimizationTechnique;
+  extraInstructions?: string;
+  usedFallback: boolean;
+}
+
+interface ProviderInfo {
+  provider: string;
+  model: string;
+}
+
+function buildCorrections(original: string, refined: string): string[] {
+  if (refined === original) {
+    return ['No changes needed - prompt is already well-formed'];
+  }
+
+  const corrections = ['Applied LLM refinement'];
+  if (original.length !== refined.length) {
+    corrections.push(`Length: ${original.length} -> ${refined.length} chars`);
+  }
+  return corrections;
+}
+
+function buildRefineOutput(
+  refined: string,
+  corrections: string[],
+  input: ResolvedRefineInputs,
+  techniqueUsed: OptimizationTechnique,
+  provider: ProviderInfo
+): string {
+  const meta = [
+    formatProviderLine(provider),
+    `Technique: ${techniqueUsed}`,
+    `Target format: ${input.resolvedFormat}`,
+  ];
+
+  return buildOutput('Prompt Refinement', meta, [
+    { title: 'Refined Prompt', lines: asCodeBlock(refined) },
+    { title: 'Changes', lines: asBulletList(corrections) },
+  ]);
+}
+
+function buildRefineResponse(
+  refined: string,
+  corrections: string[],
+  input: ResolvedRefineInputs,
+  techniqueUsed: OptimizationTechnique,
+  usedFallback: boolean,
+  provider: ProviderInfo
+): ReturnType<typeof createSuccessResponse> {
+  const output = buildRefineOutput(
+    refined,
+    corrections,
+    input,
+    techniqueUsed,
+    provider
+  );
+  const promptResource = buildPromptResourceBlock(
+    refined,
+    `refined-prompt-${techniqueUsed}-${input.resolvedFormat}`
+  );
+  return createSuccessResponse(
+    output,
+    {
+      ok: true,
+      original: input.validatedPrompt,
+      refined,
+      corrections,
+      technique: techniqueUsed,
+      targetFormat: input.resolvedFormat,
+      usedFallback,
+      provider: provider.provider,
+      model: provider.model,
+    },
+    [promptResource]
+  );
+}
+
 function resolveInputs(input: RefinePromptInput): ResolvedRefineInputs {
   const parsed = RefinePromptInputSchema.parse(input);
   return {
@@ -61,6 +153,19 @@ function resolveInputs(input: RefinePromptInput): ResolvedRefineInputs {
     validatedTechnique: parsed.technique,
     resolvedFormat: resolveFormat(parsed.targetFormat, parsed.prompt),
   };
+}
+
+function validateRefinedOutput(
+  output: string,
+  technique: OptimizationTechnique,
+  targetFormat: TargetFormat
+): string | null {
+  const checks = [
+    validatePromptOutput(output),
+    validateScaffolding(output),
+    validateTechnique(output, technique, targetFormat),
+  ];
+  return checks.find((issue) => issue !== null) ?? null;
 }
 
 function validatePromptOutput(output: string): string | null {
@@ -87,19 +192,6 @@ function validateTechnique(
 ): string | null {
   const validation = validateTechniqueOutput(output, technique, targetFormat);
   return validation.ok ? null : (validation.reason ?? 'Validation failed');
-}
-
-function validateRefinedOutput(
-  output: string,
-  technique: OptimizationTechnique,
-  targetFormat: TargetFormat
-): string | null {
-  const checks = [
-    validatePromptOutput(output),
-    validateScaffolding(output),
-    validateTechnique(output, technique, targetFormat),
-  ];
-  return checks.find((issue) => issue !== null) ?? null;
 }
 
 function buildRefinementPlan(
