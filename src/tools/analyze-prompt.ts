@@ -28,7 +28,10 @@ import {
   buildOutput,
   formatProviderLine,
 } from '../lib/tool-formatters.js';
-import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
+import {
+  executeLLMWithJsonResponse,
+  extractPromptFromInput,
+} from '../lib/tool-helpers.js';
 import {
   AnalyzePromptInputSchema,
   AnalyzePromptOutputSchema,
@@ -286,7 +289,11 @@ async function handleAnalyzePrompt(
     await sendProgress(extra, 'completed', 100);
     return response;
   } catch (error) {
-    return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
+    return createErrorResponse(
+      error,
+      ErrorCode.E_LLM_FAILED,
+      extractPromptFromInput(input)
+    );
   }
 }
 

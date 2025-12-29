@@ -223,6 +223,33 @@ type AttemptOutcome =
   | { type: 'retry'; delayMs: number }
   | { type: 'fail'; error: McpError };
 
+async function waitForRetry(
+  delayMs: number,
+  signal: AbortSignal | undefined
+): Promise<void> {
+  try {
+    await setTimeout(delayMs, undefined, { signal });
+  } catch (error) {
+    if (signal?.aborted) {
+      throw new McpError(
+        ErrorCode.E_TIMEOUT,
+        'Request aborted during retry backoff'
+      );
+    }
+    throw error;
+  }
+}
+
+async function handleOutcome(
+  outcome: AttemptOutcome,
+  signal: AbortSignal | undefined
+): Promise<string | null> {
+  if (outcome.type === 'success') return outcome.content;
+  if (outcome.type === 'fail') throw outcome.error;
+  await waitForRetry(outcome.delayMs, signal);
+  return null;
+}
+
 async function attemptGeneration(
   provider: LLMProvider,
   requestFn: () => Promise<string>,
@@ -275,9 +302,8 @@ export async function runGeneration(
       attempt
     );
 
-    if (outcome.type === 'success') return outcome.content;
-    if (outcome.type === 'fail') throw outcome.error;
-    await setTimeout(outcome.delayMs, undefined, { signal });
+    const content = await handleOutcome(outcome, signal);
+    if (content !== null) return content;
   }
 
   throw new McpError(

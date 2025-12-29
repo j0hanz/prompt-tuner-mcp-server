@@ -9,6 +9,7 @@ import type { ErrorResponse, OptimizeResponse } from '../config/types.js';
 import { createErrorResponse, ErrorCode, McpError } from '../lib/errors.js';
 import { getProviderInfo } from '../lib/llm-client.js';
 import { normalizeScore } from '../lib/output-normalization.js';
+import { extractPromptFromInput } from '../lib/tool-helpers.js';
 import {
   OptimizePromptInputSchema,
   OptimizePromptOutputSchema,
@@ -147,7 +148,11 @@ async function handleOptimizePrompt(
       }
     );
   } catch (error) {
-    return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
+    return createErrorResponse(
+      error,
+      ErrorCode.E_LLM_FAILED,
+      extractPromptFromInput(input)
+    );
   }
 }
 

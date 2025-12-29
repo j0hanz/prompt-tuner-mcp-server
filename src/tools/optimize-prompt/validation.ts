@@ -8,6 +8,7 @@ import {
   normalizePromptText,
   validateTechniqueOutput,
 } from '../../lib/output-validation.js';
+import { validatePrompt } from '../../lib/validation.js';
 import { isConcreteTechnique } from './inputs.js';
 import type { ConcreteTechnique, OptimizeValidationConfig } from './types.js';
 
@@ -69,6 +70,29 @@ function validateTechniqueOutputs(
   return null;
 }
 
+function validateOptimizedText(normalized: OptimizeResponse): string | null {
+  try {
+    validatePrompt(normalized.optimized);
+  } catch (error) {
+    return error instanceof Error
+      ? error.message
+      : 'Optimized prompt is empty or invalid';
+  }
+
+  if (containsOutputScaffolding(normalized.optimized)) {
+    return 'Output contains optimization scaffolding';
+  }
+
+  return null;
+}
+
+function buildFailure(
+  normalized: OptimizeResponse,
+  reason: string
+): { ok: false; result: OptimizeResponse; reason: string } {
+  return { ok: false, result: normalized, reason };
+}
+
 export function validateOptimizeResult(
   result: OptimizeResponse,
   config: OptimizeValidationConfig
@@ -76,12 +100,9 @@ export function validateOptimizeResult(
   const normalizedResult = normalizeOptimizeResult(result);
   const allowedSet = new Set(config.allowedTechniques);
 
-  if (containsOutputScaffolding(normalizedResult.normalized.optimized)) {
-    return {
-      ok: false,
-      result: normalizedResult.normalized,
-      reason: 'Output contains optimization scaffolding',
-    };
+  const textIssue = validateOptimizedText(normalizedResult.normalized);
+  if (textIssue) {
+    return buildFailure(normalizedResult.normalized, textIssue);
   }
 
   const techniqueIssue = validateAppliedTechniques(
@@ -90,11 +111,7 @@ export function validateOptimizeResult(
     allowedSet
   );
   if (techniqueIssue) {
-    return {
-      ok: false,
-      result: normalizedResult.normalized,
-      reason: techniqueIssue,
-    };
+    return buildFailure(normalizedResult.normalized, techniqueIssue);
   }
 
   const outputIssue = validateTechniqueOutputs(
@@ -103,11 +120,7 @@ export function validateOptimizeResult(
     config.targetFormat
   );
   if (outputIssue) {
-    return {
-      ok: false,
-      result: normalizedResult.normalized,
-      reason: outputIssue,
-    };
+    return buildFailure(normalizedResult.normalized, outputIssue);
   }
 
   return { ok: true, result: normalizedResult.normalized };

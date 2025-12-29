@@ -19,12 +19,16 @@ import {
 } from '../lib/errors.js';
 import { getProviderInfo } from '../lib/llm-client.js';
 import { wrapPromptData } from '../lib/prompt-policy.js';
-import { executeLLMWithJsonResponse } from '../lib/tool-helpers.js';
+import {
+  executeLLMWithJsonResponse,
+  extractPromptFromInput,
+} from '../lib/tool-helpers.js';
 import {
   ValidatePromptInputSchema,
   ValidatePromptOutputSchema,
 } from '../schemas/index.js';
 import { ValidationResponseSchema } from '../schemas/llm-responses.js';
+import { TOKEN_LIMITS_BY_MODEL } from './validate-prompt/constants.js';
 import { formatValidationOutput } from './validate-prompt/formatters.js';
 import { VALIDATION_SYSTEM_PROMPT } from './validate-prompt/prompt.js';
 import type { ValidationModel } from './validate-prompt/types.js';
@@ -36,13 +40,6 @@ const INJECTION_TERMS = [
   'payload',
   'exploit',
 ];
-
-const TOKEN_LIMITS_BY_MODEL = {
-  claude: 200000,
-  gpt: 128000,
-  gemini: 1000000,
-  generic: 8000,
-} as const;
 
 const TOOL_NAME = 'validate_prompt' as const;
 
@@ -197,7 +194,11 @@ async function handleValidatePrompt(
       provider
     );
   } catch (error) {
-    return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
+    return createErrorResponse(
+      error,
+      ErrorCode.E_LLM_FAILED,
+      extractPromptFromInput(input)
+    );
   }
 }
 

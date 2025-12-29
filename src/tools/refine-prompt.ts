@@ -21,6 +21,8 @@ import {
   validateTechniqueOutput,
 } from '../lib/output-validation.js';
 import { resolveFormat } from '../lib/prompt-analysis.js';
+import { extractPromptFromInput } from '../lib/tool-helpers.js';
+import { validatePrompt } from '../lib/validation.js';
 import {
   RefinePromptInputSchema,
   RefinePromptOutputSchema,
@@ -94,6 +96,17 @@ function validateRefinedOutput(
   technique: OptimizationTechnique,
   targetFormat: TargetFormat
 ): { ok: boolean; reason?: string } {
+  try {
+    validatePrompt(output);
+  } catch (error) {
+    return {
+      ok: false,
+      reason:
+        error instanceof Error
+          ? error.message
+          : 'Refined prompt is empty or invalid',
+    };
+  }
   if (containsOutputScaffolding(output)) {
     return { ok: false, reason: 'Output contains scaffolding or formatting' };
   }
@@ -238,7 +251,11 @@ async function handleRefinePrompt(
       provider
     );
   } catch (error) {
-    return createErrorResponse(error, ErrorCode.E_LLM_FAILED, input.prompt);
+    return createErrorResponse(
+      error,
+      ErrorCode.E_LLM_FAILED,
+      extractPromptFromInput(input)
+    );
   }
 }
 

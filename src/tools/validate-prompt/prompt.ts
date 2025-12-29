@@ -1,4 +1,5 @@
 import { INPUT_HANDLING_SECTION } from '../../lib/prompt-policy.js';
+import { MODEL_LIMITS_LINE } from './constants.js';
 
 export const VALIDATION_SYSTEM_PROMPT = `<role>
 You are an expert prompt validator focused on quality and security.
@@ -22,7 +23,7 @@ ${INPUT_HANDLING_SECTION}
 </requirements>
 
 <model_limits>
-claude 200000 | gpt 128000 | gemini 1000000 | generic 8000
+${MODEL_LIMITS_LINE}
 </model_limits>
 
 <output_rules>

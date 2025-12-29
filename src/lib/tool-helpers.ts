@@ -17,6 +17,13 @@ export interface JsonResponseResult<T> {
   usedFallback: boolean;
 }
 
+export function extractPromptFromInput(input: unknown): string | undefined {
+  if (typeof input !== 'object' || input === null) return undefined;
+  if (!('prompt' in input)) return undefined;
+  const { prompt } = input as { prompt?: unknown };
+  return typeof prompt === 'string' ? prompt : undefined;
+}
+
 function resolveOptions(
   options?: LLMToolOptions
 ): Required<Omit<LLMToolOptions, 'signal'>> {
