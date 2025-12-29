@@ -4,7 +4,7 @@
 
 [![npm version](https://img.shields.io/npm/v/@j0hanz/prompt-tuner-mcp-server.svg)](https://www.npmjs.com/package/@j0hanz/prompt-tuner-mcp-server)
 [![License](https://img.shields.io/npm/l/@j0hanz/prompt-tuner-mcp-server)](LICENSE)
-[![Node.js Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)](https://nodejs.org/)
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen)](https://nodejs.org/)
 
 PromptTuner MCP is an MCP server that refines, analyzes, optimizes, and validates prompts using OpenAI, Anthropic, or Google Gemini.
 
@@ -14,7 +14,7 @@ PromptTuner MCP is an MCP server that refines, analyzes, optimizes, and validate
 2. Resolves the target format (`auto` uses heuristics; falls back to `gpt` if no format is detected).
 3. Calls the selected provider with retry and timeout controls.
 4. Validates and normalizes LLM output, falling back to stricter prompts or the `basic` technique when needed.
-5. Returns human-readable text plus machine-friendly `structuredContent` (and prompt files for refined/optimized outputs).
+5. Returns human-readable text plus machine-friendly `structuredContent` (and resource blocks for refined/optimized outputs).
 
 ## Features
 
@@ -27,7 +27,7 @@ PromptTuner MCP is an MCP server that refines, analyzes, optimizes, and validate
 
 ## Quick Start
 
-PromptTuner runs over stdio (MCP default). The `--http` flag shown in some scripts is reserved and currently has no effect.
+PromptTuner runs over stdio only. The `dev:http` and `start:http` scripts are compatibility aliases (no HTTP transport yet).
 
 ### Claude Desktop
 
@@ -95,11 +95,11 @@ Returns: `ok`, `hasTypos`, `isVague`, `missingContext`, `suggestions`, `score`, 
 
 Apply multiple techniques sequentially and return before/after scores.
 
-| Parameter      | Type     | Required | Default     | Notes                               |
-| -------------- | -------- | -------- | ----------- | ----------------------------------- |
-| `prompt`       | string   | Yes      | -           | Trimmed and length-checked.         |
-| `techniques`   | string[] | No       | `["basic"]` | 1-6 techniques; duplicates removed. |
-| `targetFormat` | string   | No       | `auto`      | `auto`, `claude`, `gpt`, `json`.    |
+| Parameter      | Type     | Required | Default     | Notes                                                                                                                           |
+| -------------- | -------- | -------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `prompt`       | string   | Yes      | -           | Trimmed and length-checked.                                                                                                     |
+| `techniques`   | string[] | No       | `["basic"]` | 1-6 techniques; duplicates removed. `comprehensive` expands to `basic -> roleBased -> structured -> fewShot -> chainOfThought`. |
+| `targetFormat` | string   | No       | `auto`      | `auto`, `claude`, `gpt`, `json`.                                                                                                |
 
 Returns: `ok`, `original`, `optimized`, `techniquesApplied`, `targetFormat`, `beforeScore`, `afterScore`, `scoreDelta`, `improvements`, `usedFallback`, `scoreAdjusted`, `overallSource`, `provider`, `model`.
 
@@ -119,10 +119,10 @@ Token limits used for `validate_prompt`: `claude` 200000, `gpt` 128000, `gemini`
 
 ## Response Format
 
-- `content`: human-readable Markdown summary.
+- `content`: array of content blocks (human-readable Markdown text plus optional resources).
 - `structuredContent`: machine-parseable results.
 - Errors return `structuredContent.ok=false` and an `error` object with `code`, `message`, optional `context` (sanitized, up to 200 chars), `details`, and `recoveryHint`.
-- `refine_prompt` and `optimize_prompt` include a `resource` content block with a `file:///` URI containing the refined or optimized prompt.
+- `refine_prompt` and `optimize_prompt` include a `resource` content block with a `file:///` URI and the prompt text in `resource.text` (Markdown).
 
 ## Prompts
 
@@ -159,27 +159,27 @@ Token limits used for `validate_prompt`: `claude` 200000, `gpt` 128000, `gemini`
 
 ### Prerequisites
 
-- Node.js >= 20.0.0
+- Node.js >= 22.0.0
 - npm
 
 ### Scripts
 
-| Command                  | Description                                              |
-| ------------------------ | -------------------------------------------------------- |
-| `npm run build`          | Compile TypeScript and set permissions.                  |
-| `npm run dev`            | Run from source in watch mode.                           |
-| `npm run dev:http`       | Run from source with `--http` (reserved, no effect).     |
-| `npm run start`          | Run the compiled server from `dist/`.                    |
-| `npm run start:http`     | Run compiled server with `--http` (reserved, no effect). |
-| `npm run test`           | Run Vitest once.                                         |
-| `npm run test:coverage`  | Run tests with coverage.                                 |
-| `npm run test:watch`     | Run Vitest in watch mode.                                |
-| `npm run lint`           | Run ESLint.                                              |
-| `npm run format`         | Run Prettier.                                            |
-| `npm run type-check`     | TypeScript type checking.                                |
-| `npm run inspector`      | Run MCP Inspector against `dist/index.js`.               |
-| `npm run inspector:http` | Inspector with `--http` (reserved, no effect).           |
-| `npm run duplication`    | Run jscpd duplication report.                            |
+| Command                  | Description                                           |
+| ------------------------ | ----------------------------------------------------- |
+| `npm run build`          | Compile TypeScript and set permissions.               |
+| `npm run dev`            | Run from source in watch mode.                        |
+| `npm run dev:http`       | Alias of `npm run dev` (no HTTP transport yet).       |
+| `npm run start`          | Run the compiled server from `dist/`.                 |
+| `npm run start:http`     | Alias of `npm run start` (no HTTP transport yet).     |
+| `npm run test`           | Run Vitest once.                                      |
+| `npm run test:coverage`  | Run tests with coverage.                              |
+| `npm run test:watch`     | Run Vitest in watch mode.                             |
+| `npm run lint`           | Run ESLint.                                           |
+| `npm run format`         | Run Prettier.                                         |
+| `npm run type-check`     | TypeScript type checking.                             |
+| `npm run inspector`      | Run MCP Inspector against `dist/index.js`.            |
+| `npm run inspector:http` | Alias of `npm run inspector` (no HTTP transport yet). |
+| `npm run duplication`    | Run jscpd duplication report.                         |
 
 ## Project Structure
 
@@ -190,8 +190,7 @@ src/
   config/         Configuration and constants
   lib/            Shared utilities (LLM, retry, validation)
   tools/          Tool implementations
-  prompts/        Prompt templates
-  resources/      Resource registration (currently none)
+  prompts/        MCP prompt templates
   schemas/        Zod input/output schemas
   types/          Shared types
 

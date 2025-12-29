@@ -1,6 +1,6 @@
 # PromptTuner MCP Configuration Guide
 
-PromptTuner MCP is configured entirely via environment variables. Set them in your MCP client configuration (for example `mcp.json`, `claude_desktop_config.json`) or a `.env` file.
+PromptTuner MCP is configured entirely via environment variables. Set them in your MCP client configuration (for example `mcp.json`, `claude_desktop_config.json`) or a `.env` file. Node.js >= 22.0.0 is required (see `package.json` engines).
 
 ## Required configuration
 
@@ -33,6 +33,10 @@ Set `LLM_MODEL` to override the default model for the chosen provider.
 | `LLM_MAX_TOKENS`    | `8000`  | Upper bound for model output tokens. |
 | `LLM_TIMEOUT_MS`    | `60000` | Per-request timeout (ms).            |
 
+All numeric values are parsed as integers. Invalid values or values below the minimum thresholds will fail startup validation.
+
+Minimums: `MAX_PROMPT_LENGTH` >= 1, `LLM_MAX_TOKENS` >= 1, `LLM_TIMEOUT_MS` >= 1000.
+
 ### Prompt length enforcement
 
 - Input is trimmed before validation.
@@ -61,13 +65,15 @@ Tool max tokens are derived from `LLM_MAX_TOKENS`:
 
 Retries use exponential backoff with jitter and stop when the total timeout is exceeded.
 
+Minimums: `RETRY_MAX_ATTEMPTS` >= 0, `RETRY_BASE_DELAY_MS` >= 100, `RETRY_MAX_DELAY_MS` >= 1000, `RETRY_TOTAL_TIMEOUT_MS` >= 10000.
+
 ## Logging and error context (optional)
 
-| Variable                | Default | Description                                                    |
-| ----------------------- | ------- | -------------------------------------------------------------- |
-| `DEBUG`                 | `false` | Enables debug logging. Logs are written to stderr.             |
-| `LOG_FORMAT`            | `text`  | Parsed but currently unused (logging output is JSON via pino). |
-| `INCLUDE_ERROR_CONTEXT` | `false` | Adds a sanitized prompt snippet (up to 200 chars) to errors.   |
+| Variable                | Default | Description                                                                              |
+| ----------------------- | ------- | ---------------------------------------------------------------------------------------- |
+| `DEBUG`                 | `false` | Enables debug logging (set to the string `true` or `false`). Logs are written to stderr. |
+| `LOG_FORMAT`            | `text`  | Accepted values: `json`, `text`. Currently ignored; output is always JSON via pino.      |
+| `INCLUDE_ERROR_CONTEXT` | `false` | Adds a sanitized prompt snippet (up to 200 chars) to errors.                             |
 
 ## Provider-specific settings
 
@@ -179,7 +185,7 @@ The following behaviors are hardcoded for stability:
 
 If you have an old `.env` file, remove unused settings:
 
-- `PORT`, `HOST`, `CORS_ORIGIN` (stdio transport only; `--http` is reserved).
+- `PORT`, `HOST`, `CORS_ORIGIN` (stdio transport only; no HTTP listener).
 - `API_KEY` (no server-level auth).
 - `LOG_LEVEL` (use `DEBUG=true` or false).
 - `RATE_LIMIT`, `RATE_WINDOW_MS` (no server-side rate limiting).
@@ -192,7 +198,7 @@ If you have an old `.env` file, remove unused settings:
 
 ### Prompt rejected
 
-- Reduce `MAX_PROMPT_LENGTH` or trim the input to remove excessive whitespace.
+- Shorten the prompt, remove excessive whitespace, or increase `MAX_PROMPT_LENGTH`.
 
 ### Timeout errors
 
@@ -215,4 +221,4 @@ If you have an old `.env` file, remove unused settings:
 2. Use input variables for secrets (for example `"OPENAI_API_KEY": "${input:openai-api-key}"`).
 3. Start with defaults and tune only when needed.
 4. Enable `DEBUG=true` temporarily for troubleshooting.
-5. Prefer JSON logging in production (current output is JSON via pino).
+5. Logs are JSON via pino; plan parsing/collection accordingly.
