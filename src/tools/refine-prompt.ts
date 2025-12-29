@@ -20,7 +20,7 @@ import {
   normalizePromptText,
   validateTechniqueOutput,
 } from '../lib/output-validation.js';
-import { resolveFormat } from '../lib/prompt-analysis.js';
+import { resolveFormat } from '../lib/prompt-analysis/format.js';
 import { extractPromptFromInput } from '../lib/tool-helpers.js';
 import { validatePrompt } from '../lib/validation.js';
 import {
@@ -54,98 +54,52 @@ const TOOL_NAME = 'refine_prompt' as const;
 const STRICT_REFINEMENT_RULES =
   '\nSTRICT RULES: Return only the refined prompt text. Do not include headings, explanations, or code fences. Ensure the output follows the selected technique and target format.';
 
-function parseRefineInput(input: RefinePromptInput): {
-  prompt: string;
-  technique: OptimizationTechnique;
-  targetFormat: TargetFormat;
-} {
-  return RefinePromptInputSchema.parse(input);
-}
-
 function resolveInputs(input: RefinePromptInput): ResolvedRefineInputs {
-  const parsed = parseRefineInput(input);
-  const resolvedFormat = resolveFormat(parsed.targetFormat, parsed.prompt);
+  const parsed = RefinePromptInputSchema.parse(input);
   return {
     validatedPrompt: parsed.prompt,
     validatedTechnique: parsed.technique,
-    resolvedFormat,
+    resolvedFormat: resolveFormat(parsed.targetFormat, parsed.prompt),
   };
 }
 
-function buildRefinementRequester(
-  input: ResolvedRefineInputs,
-  signal: AbortSignal
-): (technique: OptimizationTechnique, extra?: string) => Promise<string> {
-  return async (
-    technique: OptimizationTechnique,
-    extraInstructions?: string
-  ): Promise<string> =>
-    refineLLM(
-      input.validatedPrompt,
-      technique,
-      input.resolvedFormat,
-      REFINE_MAX_TOKENS,
-      LLM_TIMEOUT_MS,
-      signal,
-      extraInstructions
-    );
+function validatePromptOutput(output: string): string | null {
+  try {
+    validatePrompt(output);
+    return null;
+  } catch (error) {
+    return error instanceof Error
+      ? error.message
+      : 'Refined prompt is empty or invalid';
+  }
+}
+
+function validateScaffolding(output: string): string | null {
+  return containsOutputScaffolding(output)
+    ? 'Output contains scaffolding or formatting'
+    : null;
+}
+
+function validateTechnique(
+  output: string,
+  technique: OptimizationTechnique,
+  targetFormat: TargetFormat
+): string | null {
+  const validation = validateTechniqueOutput(output, technique, targetFormat);
+  return validation.ok ? null : (validation.reason ?? 'Validation failed');
 }
 
 function validateRefinedOutput(
   output: string,
   technique: OptimizationTechnique,
   targetFormat: TargetFormat
-): { ok: boolean; reason?: string } {
-  try {
-    validatePrompt(output);
-  } catch (error) {
-    return {
-      ok: false,
-      reason:
-        error instanceof Error
-          ? error.message
-          : 'Refined prompt is empty or invalid',
-    };
-  }
-  if (containsOutputScaffolding(output)) {
-    return { ok: false, reason: 'Output contains scaffolding or formatting' };
-  }
-  const validation = validateTechniqueOutput(output, technique, targetFormat);
-  return validation.ok
-    ? { ok: true }
-    : { ok: false, reason: validation.reason };
-}
-
-async function runRefinementAttempt(
-  request: (
-    technique: OptimizationTechnique,
-    extra?: string
-  ) => Promise<string>,
-  technique: OptimizationTechnique,
-  targetFormat: TargetFormat,
-  extraInstructions?: string
-): Promise<{ refined: string; validation: { ok: boolean; reason?: string } }> {
-  const refined = await request(technique, extraInstructions);
-  const { normalized } = normalizePromptText(refined);
-  return {
-    refined: normalized,
-    validation: validateRefinedOutput(normalized, technique, targetFormat),
-  };
-}
-
-function buildRefinementResult(
-  input: ResolvedRefineInputs,
-  refined: string,
-  techniqueUsed: OptimizationTechnique,
-  usedFallback: boolean
-): {
-  refined: string;
-  corrections: string[];
-  techniqueUsed: OptimizationTechnique;
-  usedFallback: boolean;
-} {
-  const corrections = buildCorrections(input.validatedPrompt, refined);
-  return { refined, corrections, techniqueUsed, usedFallback };
+): string | null {
+  const checks = [
+    validatePromptOutput(output),
+    validateScaffolding(output),
+    validateTechnique(output, technique, targetFormat),
+  ];
+  return checks.find((issue) => issue !== null) ?? null;
 }
 
 function buildRefinementPlan(
@@ -171,41 +125,39 @@ function buildRefinementPlan(
   return plan;
 }
 
-async function executeRefinementPlan(
-  plan: RefinementAttemptPlan[],
-  request: (
-    technique: OptimizationTechnique,
-    extra?: string
-  ) => Promise<string>,
-  targetFormat: TargetFormat
+async function runRefinementAttempt(
+  input: ResolvedRefineInputs,
+  attempt: RefinementAttemptPlan,
+  signal: AbortSignal
 ): Promise<{
   refined: string;
+  reason: string | null;
   techniqueUsed: OptimizationTechnique;
   usedFallback: boolean;
 }> {
-  let lastReason: string | undefined;
-
-  for (const attempt of plan) {
-    const result = await runRefinementAttempt(
-      request,
-      attempt.technique,
-      targetFormat,
-      attempt.extraInstructions
-    );
-    if (result.validation.ok) {
-      return {
-        refined: result.refined,
-        techniqueUsed: attempt.technique,
-        usedFallback: attempt.usedFallback,
-      };
-    }
-    lastReason = result.validation.reason;
-  }
-
-  throw new McpError(
-    ErrorCode.E_LLM_FAILED,
-    `Refined prompt failed validation${lastReason ? `: ${lastReason}` : ''}`
+  const refinedRaw = await refineLLM(
+    input.validatedPrompt,
+    attempt.technique,
+    input.resolvedFormat,
+    REFINE_MAX_TOKENS,
+    LLM_TIMEOUT_MS,
+    signal,
+    attempt.extraInstructions
   );
+
+  const { normalized } = normalizePromptText(refinedRaw);
+  const reason = validateRefinedOutput(
+    normalized,
+    attempt.technique,
+    input.resolvedFormat
+  );
+
+  return {
+    refined: normalized,
+    reason,
+    techniqueUsed: attempt.technique,
+    usedFallback: attempt.usedFallback,
+  };
 }
 
 async function refineWithLLM(
@@ -217,19 +169,31 @@ async function refineWithLLM(
   techniqueUsed: OptimizationTechnique;
   usedFallback: boolean;
 }> {
-  const request = buildRefinementRequester(input, signal);
   const plan = buildRefinementPlan(input.validatedTechnique);
-  const resolved = await executeRefinementPlan(
-    plan,
-    request,
-    input.resolvedFormat
-  );
+  let lastReason: string | null = null;
 
-  return buildRefinementResult(
-    input,
-    resolved.refined,
-    resolved.techniqueUsed,
-    resolved.usedFallback
+  for (const attempt of plan) {
+    const result = await runRefinementAttempt(input, attempt, signal);
+
+    if (!result.reason) {
+      const corrections = buildCorrections(
+        input.validatedPrompt,
+        result.refined
+      );
+      return {
+        refined: result.refined,
+        corrections,
+        techniqueUsed: result.techniqueUsed,
+        usedFallback: result.usedFallback,
+      };
+    }
+
+    lastReason = result.reason;
+  }
+
+  throw new McpError(
+    ErrorCode.E_LLM_FAILED,
+    `Refined prompt failed validation${lastReason ? `: ${lastReason}` : ''}`
   );
 }
 

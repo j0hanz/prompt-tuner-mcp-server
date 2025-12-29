@@ -1,59 +1,25 @@
 #!/usr/bin/env node
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+
 import { logger } from './lib/errors.js';
-import { createServer, startServer, validateApiKeys } from './server.js';
+import { startServer, validateApiKeys } from './server.js';
 
 const SHUTDOWN_DELAY_MS = 500;
-const SIGNALS: NodeJS.Signals[] = [
-  'SIGHUP',
-  'SIGINT',
-  'SIGQUIT',
-  'SIGILL',
-  'SIGTRAP',
-  'SIGABRT',
-  'SIGBUS',
-  'SIGFPE',
-  'SIGSEGV',
-  'SIGUSR2',
-  'SIGTERM',
-];
-const ERROR_EVENTS = ['uncaughtException', 'unhandledRejection'] as const;
-const EXIT_EVENTS = ['beforeExit'] as const;
-type ExitEvent = (typeof EXIT_EVENTS)[number] | 'stdin_end' | 'stdin_close';
-interface ShutdownReason {
-  signal?: NodeJS.Signals;
-  err?: unknown;
-  event?: ExitEvent;
-}
+const SIGNALS = ['SIGHUP', 'SIGINT', 'SIGTERM'] as const;
 
+let server: McpServer | null = null;
 let shuttingDown = false;
-let server: ReturnType<typeof createServer> | null = null;
 
-function logSecondShutdown(reason: ShutdownReason): void {
-  if (reason.signal) {
-    logger.error({ signal: reason.signal }, `Second ${reason.signal}, exiting`);
-    return;
-  }
-  if (reason.err) {
-    logger.error({ err: reason.err }, 'Second error, exiting');
-    return;
-  }
-  logger.error('Second shutdown event, exiting');
+function logSecondShutdown(reason: string): void {
+  logger.error({ reason }, 'Second shutdown, exiting');
 }
 
-function logShutdownStart(reason: ShutdownReason): void {
-  if (reason.err) {
-    logger.error({ err: reason.err }, 'Server closing due to error');
+function logShutdown(reason: string, err?: unknown): void {
+  if (err) {
+    logger.error({ err, reason }, 'Server shutting down due to error');
+    return;
   }
-  if (reason.signal) {
-    logger.info({ signal: reason.signal }, 'Server shutting down gracefully');
-  }
-  if (reason.event) {
-    logger.info({ event: reason.event }, 'Server shutting down gracefully');
-  }
-}
-
-function resolveExitCode(reason: ShutdownReason): number {
-  return reason.err ? 1 : 0;
+  logger.info({ reason }, 'Server shutting down');
 }
 
 function startForcedShutdownTimer(): NodeJS.Timeout {
@@ -66,13 +32,23 @@ function startForcedShutdownTimer(): NodeJS.Timeout {
   }, SHUTDOWN_DELAY_MS);
 }
 
-async function closeServerIfConnected(): Promise<void> {
-  if (server?.isConnected()) {
+function resolveExitCode(err?: unknown): number {
+  return err ? 1 : 0;
+}
+
+async function closeServer(exitCode: number): Promise<number> {
+  if (!server?.isConnected()) return exitCode;
+
+  try {
     await server.close();
+    return exitCode;
+  } catch (closeError) {
+    logger.error({ err: closeError }, 'Error during shutdown');
+    return 1;
   }
 }
 
-async function beginShutdown(reason: ShutdownReason): Promise<void> {
+async function shutdown(reason: string, err?: unknown): Promise<void> {
   if (shuttingDown) {
     logSecondShutdown(reason);
     process.exit(1);
@@ -80,50 +56,33 @@ async function beginShutdown(reason: ShutdownReason): Promise<void> {
   }
 
   shuttingDown = true;
-  logShutdownStart(reason);
+  logShutdown(reason, err);
 
-  let exitCode = resolveExitCode(reason);
   const timeout = startForcedShutdownTimer();
+  const exitCode = await closeServer(resolveExitCode(err));
 
-  try {
-    await closeServerIfConnected();
-  } catch (error) {
-    exitCode = 1;
-    logger.error({ err: error }, 'Error during shutdown');
-  } finally {
-    clearTimeout(timeout);
-    process.exit(exitCode);
-  }
+  clearTimeout(timeout);
+  process.exit(exitCode);
 }
 
 for (const signal of SIGNALS) {
-  process.once(signal, (received) => {
-    void beginShutdown({ signal: received });
+  process.once(signal, () => {
+    void shutdown(signal);
   });
 }
-for (const event of ERROR_EVENTS) {
-  process.once(event, (err) => {
-    void beginShutdown({ err });
-  });
-}
-for (const event of EXIT_EVENTS) {
-  process.once(event, () => {
-    void beginShutdown({ event });
-  });
-}
-process.stdin.once('end', () => {
-  void beginShutdown({ event: 'stdin_end' });
+
+process.once('uncaughtException', (err) => {
+  void shutdown('uncaughtException', err);
 });
-process.stdin.once('close', () => {
-  void beginShutdown({ event: 'stdin_close' });
+process.once('unhandledRejection', (err) => {
+  void shutdown('unhandledRejection', err);
 });
 
 async function main(): Promise<void> {
   await validateApiKeys();
-  server = createServer();
-  await startServer(server);
+  server = await startServer();
 }
 
-main().catch((error: unknown) => {
-  void beginShutdown({ err: error });
+main().catch((err: unknown) => {
+  void shutdown('startup', err);
 });

@@ -3,7 +3,10 @@ import type {
   AnalysisCharacteristics,
   OptimizeScore,
 } from '../config/types.js';
-import { buildPatternCache, detectTargetFormat } from './prompt-analysis.js';
+import {
+  buildPatternCache,
+  detectTargetFormat,
+} from './prompt-analysis/format.js';
 
 const SCORE_KEYS = [
   'clarity',
@@ -27,17 +30,7 @@ function clampScore(value: number): number {
 
 function countWords(text: string): number {
   const trimmed = text.trim();
-  if (!trimmed) return 0;
-  let count = 0;
-  const pattern = /\S+/g;
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(trimmed)) !== null) {
-    count += 1;
-    if (match[0] === '') {
-      pattern.lastIndex += 1;
-    }
-  }
-  return count;
+  return trimmed ? trimmed.split(/\s+/).length : 0;
 }
 
 export function normalizeScore(score: OptimizeScore): {
@@ -69,26 +62,18 @@ export function mergeCharacteristics(
 ): AnalysisCharacteristics {
   const patternCache = buildPatternCache(prompt);
   const derivedFormat = detectTargetFormat(prompt, patternCache).format;
-  const derivedWordCount = countWords(prompt);
-  const derivedHasRole = patternCache.hasRole;
-  const derivedHasExamples = patternCache.hasExamples;
-  const derivedHasStructure =
-    patternCache.hasXmlStructure ||
-    patternCache.hasMarkdownStructure ||
-    patternCache.hasJsonStructure;
-  const derivedHasStepByStep = patternCache.hasStepByStep;
-  const derivedIsVague = base.isVague || patternCache.isVague;
 
-  const characteristics: AnalysisCharacteristics = {
+  return {
     ...base,
     detectedFormat: derivedFormat,
-    wordCount: derivedWordCount,
-    hasRoleContext: derivedHasRole,
-    hasExamples: derivedHasExamples,
-    hasStructure: derivedHasStructure,
-    hasStepByStep: derivedHasStepByStep,
-    isVague: derivedIsVague,
+    wordCount: countWords(prompt),
+    hasRoleContext: patternCache.hasRole,
+    hasExamples: patternCache.hasExamples,
+    hasStructure:
+      patternCache.hasXmlStructure ||
+      patternCache.hasMarkdownStructure ||
+      patternCache.hasJsonStructure,
+    hasStepByStep: patternCache.hasStepByStep,
+    isVague: base.isVague || patternCache.isVague,
   };
-
-  return characteristics;
 }

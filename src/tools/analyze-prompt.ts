@@ -38,6 +38,8 @@ import {
 } from '../schemas/index.js';
 import { AnalysisResponseSchema } from '../schemas/llm-responses.js';
 
+const TOOL_NAME = 'analyze_prompt' as const;
+
 const ANALYSIS_SYSTEM_PROMPT = `<role>
 You are an expert prompt analyst.
 </role>
@@ -86,12 +88,6 @@ Return JSON only. No markdown, code fences, or extra text.
   "suggestions": string[]
 }
 </schema>`;
-
-const TOOL_NAME = 'analyze_prompt' as const;
-
-interface AnalyzePromptInput {
-  prompt: string;
-}
 
 const ANALYZE_PROMPT_TOOL = {
   title: 'Analyze Prompt',
@@ -159,30 +155,6 @@ function formatAnalysisOutput(
   );
 }
 
-function parseAnalyzeInput(input: AnalyzePromptInput): AnalyzePromptInput {
-  return AnalyzePromptInputSchema.parse(input);
-}
-
-function normalizeAnalysisResult(
-  result: AnalysisResponse,
-  prompt: string
-): {
-  analysisResult: AnalysisResponse;
-  scoreAdjusted: boolean;
-  overallSource: string;
-} {
-  const normalizedScore = normalizeScore(result.score);
-  const characteristics = mergeCharacteristics(prompt, result.characteristics);
-  const analysisResult: AnalysisResponse = {
-    ...result,
-    score: normalizedScore.score,
-    characteristics,
-  };
-  const scoreAdjusted = normalizedScore.adjusted;
-  const overallSource = scoreAdjusted ? 'server' : 'llm';
-  return { analysisResult, scoreAdjusted, overallSource };
-}
-
 async function sendProgress(
   context: RequestHandlerExtra<ServerRequest, ServerNotification>,
   message: string,
@@ -216,6 +188,10 @@ function buildAnalysisPrompt(prompt: string): string {
   )}\n</prompt_to_analyze>`;
 }
 
+function parseAnalyzeInput(input: { prompt: string }): { prompt: string } {
+  return AnalyzePromptInputSchema.parse(input);
+}
+
 async function runAnalysis(
   analysisPrompt: string,
   signal?: AbortSignal
@@ -223,7 +199,7 @@ async function runAnalysis(
   const { value, usedFallback } =
     await executeLLMWithJsonResponse<AnalysisResponse>(
       analysisPrompt,
-      (value) => AnalysisResponseSchema.parse(value),
+      (response) => AnalysisResponseSchema.parse(response),
       ErrorCode.E_LLM_FAILED,
       TOOL_NAME,
       {
@@ -234,6 +210,26 @@ async function runAnalysis(
       }
     );
   return { result: value, usedFallback };
+}
+
+function normalizeAnalysisResult(
+  result: AnalysisResponse,
+  prompt: string
+): {
+  analysisResult: AnalysisResponse;
+  scoreAdjusted: boolean;
+  overallSource: string;
+} {
+  const normalizedScore = normalizeScore(result.score);
+  const characteristics = mergeCharacteristics(prompt, result.characteristics);
+  const analysisResult: AnalysisResponse = {
+    ...result,
+    score: normalizedScore.score,
+    characteristics,
+  };
+  const scoreAdjusted = normalizedScore.adjusted;
+  const overallSource = scoreAdjusted ? 'server' : 'llm';
+  return { analysisResult, scoreAdjusted, overallSource };
 }
 
 function buildAnalysisResponse(
@@ -259,7 +255,7 @@ function buildAnalysisResponse(
 }
 
 async function handleAnalyzePrompt(
-  input: AnalyzePromptInput,
+  input: { prompt: string },
   extra: RequestHandlerExtra<ServerRequest, ServerNotification>
 ): Promise<ReturnType<typeof createSuccessResponse> | ErrorResponse> {
   try {
@@ -276,6 +272,7 @@ async function handleAnalyzePrompt(
       extra.signal
     );
     const normalized = normalizeAnalysisResult(result, parsed.prompt);
+
     const provider = await getProviderInfo();
     const response = buildAnalysisResponse(
       normalized.analysisResult,
@@ -286,7 +283,9 @@ async function handleAnalyzePrompt(
         overallSource: normalized.overallSource,
       }
     );
+
     await sendProgress(extra, 'completed', 100);
+
     return response;
   } catch (error) {
     return createErrorResponse(
