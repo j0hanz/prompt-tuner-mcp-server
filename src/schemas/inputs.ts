@@ -7,7 +7,7 @@ const promptSchema = z
   .string()
   .max(
     MAX_PROMPT_LENGTH * 2,
-    `Prompt with excessive whitespace rejected (max ${MAX_PROMPT_LENGTH * 2} characters).`
+    `Prompt rejected: raw input exceeds ${MAX_PROMPT_LENGTH * 2} characters (including whitespace). Trim or shorten your prompt.`
   )
   .superRefine((value, ctx) => {
     const trimmed = value.trim();
@@ -29,7 +29,7 @@ const promptSchema = z
         maximum: MAX_PROMPT_LENGTH,
         type: 'string',
         inclusive: true,
-        message: `Prompt exceeds maximum length of ${MAX_PROMPT_LENGTH} characters (${trimmed.length} provided). Please shorten your prompt.`,
+        message: `Prompt exceeds maximum length after trimming: ${trimmed.length} characters (limit: ${MAX_PROMPT_LENGTH}). Please shorten your prompt.`,
       });
     }
   })

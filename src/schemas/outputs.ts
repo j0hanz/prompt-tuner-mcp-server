@@ -110,6 +110,7 @@ export const RefinePromptOutputSchema = z
     ...FallbackFields,
     ...ProviderModelErrorFields,
   })
+  .strict()
   .describe('Refine prompt response');
 
 export const AnalyzePromptOutputSchema = z
@@ -130,6 +131,7 @@ export const AnalyzePromptOutputSchema = z
     ...ScoreAdjustmentFields,
     ...ProviderModelErrorFields,
   })
+  .strict()
   .describe('Analyze prompt response');
 
 export const OptimizePromptOutputSchema = z
@@ -156,6 +158,7 @@ export const OptimizePromptOutputSchema = z
     ...ScoreAdjustmentFields,
     ...ProviderModelErrorFields,
   })
+  .strict()
   .describe('Optimize prompt response');
 
 export const ValidatePromptOutputSchema = z
@@ -183,4 +186,5 @@ export const ValidatePromptOutputSchema = z
     securityFlags: z.array(z.string()).optional().describe('Security flags'),
     ...ProviderModelErrorFields,
   })
+  .strict()
   .describe('Validate prompt response');
