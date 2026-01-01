@@ -74,6 +74,20 @@ const ERROR_CODE_PATTERNS = {
   authFailed: ['invalid_api_key', 'authentication_error'],
 } as const;
 
+type RateLimitedCode = (typeof ERROR_CODE_PATTERNS.rateLimited)[number];
+type AuthFailedCode = (typeof ERROR_CODE_PATTERNS.authFailed)[number];
+
+const RATE_LIMITED_CODES = new Set<string>(ERROR_CODE_PATTERNS.rateLimited);
+const AUTH_FAILED_CODES = new Set<string>(ERROR_CODE_PATTERNS.authFailed);
+
+function isRateLimitedCode(value: string): value is RateLimitedCode {
+  return RATE_LIMITED_CODES.has(value);
+}
+
+function isAuthFailedCode(value: string): value is AuthFailedCode {
+  return AUTH_FAILED_CODES.has(value);
+}
+
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 const NON_RETRYABLE_CODES = new Set<ErrorCodeType>([
   ErrorCode.E_LLM_AUTH_FAILED,
@@ -127,7 +141,7 @@ function classifyByErrorCode(
 ): McpError | null {
   if (!code) return null;
 
-  if (ERROR_CODE_PATTERNS.rateLimited.includes(code as never)) {
+  if (isRateLimitedCode(code)) {
     const recoveryHint =
       code === 'insufficient_quota'
         ? 'Insufficient quota: check account billing'
@@ -142,7 +156,7 @@ function classifyByErrorCode(
     );
   }
 
-  if (ERROR_CODE_PATTERNS.authFailed.includes(code as never)) {
+  if (isAuthFailedCode(code)) {
     return new McpError(
       ErrorCode.E_LLM_AUTH_FAILED,
       `Authentication failed for ${provider}: ${code}`,

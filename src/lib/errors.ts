@@ -61,7 +61,7 @@ export class McpError extends Error {
 export function createSuccessResponse<T extends Record<string, unknown>>(
   text: string,
   structured: T,
-  extraContent: ContentBlock[] = []
+  extraContent: readonly ContentBlock[] = []
 ): SuccessResponse<T> {
   const structuredBlock: ContentBlock = {
     type: 'text',

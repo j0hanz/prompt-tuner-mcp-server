@@ -1,42 +1,42 @@
 interface ResourceTextPayload {
-  uri: string;
-  text: string;
-  mimeType?: string;
+  readonly uri: string;
+  readonly text: string;
+  readonly mimeType?: string;
 }
 
 export type ContentBlock =
-  | { type: 'text'; text: string }
+  | { readonly type: 'text'; readonly text: string }
   | {
-      type: 'resource';
-      resource: ResourceTextPayload;
+      readonly type: 'resource';
+      readonly resource: ResourceTextPayload;
     };
 
 export interface ErrorResponse {
   [key: string]: unknown;
-  content: ContentBlock[];
-  structuredContent: {
-    ok: false;
-    error: {
-      code: string;
-      message: string;
-      context?: string;
-      details?: Record<string, unknown>;
-      recoveryHint?: string;
+  readonly content: ContentBlock[];
+  readonly structuredContent: {
+    readonly ok: false;
+    readonly error: {
+      readonly code: string;
+      readonly message: string;
+      readonly context?: string;
+      readonly details?: Record<string, unknown>;
+      readonly recoveryHint?: string;
     };
   };
-  isError: true;
+  readonly isError: true;
 }
 
 export interface SuccessResponse<T extends Record<string, unknown>> {
   [key: string]: unknown;
-  content: ContentBlock[];
-  structuredContent: T;
+  readonly content: ContentBlock[];
+  readonly structuredContent: T;
 }
 
 export interface TechniqueTemplate {
-  name: OptimizationTechnique;
-  description: string;
-  systemPrompt: string;
+  readonly name: OptimizationTechnique;
+  readonly description: string;
+  readonly systemPrompt: string;
 }
 
 export const OPTIMIZATION_TECHNIQUES = [
@@ -60,56 +60,62 @@ export const TARGET_FORMATS = [
 export type TargetFormat = (typeof TARGET_FORMATS)[number];
 
 export interface PatternCache {
-  hasClaudePatterns: boolean;
-  hasXmlStructure: boolean;
-  hasMarkdownStructure: boolean;
-  hasGptPatterns: boolean;
-  hasJsonStructure: boolean;
-  hasBoldOrHeaders: boolean;
-  hasAngleBrackets: boolean;
-  hasJsonChars: boolean;
-  hasRole: boolean;
-  hasExamples: boolean;
-  hasStepByStep: boolean;
-  isVague: boolean;
+  readonly hasClaudePatterns: boolean;
+  readonly hasXmlStructure: boolean;
+  readonly hasMarkdownStructure: boolean;
+  readonly hasGptPatterns: boolean;
+  readonly hasJsonStructure: boolean;
+  readonly hasBoldOrHeaders: boolean;
+  readonly hasAngleBrackets: boolean;
+  readonly hasJsonChars: boolean;
+  readonly hasRole: boolean;
+  readonly hasExamples: boolean;
+  readonly hasStepByStep: boolean;
+  readonly isVague: boolean;
 }
 
 export interface FormatScoringConfig {
-  positive: { key: keyof PatternCache; weight: number }[];
-  negative: { key: keyof PatternCache; weight: number }[];
+  readonly positive: readonly {
+    readonly key: keyof PatternCache;
+    readonly weight: number;
+  }[];
+  readonly negative: readonly {
+    readonly key: keyof PatternCache;
+    readonly weight: number;
+  }[];
 }
 
 export interface FormatResult {
-  net: number;
-  format: TargetFormat;
-  recommendation: string;
-  rawScore: number;
+  readonly net: number;
+  readonly format: TargetFormat;
+  readonly recommendation: string;
+  readonly rawScore: number;
 }
 
 export type LLMProvider = 'openai' | 'anthropic' | 'google';
 
 export interface ProviderInfo {
-  provider: LLMProvider;
-  model: string;
+  readonly provider: LLMProvider;
+  readonly model: string;
 }
 
 export interface SafeErrorDetails {
-  status?: number;
-  code?: string;
+  readonly status?: number;
+  readonly code?: string;
 }
 
 export interface LLMError {
-  status?: number;
-  code?: string;
-  message?: string;
+  readonly status?: number;
+  readonly code?: string;
+  readonly message?: string;
 }
 
 export interface LLMRequestOptions {
-  timeoutMs?: number;
-  signal?: AbortSignal;
-  requestId?: string;
-  sessionId?: string;
-  metadata?: Record<string, unknown>;
+  readonly timeoutMs?: number;
+  readonly signal?: AbortSignal;
+  readonly requestId?: string;
+  readonly sessionId?: string;
+  readonly metadata?: Record<string, unknown>;
 }
 
 export interface LLMClient {
@@ -123,15 +129,15 @@ export interface LLMClient {
 }
 
 export interface LLMToolOptions {
-  maxTokens?: number;
-  timeoutMs?: number;
-  signal?: AbortSignal;
+  readonly maxTokens?: number;
+  readonly timeoutMs?: number;
+  readonly signal?: AbortSignal;
 }
 
 export interface McpErrorOptions {
-  context?: string;
-  details?: Record<string, unknown>;
-  recoveryHint?: string;
+  readonly context?: string;
+  readonly details?: Record<string, unknown>;
+  readonly recoveryHint?: string;
 }
 
 export const ErrorCode = {
@@ -145,49 +151,49 @@ export const ErrorCode = {
 export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
 
 export interface OptimizeScore {
-  clarity: number;
-  specificity: number;
-  completeness: number;
-  structure: number;
-  effectiveness: number;
-  overall: number;
+  readonly clarity: number;
+  readonly specificity: number;
+  readonly completeness: number;
+  readonly structure: number;
+  readonly effectiveness: number;
+  readonly overall: number;
 }
 
 export interface OptimizeResponse {
-  optimized: string;
-  techniquesApplied: OptimizationTechnique[];
-  improvements: string[];
-  beforeScore: OptimizeScore;
-  afterScore: OptimizeScore;
+  readonly optimized: string;
+  readonly techniquesApplied: readonly OptimizationTechnique[];
+  readonly improvements: readonly string[];
+  readonly beforeScore: OptimizeScore;
+  readonly afterScore: OptimizeScore;
 }
 
 export interface AnalysisCharacteristics {
-  hasTypos: boolean;
-  isVague: boolean;
-  missingContext: boolean;
-  hasRoleContext: boolean;
-  hasExamples: boolean;
-  hasStructure: boolean;
-  hasStepByStep: boolean;
-  wordCount: number;
-  detectedFormat: 'claude' | 'gpt' | 'json' | 'auto';
-  estimatedComplexity: 'simple' | 'moderate' | 'complex';
+  readonly hasTypos: boolean;
+  readonly isVague: boolean;
+  readonly missingContext: boolean;
+  readonly hasRoleContext: boolean;
+  readonly hasExamples: boolean;
+  readonly hasStructure: boolean;
+  readonly hasStepByStep: boolean;
+  readonly wordCount: number;
+  readonly detectedFormat: 'claude' | 'gpt' | 'json' | 'auto';
+  readonly estimatedComplexity: 'simple' | 'moderate' | 'complex';
 }
 
 export interface AnalysisResponse {
-  score: OptimizeScore;
-  characteristics: AnalysisCharacteristics;
-  suggestions: string[];
+  readonly score: OptimizeScore;
+  readonly characteristics: AnalysisCharacteristics;
+  readonly suggestions: readonly string[];
 }
 
 export interface ValidationIssue {
-  type: 'error' | 'warning' | 'info';
-  message: string;
-  suggestion?: string;
+  readonly type: 'error' | 'warning' | 'info';
+  readonly message: string;
+  readonly suggestion?: string;
 }
 
 export interface ValidationResponse {
-  isValid: boolean;
-  tokenEstimate: number;
-  issues: ValidationIssue[];
+  readonly isValid: boolean;
+  readonly tokenEstimate: number;
+  readonly issues: readonly ValidationIssue[];
 }

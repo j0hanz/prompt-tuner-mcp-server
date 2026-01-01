@@ -107,30 +107,31 @@ const COMPREHENSIVE_TECHNIQUE_ORDER = [
   'fewShot',
   'chainOfThought',
 ] as const;
+const DEFAULT_TECHNIQUES = ['basic'] as const;
 
 type ConcreteTechnique = Exclude<OptimizationTechnique, 'comprehensive'>;
 
 interface OptimizePromptInput {
   prompt: string;
-  techniques?: OptimizationTechnique[];
+  techniques?: readonly OptimizationTechnique[];
   targetFormat?: TargetFormat;
 }
 
 interface ResolvedOptimizeInputs {
-  validatedPrompt: string;
-  effectiveTechniques: ConcreteTechnique[];
-  resolvedFormat: TargetFormat;
+  readonly validatedPrompt: string;
+  readonly effectiveTechniques: readonly ConcreteTechnique[];
+  readonly resolvedFormat: TargetFormat;
 }
 
 interface OptimizeValidationConfig {
-  allowedTechniques: ConcreteTechnique[];
-  targetFormat: TargetFormat;
+  readonly allowedTechniques: readonly ConcreteTechnique[];
+  readonly targetFormat: TargetFormat;
 }
 
 interface OptimizationMeta {
-  usedFallback: boolean;
-  scoreAdjusted: boolean;
-  overallSource: 'llm' | 'server';
+  readonly usedFallback: boolean;
+  readonly scoreAdjusted: boolean;
+  readonly overallSource: 'llm' | 'server';
 }
 
 const OPTIMIZE_PROMPT_TOOL = {
@@ -153,9 +154,9 @@ function isConcreteTechnique(
 }
 
 function resolveTechniques(
-  techniques: OptimizationTechnique[] | undefined
-): OptimizationTechnique[] {
-  return techniques && techniques.length > 0 ? techniques : ['basic'];
+  techniques: readonly OptimizationTechnique[] | undefined
+): readonly OptimizationTechnique[] {
+  return techniques && techniques.length > 0 ? techniques : DEFAULT_TECHNIQUES;
 }
 
 function resolveOptimizeInputs(
@@ -177,7 +178,7 @@ function resolveOptimizeInputs(
 function buildOptimizePrompt(
   prompt: string,
   resolvedFormat: TargetFormat,
-  techniques: OptimizationTechnique[],
+  techniques: readonly OptimizationTechnique[],
   extraRules?: string
 ): string {
   return `${OPTIMIZE_SYSTEM_PROMPT}\n\nTarget Format: ${resolvedFormat}\nTechniques to apply: ${techniques.join(
@@ -225,8 +226,8 @@ async function optimizeOnce(
 
 function normalizeOptimizeResult(result: OptimizeResponse): {
   normalized: OptimizeResponse;
-  techniquesApplied: OptimizationTechnique[];
-  appliedConcrete: ConcreteTechnique[];
+  techniquesApplied: readonly OptimizationTechnique[];
+  appliedConcrete: readonly ConcreteTechnique[];
 } {
   const { normalized } = normalizePromptText(result.optimized);
   const techniquesApplied = Array.from(new Set(result.techniquesApplied));
@@ -255,7 +256,7 @@ function validateOptimizedText(normalized: OptimizeResponse): string | null {
 }
 
 function hasUnexpectedTechniques(
-  techniquesApplied: OptimizationTechnique[],
+  techniquesApplied: readonly OptimizationTechnique[],
   allowedSet: ReadonlySet<ConcreteTechnique>
 ): boolean {
   return techniquesApplied.some(
@@ -264,8 +265,8 @@ function hasUnexpectedTechniques(
 }
 
 function validateAppliedTechniques(
-  techniquesApplied: OptimizationTechnique[],
-  appliedConcrete: ConcreteTechnique[],
+  techniquesApplied: readonly OptimizationTechnique[],
+  appliedConcrete: readonly ConcreteTechnique[],
   allowedSet: ReadonlySet<ConcreteTechnique>
 ): string | null {
   if (hasUnexpectedTechniques(techniquesApplied, allowedSet)) {
@@ -279,7 +280,7 @@ function validateAppliedTechniques(
 
 function validateTechniqueOutputs(
   text: string,
-  appliedTechniques: ConcreteTechnique[],
+  appliedTechniques: readonly ConcreteTechnique[],
   targetFormat: TargetFormat
 ): string | null {
   for (const technique of appliedTechniques) {
@@ -446,7 +447,7 @@ function normalizeOptimizationScores(result: OptimizeResponse): {
   };
 }
 
-function formatImprovements(improvements: string[]): string[] {
+function formatImprovements(improvements: readonly string[]): string[] {
   const cleaned = improvements.map((item) => item.trim()).filter(Boolean);
   return asBulletList(cleaned);
 }

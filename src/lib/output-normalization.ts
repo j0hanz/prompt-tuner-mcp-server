@@ -8,40 +8,46 @@ import {
   detectTargetFormat,
 } from './prompt-analysis/format.js';
 
-const SCORE_KEYS = [
-  'clarity',
-  'specificity',
-  'completeness',
-  'structure',
-  'effectiveness',
-] as const;
-
-const WEIGHTED_SCORE_KEYS = [
-  { key: 'clarity', weight: SCORING_WEIGHTS.clarity },
-  { key: 'specificity', weight: SCORING_WEIGHTS.specificity },
-  { key: 'completeness', weight: SCORING_WEIGHTS.completeness },
-  { key: 'structure', weight: SCORING_WEIGHTS.structure },
-  { key: 'effectiveness', weight: SCORING_WEIGHTS.effectiveness },
-] as const;
+const WHITESPACE_RE = /\s/;
 
 function clampScore(value: number): number {
   return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+function countWords(text: string): number {
+  let count = 0;
+  let inWord = false;
+
+  for (const char of text) {
+    if (WHITESPACE_RE.test(char)) {
+      inWord = false;
+    } else if (!inWord) {
+      count += 1;
+      inWord = true;
+    }
+  }
+
+  return count;
 }
 
 export function normalizeScore(score: OptimizeScore): {
   score: OptimizeScore;
   adjusted: boolean;
 } {
-  const normalizedScore = SCORE_KEYS.reduce((acc, key) => {
-    acc[key] = clampScore(score[key]);
-    return acc;
-  }, {} as OptimizeScore);
+  const normalizedScore = {
+    clarity: clampScore(score.clarity),
+    specificity: clampScore(score.specificity),
+    completeness: clampScore(score.completeness),
+    structure: clampScore(score.structure),
+    effectiveness: clampScore(score.effectiveness),
+  } satisfies Omit<OptimizeScore, 'overall'>;
 
   const overall = clampScore(
-    WEIGHTED_SCORE_KEYS.reduce(
-      (total, item) => total + normalizedScore[item.key] * item.weight,
-      0
-    )
+    normalizedScore.clarity * SCORING_WEIGHTS.clarity +
+      normalizedScore.specificity * SCORING_WEIGHTS.specificity +
+      normalizedScore.completeness * SCORING_WEIGHTS.completeness +
+      normalizedScore.structure * SCORING_WEIGHTS.structure +
+      normalizedScore.effectiveness * SCORING_WEIGHTS.effectiveness
   );
 
   const adjusted = overall !== score.overall;
@@ -58,7 +64,7 @@ export function mergeCharacteristics(
   const patternCache = buildPatternCache(prompt);
   const derivedFormat = detectTargetFormat(prompt, patternCache).format;
   const trimmed = prompt.trim();
-  const wordCount = trimmed ? trimmed.split(/\s+/).length : 0;
+  const wordCount = trimmed ? countWords(trimmed) : 0;
 
   return {
     ...base,

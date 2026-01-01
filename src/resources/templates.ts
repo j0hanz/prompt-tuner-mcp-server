@@ -2,18 +2,18 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 
 interface TemplateResource {
-  uri: string;
-  name: string;
-  title: string;
-  description: string;
-  category: string;
-  mimeType: string;
-  text: string;
+  readonly uri: string;
+  readonly name: string;
+  readonly title: string;
+  readonly description: string;
+  readonly category: string;
+  readonly mimeType: string;
+  readonly text: string;
 }
 
 const TEMPLATE_CATALOG_URI = 'templates://catalog';
 
-const TEMPLATE_RESOURCES: TemplateResource[] = [
+const TEMPLATE_RESOURCES: readonly TemplateResource[] = [
   {
     uri: 'templates://coding/code-review',
     name: 'code-review',
@@ -50,24 +50,25 @@ You are a senior software engineer performing a code review.
 ];
 
 interface TemplateCatalogEntry {
-  uri: string;
-  name: string;
-  title: string;
-  description: string;
-  category: string;
-  mimeType: string;
+  readonly uri: string;
+  readonly name: string;
+  readonly title: string;
+  readonly description: string;
+  readonly category: string;
+  readonly mimeType: string;
 }
 
-const TEMPLATE_CATALOG: TemplateCatalogEntry[] = TEMPLATE_RESOURCES.map(
-  ({ uri, name, title, description, category, mimeType }) => ({
-    uri,
-    name,
-    title,
-    description,
-    category,
-    mimeType,
-  })
-);
+const TEMPLATE_CATALOG: readonly TemplateCatalogEntry[] =
+  TEMPLATE_RESOURCES.map(
+    ({ uri, name, title, description, category, mimeType }) => ({
+      uri,
+      name,
+      title,
+      description,
+      category,
+      mimeType,
+    })
+  );
 
 function buildTextResource(
   uri: string,

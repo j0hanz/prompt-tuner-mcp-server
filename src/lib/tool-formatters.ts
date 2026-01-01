@@ -1,15 +1,15 @@
 import type { ProviderInfo } from '../config/types.js';
 
 export interface OutputSection {
-  title: string;
-  lines: string[];
+  readonly title: string;
+  readonly lines: readonly string[];
 }
 
 export function buildOutput(
   title: string,
-  meta: string[],
-  sections: OutputSection[],
-  footer: string[] = []
+  meta: readonly string[],
+  sections: readonly OutputSection[],
+  footer: readonly string[] = []
 ): string {
   const lines: string[] = [`# ${title}`];
 
@@ -28,11 +28,11 @@ export function buildOutput(
   return lines.join('\n');
 }
 
-export function asBulletList(items: string[]): string[] {
+export function asBulletList(items: readonly string[]): string[] {
   return items.map((item) => `- ${item}`);
 }
 
-export function asNumberedList(items: string[]): string[] {
+export function asNumberedList(items: readonly string[]): string[] {
   return items.map((item, index) => `${index + 1}. ${item}`);
 }
 
