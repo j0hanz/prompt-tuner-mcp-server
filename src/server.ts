@@ -11,6 +11,7 @@ import {
 } from './config/constants.js';
 import { logger } from './lib/errors.js';
 import { registerAllPrompts } from './prompts/index.js';
+import { registerTemplateResources } from './resources/templates.js';
 import { registerAnalyzePromptTool } from './tools/analyze-prompt.js';
 import { registerOptimizePromptTool } from './tools/optimize-prompt.js';
 import { registerRefinePromptTool } from './tools/refine-prompt.js';
@@ -34,6 +35,7 @@ export function createServer(): McpServer {
       instructions: SERVER_INSTRUCTIONS,
       capabilities: {
         logging: {},
+        resources: { listChanged: true },
         tools: { listChanged: true },
         prompts: { listChanged: true },
       },
@@ -44,6 +46,7 @@ export function createServer(): McpServer {
   registerAnalyzePromptTool(server);
   registerOptimizePromptTool(server);
   registerValidatePromptTool(server);
+  registerTemplateResources(server);
   registerAllPrompts(server);
 
   return server;

@@ -63,8 +63,13 @@ export function createSuccessResponse<T extends Record<string, unknown>>(
   structured: T,
   extraContent: ContentBlock[] = []
 ): SuccessResponse<T> {
+  const structuredBlock: ContentBlock = {
+    type: 'text',
+    text: JSON.stringify(structured),
+  };
+  const messageBlock: ContentBlock = { type: 'text', text };
   return {
-    content: [{ type: 'text', text }, ...extraContent],
+    content: [structuredBlock, messageBlock, ...extraContent],
     structuredContent: structured,
   };
 }
@@ -143,12 +148,16 @@ export function createErrorResponse(
   context?: string
 ): ErrorResponse {
   const structuredError = buildStructuredError(error, fallbackCode, context);
+  const structured: ErrorResponse['structuredContent'] = {
+    ok: false,
+    error: structuredError,
+  };
   return {
-    content: [{ type: 'text', text: `Error: ${structuredError.message}` }],
-    structuredContent: {
-      ok: false,
-      error: structuredError,
-    },
+    content: [
+      { type: 'text', text: JSON.stringify(structured) },
+      { type: 'text', text: `Error: ${structuredError.message}` },
+    ],
+    structuredContent: structured,
     isError: true,
   };
 }
