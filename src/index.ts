@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { parseArgs } from 'node:util';
+import { inspect, parseArgs } from 'node:util';
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
@@ -12,34 +12,41 @@ interface Logger {
   debug: LogFn;
 }
 
+function formatFallbackPayload(payload: unknown): string {
+  if (typeof payload === 'string') return payload;
+  return inspect(payload, { depth: 4, colors: false, breakLength: 120 });
+}
+
+function formatFallbackMessage(payload: unknown, msg?: string): string {
+  if (msg) {
+    return payload === undefined
+      ? msg
+      : `${msg} ${formatFallbackPayload(payload)}`;
+  }
+  return formatFallbackPayload(payload);
+}
+
+function writeStderr(message: string): void {
+  process.stderr.write(message.endsWith('\n') ? message : `${message}\n`);
+}
+
+function writeCliOutput(message: string): void {
+  const stream = process.stdout.isTTY ? process.stdout : process.stderr;
+  stream.write(message.endsWith('\n') ? message : `${message}\n`);
+}
+
 const fallbackLogger: Logger = {
   info: (payload: unknown, msg?: string): void => {
-    if (msg) {
-      console.log(msg, payload);
-      return;
-    }
-    console.log(payload);
+    writeStderr(formatFallbackMessage(payload, msg));
   },
   warn: (payload: unknown, msg?: string): void => {
-    if (msg) {
-      console.warn(msg, payload);
-      return;
-    }
-    console.warn(payload);
+    writeStderr(formatFallbackMessage(payload, msg));
   },
   error: (payload: unknown, msg?: string): void => {
-    if (msg) {
-      console.error(msg, payload);
-      return;
-    }
-    console.error(payload);
+    writeStderr(formatFallbackMessage(payload, msg));
   },
   debug: (payload: unknown, msg?: string): void => {
-    if (msg) {
-      console.debug(msg, payload);
-      return;
-    }
-    console.debug(payload);
+    writeStderr(formatFallbackMessage(payload, msg));
   },
 };
 
@@ -161,7 +168,7 @@ function applyEnvOverrides(values: CliValues): void {
 }
 
 function printHelp(): void {
-  console.log(`Usage: prompt-tuner-mcp-server [options]
+  writeCliOutput(`Usage: prompt-tuner-mcp-server [options]
 
 Options:
   -h, --help                    Show help text
@@ -280,7 +287,7 @@ async function main(): Promise<void> {
   if (cli.version) {
     const { SERVER_NAME, SERVER_VERSION } =
       await import('./config/constants.js');
-    console.log(`${SERVER_NAME} v${SERVER_VERSION}`);
+    writeCliOutput(`${SERVER_NAME} v${SERVER_VERSION}`);
     return;
   }
 
