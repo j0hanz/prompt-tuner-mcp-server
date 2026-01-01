@@ -227,7 +227,7 @@ async function waitForRetry(
   signal: AbortSignal | undefined
 ): Promise<void> {
   try {
-    await setTimeout(delayMs, undefined, { signal });
+    await setTimeout(delayMs, undefined, { signal, ref: false });
   } catch (error) {
     if (signal?.aborted) {
       throw new McpError(
