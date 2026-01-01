@@ -15,22 +15,26 @@ interface RequestContext {
   signal?: AbortSignal;
 }
 
+interface ResolvedRequestOptions {
+  maxTokens: number;
+  timeoutMs: number;
+  signal?: AbortSignal;
+  retryOnParseFailure: boolean;
+  retryPromptSuffix: string;
+}
+
 export function extractPromptFromInput(input: unknown): string | undefined {
   if (typeof input !== 'object' || input === null) return undefined;
   const { prompt } = input as { prompt?: unknown };
   return typeof prompt === 'string' ? prompt : undefined;
 }
 
-function buildRequestContext(
+function resolveRequestOptions(
   options: LLMToolOptions & {
     retryOnParseFailure?: boolean;
     retryPromptSuffix?: string;
   }
-): {
-  ctx: RequestContext;
-  retryOnParseFailure: boolean;
-  retryPromptSuffix: string;
-} {
+): ResolvedRequestOptions {
   const {
     maxTokens = DEFAULT_MAX_TOKENS,
     timeoutMs = DEFAULT_TIMEOUT_MS,
@@ -40,13 +44,19 @@ function buildRequestContext(
   } = options;
 
   return {
-    ctx: {
-      maxTokens,
-      timeoutMs,
-      signal: buildAbortSignal(timeoutMs, signal),
-    },
+    maxTokens,
+    timeoutMs,
+    signal,
     retryOnParseFailure,
     retryPromptSuffix,
+  };
+}
+
+function buildRequestContext(options: ResolvedRequestOptions): RequestContext {
+  return {
+    maxTokens: options.maxTokens,
+    timeoutMs: options.timeoutMs,
+    signal: buildAbortSignal(options.timeoutMs, options.signal),
   };
 }
 
@@ -89,26 +99,26 @@ export async function executeLLMWithJsonResponse<T>(
     retryPromptSuffix?: string;
   } = {}
 ): Promise<{ value: T; usedFallback: boolean }> {
-  const { ctx, retryOnParseFailure, retryPromptSuffix } =
-    buildRequestContext(options);
+  const resolved = resolveRequestOptions(options);
+  const buildCtx = (): RequestContext => buildRequestContext(resolved);
   const client = await getLLMClient();
 
   try {
     const value = await runAndParse(
       prompt,
       client,
-      ctx,
+      buildCtx(),
       parseSchema,
       errorCode,
       debugLabel
     );
     return { value, usedFallback: false };
   } catch (error) {
-    if (!shouldRetryParse(error, retryOnParseFailure)) throw error;
+    if (!shouldRetryParse(error, resolved.retryOnParseFailure)) throw error;
     const value = await runAndParse(
-      prompt + retryPromptSuffix,
+      prompt + resolved.retryPromptSuffix,
       client,
-      ctx,
+      buildCtx(),
       parseSchema,
       errorCode,
       debugLabel

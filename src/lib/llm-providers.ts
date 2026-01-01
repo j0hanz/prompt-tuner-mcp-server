@@ -148,9 +148,8 @@ class GoogleClient implements LLMClient {
     maxTokens: number,
     options?: LLMRequestOptions
   ): Promise<string> {
-    const timeoutSignal = AbortSignal.timeout(
-      options?.timeoutMs ?? DEFAULT_TIMEOUT_MS
-    );
+    const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const timeoutSignal = AbortSignal.timeout(timeoutMs);
     const combinedSignal = options?.signal
       ? AbortSignal.any([options.signal, timeoutSignal])
       : timeoutSignal;
@@ -158,6 +157,7 @@ class GoogleClient implements LLMClient {
     checkAborted(combinedSignal);
     const response = await this.executeRequest(prompt, maxTokens, {
       ...options,
+      timeoutMs,
       signal: combinedSignal,
     });
     return response.trim();
@@ -189,16 +189,17 @@ class GoogleClient implements LLMClient {
     maxTokens: number,
     options?: LLMRequestOptions
   ): Promise<string> {
+    const { signal, timeoutMs } = options ?? {};
     const generatePromise = this.client.models.generateContent({
       model: this.model,
       contents: prompt,
       config: {
         maxOutputTokens: maxTokens,
         safetySettings: this.buildSafetySettings(),
+        ...(timeoutMs ? { httpOptions: { timeout: timeoutMs } } : {}),
+        ...(signal ? { abortSignal: signal } : {}),
       },
     });
-
-    const { signal } = options ?? {};
 
     if (!signal) {
       const response = await generatePromise;

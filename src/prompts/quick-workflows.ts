@@ -12,7 +12,8 @@ interface QuickWorkflowDefinition {
   name: string;
   title: string;
   description: string;
-  argsSchema: Record<string, z.ZodTypeAny>;
+  argsSchema: z.ZodRawShape;
+  parseArgs: (args: unknown) => QuickWorkflowArgs;
   buildText: (args: QuickWorkflowArgs) => string;
 }
 
@@ -35,9 +36,18 @@ function buildPromptMessage(text: string): {
   };
 }
 
-function promptArg(description: string): { prompt: z.ZodString } {
+function promptArg(description: string): {
+  argsSchema: z.ZodRawShape;
+  parseArgs: (args: unknown) => QuickWorkflowArgs;
+} {
+  const schema = z
+    .object({
+      prompt: z.string().min(1).describe(description),
+    })
+    .strict();
   return {
-    prompt: z.string().min(1).describe(description),
+    argsSchema: schema.shape,
+    parseArgs: (args) => schema.parse(args),
   };
 }
 
@@ -205,7 +215,7 @@ const QUICK_WORKFLOW_PROMPTS: QuickWorkflowDefinition[] = [
     name: 'quick-optimize',
     title: 'Quick Optimize',
     description: 'Fast prompt improvement with grammar and clarity fixes.',
-    argsSchema: promptArg('The prompt to optimize'),
+    ...promptArg('The prompt to optimize'),
     buildText: ({ prompt }) =>
       renderTemplate(TEMPLATE_QUICK_OPTIMIZE, {
         PROMPT: wrapPromptData(prompt),
@@ -215,7 +225,7 @@ const QUICK_WORKFLOW_PROMPTS: QuickWorkflowDefinition[] = [
     name: 'deep-optimize',
     title: 'Deep Optimize',
     description: 'Comprehensive optimization with all techniques applied.',
-    argsSchema: promptArg('The prompt to optimize'),
+    ...promptArg('The prompt to optimize'),
     buildText: ({ prompt }) =>
       renderTemplate(TEMPLATE_DEEP_OPTIMIZE, {
         PROMPT: wrapPromptData(prompt),
@@ -225,7 +235,7 @@ const QUICK_WORKFLOW_PROMPTS: QuickWorkflowDefinition[] = [
     name: 'analyze',
     title: 'Analyze Prompt',
     description: 'Score prompt quality and get improvement suggestions.',
-    argsSchema: promptArg('The prompt to analyze'),
+    ...promptArg('The prompt to analyze'),
     buildText: ({ prompt }) =>
       renderTemplate(TEMPLATE_ANALYZE, {
         PROMPT: wrapPromptData(prompt),
@@ -243,7 +253,7 @@ export function registerQuickWorkflowPrompts(server: McpServer): void {
         argsSchema: workflow.argsSchema,
       },
       (args) => {
-        const workflowArgs = args as QuickWorkflowArgs;
+        const workflowArgs = workflow.parseArgs(args);
         return buildPromptMessage(workflow.buildText(workflowArgs));
       }
     );
