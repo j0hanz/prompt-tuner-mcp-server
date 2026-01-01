@@ -1,6 +1,6 @@
 import { DEFAULT_MODELS } from '../config/constants.js';
 import { config } from '../config/env.js';
-import type { LLMClient, LLMProvider } from '../config/types.js';
+import type { LLMClient, LLMProvider, ProviderInfo } from '../config/types.js';
 import { ErrorCode, logger, McpError } from './errors.js';
 import {
   AnthropicClient,
@@ -68,10 +68,7 @@ export async function getLLMClient(): Promise<LLMClient> {
   return llmClientPromise;
 }
 
-export async function getProviderInfo(): Promise<{
-  provider: LLMProvider;
-  model: string;
-}> {
+export async function getProviderInfo(): Promise<ProviderInfo> {
   const client = await getLLMClient();
   return { provider: client.getProvider(), model: client.getModel() };
 }

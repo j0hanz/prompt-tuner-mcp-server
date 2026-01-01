@@ -1,3 +1,5 @@
+import type { ProviderInfo } from '../config/types.js';
+
 export interface OutputSection {
   title: string;
   lines: string[];
@@ -38,9 +40,6 @@ export function asCodeBlock(text: string): string[] {
   return ['```', text, '```'];
 }
 
-export function formatProviderLine(provider: {
-  provider: string;
-  model: string;
-}): string {
+export function formatProviderLine(provider: ProviderInfo): string {
   return `Provider: ${provider.provider} (${provider.model})`;
 }

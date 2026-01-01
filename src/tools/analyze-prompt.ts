@@ -6,7 +6,11 @@ import type {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { ANALYSIS_MAX_TOKENS, LLM_TIMEOUT_MS } from '../config/constants.js';
-import type { AnalysisResponse, ErrorResponse } from '../config/types.js';
+import type {
+  AnalysisResponse,
+  ErrorResponse,
+  ProviderInfo,
+} from '../config/types.js';
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -136,7 +140,7 @@ function formatCharacteristicLines(
 
 function formatAnalysisOutput(
   analysisResult: AnalysisResponse,
-  provider: { provider: string; model: string }
+  provider: ProviderInfo
 ): string {
   return buildOutput(
     'Prompt Analysis',
@@ -230,7 +234,7 @@ function normalizeAnalysisResult(
 
 function buildAnalysisResponse(
   analysisResult: AnalysisResponse,
-  provider: { provider: string; model: string },
+  provider: ProviderInfo,
   meta: { usedFallback: boolean; scoreAdjusted: boolean; overallSource: string }
 ): ReturnType<typeof createSuccessResponse> {
   const output = formatAnalysisOutput(analysisResult, provider);

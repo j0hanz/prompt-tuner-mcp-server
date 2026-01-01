@@ -9,6 +9,7 @@ import { LLM_TIMEOUT_MS, REFINE_MAX_TOKENS } from '../config/constants.js';
 import type {
   ErrorResponse,
   OptimizationTechnique,
+  ProviderInfo,
   TargetFormat,
 } from '../config/types.js';
 import {
@@ -72,11 +73,6 @@ interface RefinementAttemptPlan {
   technique: OptimizationTechnique;
   extraInstructions?: string;
   usedFallback: boolean;
-}
-
-interface ProviderInfo {
-  provider: string;
-  model: string;
 }
 
 function buildCorrections(original: string, refined: string): string[] {

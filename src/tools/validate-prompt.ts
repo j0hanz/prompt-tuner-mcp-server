@@ -8,6 +8,7 @@ import type {
 import { LLM_TIMEOUT_MS, VALIDATE_MAX_TOKENS } from '../config/constants.js';
 import type {
   ErrorResponse,
+  ProviderInfo,
   ValidationIssue,
   ValidationResponse,
 } from '../config/types.js';
@@ -164,7 +165,7 @@ function formatValidationOutput(
   parsed: ValidationResponse,
   targetModel: ValidationModel,
   tokenLimit: number,
-  provider: { provider: string; model: string }
+  provider: ProviderInfo
 ): string {
   const sections: OutputSection[] = [
     {
@@ -223,7 +224,7 @@ function buildValidationResponse(
   targetModel: ValidationModel,
   tokenLimit: number,
   checkInjection: boolean,
-  provider: { provider: string; model: string }
+  provider: ProviderInfo
 ): ReturnType<typeof createSuccessResponse> {
   const output = formatValidationOutput(
     parsed,

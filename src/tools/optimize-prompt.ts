@@ -7,11 +7,12 @@ import type {
 
 import { LLM_TIMEOUT_MS, OPTIMIZE_MAX_TOKENS } from '../config/constants.js';
 import type {
+  ErrorResponse,
   OptimizationTechnique,
   OptimizeResponse,
+  ProviderInfo,
   TargetFormat,
 } from '../config/types.js';
-import type { ErrorResponse } from '../config/types.js';
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -473,7 +474,7 @@ function formatScoreLines(
 function formatOptimizeOutput(
   optimizationResult: OptimizeResponse,
   targetFormat: TargetFormat,
-  provider: { provider: string; model: string }
+  provider: ProviderInfo
 ): string {
   return buildOutput(
     'Prompt Optimization',
@@ -506,7 +507,7 @@ function buildOptimizeResponse(
   result: OptimizeResponse,
   original: string,
   targetFormat: TargetFormat,
-  provider: { provider: string; model: string },
+  provider: ProviderInfo,
   meta: OptimizationMeta
 ): ReturnType<typeof createSuccessResponse> {
   const scoreDelta = result.afterScore.overall - result.beforeScore.overall;

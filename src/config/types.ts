@@ -4,24 +4,11 @@ interface ResourceTextPayload {
   mimeType?: string;
 }
 
-interface ResourceBlobPayload {
-  uri: string;
-  blob: string;
-  mimeType?: string;
-}
-
 export type ContentBlock =
   | { type: 'text'; text: string }
   | {
       type: 'resource';
-      resource: ResourceTextPayload | ResourceBlobPayload;
-    }
-  | {
-      type: 'resource_link';
-      uri: string;
-      name: string;
-      description?: string;
-      mimeType?: string;
+      resource: ResourceTextPayload;
     };
 
 export interface ErrorResponse {
@@ -100,6 +87,11 @@ export interface FormatResult {
 }
 
 export type LLMProvider = 'openai' | 'anthropic' | 'google';
+
+export interface ProviderInfo {
+  provider: LLMProvider;
+  model: string;
+}
 
 export interface SafeErrorDetails {
   status?: number;
