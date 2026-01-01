@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 import {
   AnalyzePromptInputSchema,
@@ -13,7 +14,7 @@ describe('input schemas', () => {
       prompt: 'Hello',
       extra: 'nope',
     });
-    expect(result.success).toBe(false);
+    assert.strictEqual(result.success, false);
   });
 
   it('rejects unknown fields for analyze', () => {
@@ -21,7 +22,7 @@ describe('input schemas', () => {
       prompt: 'Hello',
       extra: 'nope',
     });
-    expect(result.success).toBe(false);
+    assert.strictEqual(result.success, false);
   });
 
   it('rejects unknown fields for optimize', () => {
@@ -29,7 +30,7 @@ describe('input schemas', () => {
       prompt: 'Hello',
       extra: 'nope',
     });
-    expect(result.success).toBe(false);
+    assert.strictEqual(result.success, false);
   });
 
   it('rejects unknown fields for validate', () => {
@@ -37,23 +38,23 @@ describe('input schemas', () => {
       prompt: 'Hello',
       extra: 'nope',
     });
-    expect(result.success).toBe(false);
+    assert.strictEqual(result.success, false);
   });
 
   it('applies defaults and trims prompts', () => {
     const refine = RefinePromptInputSchema.parse({ prompt: '  Hi  ' });
-    expect(refine.prompt).toBe('Hi');
-    expect(refine.technique).toBe('basic');
-    expect(refine.targetFormat).toBe('auto');
+    assert.strictEqual(refine.prompt, 'Hi');
+    assert.strictEqual(refine.technique, 'basic');
+    assert.strictEqual(refine.targetFormat, 'auto');
 
     const optimize = OptimizePromptInputSchema.parse({ prompt: '  Hi  ' });
-    expect(optimize.prompt).toBe('Hi');
-    expect(optimize.techniques).toEqual(['basic']);
-    expect(optimize.targetFormat).toBe('auto');
+    assert.strictEqual(optimize.prompt, 'Hi');
+    assert.deepStrictEqual(optimize.techniques, ['basic']);
+    assert.strictEqual(optimize.targetFormat, 'auto');
 
     const validate = ValidatePromptInputSchema.parse({ prompt: '  Hi  ' });
-    expect(validate.prompt).toBe('Hi');
-    expect(validate.targetModel).toBe('generic');
-    expect(validate.checkInjection).toBe(true);
+    assert.strictEqual(validate.prompt, 'Hi');
+    assert.strictEqual(validate.targetModel, 'generic');
+    assert.strictEqual(validate.checkInjection, true);
   });
 });

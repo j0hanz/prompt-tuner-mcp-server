@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 import {
   containsOutputScaffolding,
@@ -9,18 +10,21 @@ import {
 describe('output validation', () => {
   it('normalizes wrapped code fences', () => {
     const result = normalizePromptText('```text\nHello\n```');
-    expect(result.normalized).toBe('Hello');
-    expect(result.changed).toBe(true);
+    assert.strictEqual(result.normalized, 'Hello');
+    assert.strictEqual(result.changed, true);
   });
 
   it('normalizes prompt labels with fenced content', () => {
     const input = 'Refined Prompt:\n```text\nHello\n```';
     const result = normalizePromptText(input);
-    expect(result.normalized).toBe('Hello');
+    assert.strictEqual(result.normalized, 'Hello');
   });
 
   it('detects output scaffolding', () => {
-    expect(containsOutputScaffolding('# Prompt Refinement\n')).toBe(true);
+    assert.strictEqual(
+      containsOutputScaffolding('# Prompt Refinement\n'),
+      true
+    );
   });
 
   it('validates structured output for gpt format', () => {
@@ -29,7 +33,7 @@ describe('output validation', () => {
       'structured',
       'gpt'
     );
-    expect(result.ok).toBe(true);
+    assert.strictEqual(result.ok, true);
   });
 
   it('rejects roleBased output without a role statement', () => {
@@ -38,6 +42,6 @@ describe('output validation', () => {
       'roleBased',
       'gpt'
     );
-    expect(result.ok).toBe(false);
+    assert.strictEqual(result.ok, false);
   });
 });

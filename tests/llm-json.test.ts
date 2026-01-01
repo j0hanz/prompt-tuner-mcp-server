@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 import { ErrorCode } from '../src/lib/errors.js';
 import { parseJsonFromLlmResponse } from '../src/lib/llm-json.js';
@@ -16,7 +17,7 @@ describe('parseJsonFromLlmResponse', () => {
       { errorCode: ErrorCode.E_INVALID_INPUT }
     );
 
-    expect(result.ok).toBe(true);
+    assert.strictEqual(result.ok, true);
   });
 
   it('parses JSON wrapped in code block markers', () => {
@@ -32,7 +33,7 @@ describe('parseJsonFromLlmResponse', () => {
       { errorCode: ErrorCode.E_INVALID_INPUT }
     );
 
-    expect(result.ok).toBe(true);
+    assert.strictEqual(result.ok, true);
   });
 
   it('parses JSON embedded in surrounding text', () => {
@@ -48,8 +49,8 @@ describe('parseJsonFromLlmResponse', () => {
       { errorCode: ErrorCode.E_INVALID_INPUT }
     );
 
-    expect(result.ok).toBe(true);
-    expect(result.count).toBe(2);
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(result.count, 2);
   });
 
   it('parses JSON with braces inside strings', () => {
@@ -66,18 +67,20 @@ describe('parseJsonFromLlmResponse', () => {
       { errorCode: ErrorCode.E_INVALID_INPUT }
     );
 
-    expect(result.ok).toBe(true);
-    expect(result.text).toBe('{not a brace}');
-    expect(result.items[0]?.a).toBe(1);
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(result.text, '{not a brace}');
+    assert.strictEqual(result.items[0]?.a, 1);
   });
 
   it('rejects payloads that exceed maxInputLength', () => {
     const payload = 'abcdef';
-    expect(() =>
-      parseJsonFromLlmResponse(payload, (value) => value, {
-        errorCode: ErrorCode.E_INVALID_INPUT,
-        maxInputLength: 5,
-      })
-    ).toThrow(/LLM response too large/);
+    assert.throws(
+      () =>
+        parseJsonFromLlmResponse(payload, (value) => value, {
+          errorCode: ErrorCode.E_INVALID_INPUT,
+          maxInputLength: 5,
+        }),
+      /LLM response too large/
+    );
   });
 });

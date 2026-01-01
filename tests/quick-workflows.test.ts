@@ -1,6 +1,7 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
-import { describe, expect, it } from 'vitest';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { registerQuickWorkflowPrompts } from '../src/prompts/quick-workflows.js';
 
@@ -27,6 +28,10 @@ describe('registerQuickWorkflowPrompts', () => {
     registerQuickWorkflowPrompts(server);
 
     const names = registered.map((entry) => entry.name);
-    expect(names).toEqual(['quick-optimize', 'deep-optimize', 'analyze']);
+    assert.deepStrictEqual(names, [
+      'quick-optimize',
+      'deep-optimize',
+      'analyze',
+    ]);
   });
 });

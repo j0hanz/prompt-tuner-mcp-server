@@ -3,7 +3,7 @@
 ## Project Overview
 
 - **Goal**: MCP server for refining, analyzing, optimizing, and validating AI prompts.
-- **Stack**: Node.js (>=20), TypeScript, Model Context Protocol (MCP), Zod, Vitest.
+- **Stack**: Node.js (>=20), TypeScript, Model Context Protocol (MCP), Zod, `node:test`.
 - **Key Libraries**: `@modelcontextprotocol/sdk`, `openai`, `@anthropic-ai/sdk`, `@google/genai`, `zod`.
 
 ## Repo Map / Structure
@@ -38,7 +38,7 @@
 
 ## Testing
 
-- **Run all tests**: `npm run test` (uses Vitest).
+- **Run all tests**: `npm run test` (uses `node:test`).
 - **Watch mode**: `npm run test:watch`.
 - **Coverage**: `npm run test:coverage`.
 - **Test files**: Located in `tests/` directory, matching `*.test.ts`.

@@ -39,6 +39,7 @@ class OpenAIClient implements LLMClient {
   ): Promise<string> {
     return runGeneration(
       this.provider,
+      this.model,
       () =>
         createCompletion(
           options,
@@ -79,6 +80,7 @@ class AnthropicClient implements LLMClient {
   ): Promise<string> {
     return runGeneration(
       this.provider,
+      this.model,
       () =>
         createCompletion(
           options,
@@ -135,6 +137,7 @@ class GoogleClient implements LLMClient {
   ): Promise<string> {
     return runGeneration(
       this.provider,
+      this.model,
       () => this.requestCompletion(prompt, maxTokens, options),
       options?.signal
     );

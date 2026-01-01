@@ -10,6 +10,7 @@ import type {
   SafeErrorDetails,
 } from '../config/types.js';
 import { ErrorCode, logger, McpError } from './errors.js';
+import { publishLlmRequest } from './telemetry.js';
 
 const PROVIDER_ENV_KEYS: Record<LLMProvider, string> = {
   openai: 'OPENAI_API_KEY',
@@ -282,15 +283,30 @@ async function attemptGeneration(
   }
 }
 
-export async function runGeneration(
+interface RunFailureDetails {
+  errorCode?: ErrorCodeType;
+  status?: number;
+}
+
+function resolveFailureDetails(error: unknown): RunFailureDetails {
+  if (!(error instanceof McpError)) return {};
+  const status =
+    typeof error.details?.status === 'number'
+      ? error.details.status
+      : undefined;
+  return { errorCode: error.code, status };
+}
+
+async function executeAttempts(
   provider: LLMProvider,
   requestFn: () => Promise<string>,
-  signal?: AbortSignal
+  signal: AbortSignal | undefined,
+  settings: RetrySettings,
+  startTime: number,
+  onAttempt: (attemptsUsed: number) => void
 ): Promise<string> {
-  const settings = resolveRetrySettings();
-  const startTime = Date.now();
-
   for (let attempt = 0; attempt <= settings.maxRetries; attempt++) {
+    onAttempt(attempt + 1);
     const outcome = await attemptGeneration(
       provider,
       requestFn,
@@ -307,4 +323,73 @@ export async function runGeneration(
     ErrorCode.E_LLM_FAILED,
     `LLM request failed (${provider}): Unknown error`
   );
+}
+
+function publishSuccessEvent(
+  provider: LLMProvider,
+  model: string,
+  attempts: number,
+  startPerf: number
+): void {
+  publishLlmRequest({
+    provider,
+    model,
+    attempts,
+    durationMs: performance.now() - startPerf,
+    ok: true,
+  });
+}
+
+function publishFailureEvent(
+  provider: LLMProvider,
+  model: string,
+  attempts: number,
+  startPerf: number,
+  details: RunFailureDetails
+): void {
+  publishLlmRequest({
+    provider,
+    model,
+    attempts,
+    durationMs: performance.now() - startPerf,
+    ok: false,
+    errorCode: details.errorCode,
+    status: details.status,
+  });
+}
+
+export async function runGeneration(
+  provider: LLMProvider,
+  model: string,
+  requestFn: () => Promise<string>,
+  signal?: AbortSignal
+): Promise<string> {
+  const settings = resolveRetrySettings();
+  const startTime = Date.now();
+  const startPerf = performance.now();
+  let attemptsUsed = 0;
+
+  try {
+    const content = await executeAttempts(
+      provider,
+      requestFn,
+      signal,
+      settings,
+      startTime,
+      (attempt) => {
+        attemptsUsed = attempt;
+      }
+    );
+    publishSuccessEvent(provider, model, attemptsUsed, startPerf);
+    return content;
+  } catch (error) {
+    publishFailureEvent(
+      provider,
+      model,
+      attemptsUsed,
+      startPerf,
+      resolveFailureDetails(error)
+    );
+    throw error;
+  }
 }

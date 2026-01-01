@@ -52,7 +52,7 @@ Add to `claude_desktop_config.json`:
 
 ## Configuration (Essentials)
 
-PromptTuner reads configuration from environment variables. Full reference in `CONFIGURATION.md`.
+PromptTuner reads configuration from environment variables. CLI flags can override them (run `prompt-tuner-mcp-server --help`). Full reference in `CONFIGURATION.md`.
 
 | Variable            | Default          | Description                                    |
 | ------------------- | ---------------- | ---------------------------------------------- |
@@ -171,9 +171,9 @@ Token limits used for `validate_prompt`: `claude` 200000, `gpt` 128000, `gemini`
 | `npm run dev:http`       | Alias of `npm run dev` (no HTTP transport yet).       |
 | `npm run start`          | Run the compiled server from `dist/`.                 |
 | `npm run start:http`     | Alias of `npm run start` (no HTTP transport yet).     |
-| `npm run test`           | Run Vitest once.                                      |
-| `npm run test:coverage`  | Run tests with coverage.                              |
-| `npm run test:watch`     | Run Vitest in watch mode.                             |
+| `npm run test`           | Run `node:test` once.                                 |
+| `npm run test:coverage`  | Run `node:test` with experimental coverage.           |
+| `npm run test:watch`     | Run `node:test` in watch mode.                        |
 | `npm run lint`           | Run ESLint.                                           |
 | `npm run format`         | Run Prettier.                                         |
 | `npm run type-check`     | TypeScript type checking.                             |
@@ -194,7 +194,7 @@ src/
   schemas/        Zod input/output schemas
   types/          Shared types
 
-tests/            Vitest suites
+tests/            node:test suites
 
 dist/             Compiled output (generated)
 
