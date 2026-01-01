@@ -10,7 +10,6 @@ import {
   SERVER_VERSION,
 } from './config/constants.js';
 import { logger } from './lib/errors.js';
-import { getLLMClient } from './lib/llm-client.js';
 import { registerAllPrompts } from './prompts/index.js';
 import { registerAnalyzePromptTool } from './tools/analyze-prompt.js';
 import { registerOptimizePromptTool } from './tools/optimize-prompt.js';
@@ -24,10 +23,6 @@ process.on('warning', (warning) => {
     `Node.js warning: ${warning.name}`
   );
 });
-
-export async function validateApiKeys(): Promise<void> {
-  await getLLMClient();
-}
 
 export function createServer(): McpServer {
   const server = new McpServer(

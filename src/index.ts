@@ -291,9 +291,10 @@ async function main(): Promise<void> {
     cleanupTelemetry();
   });
 
-  const { startServer, validateApiKeys } = await import('./server.js');
+  const { getLLMClient } = await import('./lib/llm-client.js');
+  const { startServer } = await import('./server.js');
 
-  await validateApiKeys();
+  await getLLMClient();
   server = await startServer();
 }
 

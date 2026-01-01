@@ -80,7 +80,7 @@ export function publishLlmRequest(event: LlmRequestEvent): void {
   safePublish(llmRequestChannel, event);
 }
 
-export function publishEventLoopStats(event: EventLoopStatsEvent): void {
+function publishEventLoopStats(event: EventLoopStatsEvent): void {
   safePublish(eventLoopChannel, event);
 }
 
