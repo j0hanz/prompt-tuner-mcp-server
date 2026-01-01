@@ -220,7 +220,8 @@ function buildRefinementPlan(
 async function runRefinementAttempt(
   input: ResolvedRefineInputs,
   attempt: RefinementAttemptPlan,
-  signal: AbortSignal
+  signal: AbortSignal,
+  timeoutMs: number
 ): Promise<{
   refined: string;
   reason: string | null;
@@ -232,7 +233,7 @@ async function runRefinementAttempt(
     attempt.technique,
     input.resolvedFormat,
     REFINE_MAX_TOKENS,
-    LLM_TIMEOUT_MS,
+    timeoutMs,
     signal,
     attempt.extraInstructions
   );
@@ -252,6 +253,14 @@ async function runRefinementAttempt(
   };
 }
 
+function resolveRemainingTimeout(deadlineMs: number): number {
+  const remaining = deadlineMs - Date.now();
+  if (remaining <= 0) {
+    throw new McpError(ErrorCode.E_TIMEOUT, 'Refinement budget exceeded');
+  }
+  return remaining;
+}
+
 async function refineWithLLM(
   input: ResolvedRefineInputs,
   signal: AbortSignal
@@ -263,9 +272,16 @@ async function refineWithLLM(
 }> {
   const plan = buildRefinementPlan(input.validatedTechnique);
   let lastReason: string | null = null;
+  const deadlineMs = Date.now() + LLM_TIMEOUT_MS;
 
   for (const attempt of plan) {
-    const result = await runRefinementAttempt(input, attempt, signal);
+    const remainingMs = resolveRemainingTimeout(deadlineMs);
+    const result = await runRefinementAttempt(
+      input,
+      attempt,
+      signal,
+      remainingMs
+    );
 
     if (!result.reason) {
       const corrections = buildCorrections(

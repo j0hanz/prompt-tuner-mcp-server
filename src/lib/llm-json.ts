@@ -141,16 +141,21 @@ function parseJsonCandidates<T>(
   parse: (value: unknown) => T,
   debugLabel: string | undefined
 ): { value: T } | { error: ParseFailureDetail | null } {
-  const stripped = stripCodeBlockMarkers(text);
-  const extracted = extractFirstJsonFragment(text);
   const candidates: { label: string; value: string | null }[] = [
     { label: 'raw', value: shouldTryRawParse(text) ? text : null },
-    {
-      label: 'stripped markers',
-      value: stripped !== text ? stripped : null,
-    },
-    { label: 'extracted fragment', value: extracted },
   ];
+  const initial = parseCandidates(candidates, parse, debugLabel);
+  if ('value' in initial) return initial;
+
+  const stripped = stripCodeBlockMarkers(text);
+  if (stripped !== text) {
+    candidates.push({ label: 'stripped markers', value: stripped });
+  }
+  candidates.push({
+    label: 'extracted fragment',
+    value: extractFirstJsonFragment(text),
+  });
+
   return parseCandidates(candidates, parse, debugLabel);
 }
 

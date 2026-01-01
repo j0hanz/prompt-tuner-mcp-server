@@ -29,7 +29,7 @@ export async function createCompletion<TResponse, TResult>(
   create: (requestOptions: {
     timeout: number;
     signal?: AbortSignal;
-  }) => Promise<TResponse>,
+  }) => PromiseLike<TResponse>,
   extract: (response: TResponse) => TResult
 ): Promise<TResult> {
   const response = await create(buildTimeoutOptions(options));
@@ -40,12 +40,13 @@ export function buildOpenAIRequest(
   model: string,
   prompt: string,
   maxTokens: number
-): OpenAI.Chat.Completions.ChatCompletionCreateParams {
+): OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming {
   return {
     model,
     messages: [{ role: 'user', content: prompt }],
     max_tokens: maxTokens,
     temperature: 0.7,
+    stream: false,
   };
 }
 
@@ -61,11 +62,12 @@ export function buildAnthropicRequest(
   model: string,
   prompt: string,
   maxTokens: number
-): Anthropic.Messages.MessageCreateParams {
+): Anthropic.Messages.MessageCreateParamsNonStreaming {
   return {
     model,
     max_tokens: maxTokens,
     messages: [{ role: 'user', content: prompt }],
+    stream: false,
   };
 }
 

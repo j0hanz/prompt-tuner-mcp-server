@@ -47,7 +47,7 @@ class OpenAIClient implements LLMClient {
             this.client.chat.completions.create(
               buildOpenAIRequest(this.model, prompt, maxTokens),
               requestOptions
-            ) as Promise<OpenAI.Chat.Completions.ChatCompletion>,
+            ),
           (response) => extractOpenAIText(response)
         ),
       options?.signal
@@ -88,7 +88,7 @@ class AnthropicClient implements LLMClient {
             this.client.messages.create(
               buildAnthropicRequest(this.model, prompt, maxTokens),
               requestOptions
-            ) as Promise<Anthropic.Messages.Message>,
+            ),
           (response) => extractAnthropicText(response)
         ),
       options?.signal

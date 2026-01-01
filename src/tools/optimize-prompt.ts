@@ -188,7 +188,8 @@ function buildOptimizePrompt(
 
 async function runOptimization(
   optimizePrompt: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  timeoutMs: number
 ): Promise<{ result: OptimizeResponse; usedFallback: boolean }> {
   const { value, usedFallback } =
     await executeLLMWithJsonResponse<OptimizeResponse>(
@@ -198,7 +199,7 @@ async function runOptimization(
       TOOL_NAME,
       {
         maxTokens: OPTIMIZE_MAX_TOKENS,
-        timeoutMs: LLM_TIMEOUT_MS,
+        timeoutMs,
         signal,
         retryOnParseFailure: true,
       }
@@ -209,6 +210,7 @@ async function runOptimization(
 async function optimizeOnce(
   resolved: ResolvedOptimizeInputs,
   signal: AbortSignal,
+  timeoutMs: number,
   extraRules?: string
 ): Promise<{ result: OptimizeResponse; usedFallback: boolean }> {
   const optimizePrompt = buildOptimizePrompt(
@@ -217,7 +219,7 @@ async function optimizeOnce(
     resolved.effectiveTechniques,
     extraRules
   );
-  return runOptimization(optimizePrompt, signal);
+  return runOptimization(optimizePrompt, signal, timeoutMs);
 }
 
 function normalizeOptimizeResult(result: OptimizeResponse): {
@@ -328,40 +330,98 @@ function validateOptimizeResult(
   return { ok: true, result: normalizedResult.normalized };
 }
 
+function createTimeoutBudget(
+  label: string,
+  totalTimeoutMs: number
+): () => number {
+  const deadlineMs = Date.now() + totalTimeoutMs;
+  return () => {
+    const remaining = deadlineMs - Date.now();
+    if (remaining <= 0) {
+      throw new McpError(ErrorCode.E_TIMEOUT, `${label} budget exceeded`);
+    }
+    return remaining;
+  };
+}
+
+function buildOptimizeValidationConfig(
+  resolved: ResolvedOptimizeInputs
+): OptimizeValidationConfig {
+  return {
+    allowedTechniques: resolved.effectiveTechniques,
+    targetFormat: resolved.resolvedFormat,
+  };
+}
+
+async function runOptimizationAttempt(
+  resolved: ResolvedOptimizeInputs,
+  signal: AbortSignal,
+  timeoutMs: number,
+  config: OptimizeValidationConfig,
+  extraRules?: string
+): Promise<
+  | { ok: true; result: OptimizeResponse; usedFallback: boolean }
+  | {
+      ok: false;
+      result: OptimizeResponse;
+      usedFallback: boolean;
+      reason?: string;
+    }
+> {
+  const attempt = await optimizeOnce(resolved, signal, timeoutMs, extraRules);
+  const validation = validateOptimizeResult(attempt.result, config);
+  if (validation.ok) {
+    return {
+      ok: true,
+      result: validation.result,
+      usedFallback: attempt.usedFallback,
+    };
+  }
+  return {
+    ok: false,
+    result: validation.result,
+    usedFallback: attempt.usedFallback,
+    reason: validation.reason,
+  };
+}
+
 async function runValidatedOptimization(
   resolved: ResolvedOptimizeInputs,
   signal: AbortSignal
 ): Promise<{ result: OptimizeResponse; usedFallback: boolean }> {
-  const validationConfig: OptimizeValidationConfig = {
-    allowedTechniques: resolved.effectiveTechniques,
-    targetFormat: resolved.resolvedFormat,
-  };
-  const primary = await optimizeOnce(resolved, signal);
-  const primaryValidation = validateOptimizeResult(
-    primary.result,
+  const validationConfig = buildOptimizeValidationConfig(resolved);
+  const resolveRemainingTimeout = createTimeoutBudget(
+    'Optimization',
+    LLM_TIMEOUT_MS
+  );
+  const primary = await runOptimizationAttempt(
+    resolved,
+    signal,
+    resolveRemainingTimeout(),
     validationConfig
   );
-  if (primaryValidation.ok) {
+  if (primary.ok) {
     return {
-      result: primaryValidation.result,
+      result: primary.result,
       usedFallback: primary.usedFallback,
     };
   }
-
-  const retry = await optimizeOnce(resolved, signal, STRICT_OPTIMIZE_RULES);
-  const retryValidation = validateOptimizeResult(
-    retry.result,
-    validationConfig
+  const retry = await runOptimizationAttempt(
+    resolved,
+    signal,
+    resolveRemainingTimeout(),
+    validationConfig,
+    STRICT_OPTIMIZE_RULES
   );
-  if (!retryValidation.ok) {
+  if (!retry.ok) {
     throw new McpError(
       ErrorCode.E_LLM_FAILED,
       `Optimized prompt failed validation${
-        retryValidation.reason ? `: ${retryValidation.reason}` : ''
+        retry.reason ? `: ${retry.reason}` : ''
       }`
     );
   }
-  return { result: retryValidation.result, usedFallback: true };
+  return { result: retry.result, usedFallback: true };
 }
 
 function normalizeOptimizationScores(result: OptimizeResponse): {
