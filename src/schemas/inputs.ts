@@ -5,18 +5,11 @@ import { OPTIMIZATION_TECHNIQUES, TARGET_FORMATS } from '../config/types.js';
 
 const promptSchema = z
   .string()
+  .max(
+    MAX_PROMPT_LENGTH * 2,
+    `Prompt with excessive whitespace rejected (max ${MAX_PROMPT_LENGTH * 2} characters).`
+  )
   .superRefine((value, ctx) => {
-    if (value.length > MAX_PROMPT_LENGTH * 2) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.too_big,
-        maximum: MAX_PROMPT_LENGTH * 2,
-        type: 'string',
-        inclusive: true,
-        message: `Prompt with excessive whitespace rejected (${value.length} characters). Maximum allowed: ${MAX_PROMPT_LENGTH * 2}`,
-      });
-      return;
-    }
-
     const trimmed = value.trim();
     if (trimmed.length < 1) {
       ctx.addIssue({
