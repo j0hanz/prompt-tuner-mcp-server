@@ -24,6 +24,7 @@ PromptTuner MCP is an MCP server that refines, analyzes, optimizes, and validate
 - Auto-detect target format (Claude XML, GPT Markdown, or JSON).
 - Structured outputs with provider/model metadata, fallback indicators, and score normalization.
 - Retry logic with exponential backoff for transient provider failures.
+- Emits MCP progress notifications for `analyze_prompt` when a progress token is provided.
 
 ## Quick Start
 
@@ -65,6 +66,21 @@ PromptTuner reads configuration from environment variables. CLI flags can overri
 | `LLM_MAX_TOKENS`    | `8000`           | Upper bound for LLM outputs (tool caps apply). |
 | `MAX_PROMPT_LENGTH` | `10000`          | Max trimmed prompt length (chars).             |
 
+## CLI Options
+
+CLI flags override environment variables (run `prompt-tuner-mcp-server --help`).
+
+| Flag                           | Env var                 | Description                                 |
+| ------------------------------ | ----------------------- | ------------------------------------------- | --------------------------------------- |
+| `--log-format <text            | json>`                  | `LOG_FORMAT`                                | Override log format (currently unused). |
+| `--debug / --no-debug`         | `DEBUG`                 | Enable/disable debug logging.               |
+| `--include-error-context`      | `INCLUDE_ERROR_CONTEXT` | Include sanitized prompt snippet in errors. |
+| `--llm-provider <provider>`    | `LLM_PROVIDER`          | `openai`, `anthropic`, or `google`.         |
+| `--llm-model <name>`           | `LLM_MODEL`             | Override the default model.                 |
+| `--llm-timeout-ms <number>`    | `LLM_TIMEOUT_MS`        | Override request timeout (ms).              |
+| `--llm-max-tokens <number>`    | `LLM_MAX_TOKENS`        | Override output token cap.                  |
+| `--max-prompt-length <number>` | `MAX_PROMPT_LENGTH`     | Override max prompt length (chars).         |
+
 ## Tools
 
 All tools accept plain text, Markdown, or XML prompts. Responses include `content` (human-readable) and `structuredContent` (machine-readable).
@@ -95,11 +111,11 @@ Returns: `ok`, `hasTypos`, `isVague`, `missingContext`, `suggestions`, `score`, 
 
 Apply multiple techniques sequentially and return before/after scores.
 
-| Parameter      | Type     | Required | Default     | Notes                                                                                                                           |
-| -------------- | -------- | -------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `prompt`       | string   | Yes      | -           | Trimmed and length-checked.                                                                                                     |
-| `techniques`   | string[] | No       | `["basic"]` | 1-6 techniques; duplicates removed. `comprehensive` expands to `basic -> roleBased -> structured -> fewShot -> chainOfThought`. |
-| `targetFormat` | string   | No       | `auto`      | `auto`, `claude`, `gpt`, `json`.                                                                                                |
+| Parameter      | Type     | Required | Default     | Notes                                                                                                                        |
+| -------------- | -------- | -------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `prompt`       | string   | Yes      | -           | Trimmed and length-checked.                                                                                                  |
+| `techniques`   | string[] | No       | `["basic"]` | 1-6 techniques; order preserved. `comprehensive` expands to `basic -> roleBased -> structured -> fewShot -> chainOfThought`. |
+| `targetFormat` | string   | No       | `auto`      | `auto`, `claude`, `gpt`, `json`.                                                                                             |
 
 Returns: `ok`, `original`, `optimized`, `techniquesApplied`, `targetFormat`, `beforeScore`, `afterScore`, `scoreDelta`, `improvements`, `usedFallback`, `scoreAdjusted`, `overallSource`, `provider`, `model`.
 
@@ -122,6 +138,7 @@ Token limits used for `validate_prompt`: `claude` 200000, `gpt` 128000, `gemini`
 - `content`: array of content blocks (human-readable Markdown text plus optional resources).
 - `structuredContent`: machine-parseable results.
 - Errors return `structuredContent.ok=false` and an `error` object with `code`, `message`, optional `context` (sanitized, up to 200 chars), `details`, and `recoveryHint`.
+- Error responses also include `isError: true`.
 - `refine_prompt` and `optimize_prompt` include a `resource` content block with a `file:///` URI and the prompt text in `resource.text` (Markdown).
 
 ## Prompts
@@ -131,6 +148,8 @@ Token limits used for `validate_prompt`: `claude` 200000, `gpt` 128000, `gemini`
 | `quick-optimize` | Fast prompt improvement with grammar and clarity fixes.         |
 | `deep-optimize`  | Comprehensive optimization using the `comprehensive` technique. |
 | `analyze`        | Score prompt quality and return suggestions.                    |
+
+All prompts accept a single argument: `{ "prompt": "..." }`.
 
 ## Prompt Optimization Workflow
 
@@ -167,8 +186,10 @@ Token limits used for `validate_prompt`: `claude` 200000, `gpt` 128000, `gemini`
 | Command                  | Description                                           |
 | ------------------------ | ----------------------------------------------------- |
 | `npm run build`          | Compile TypeScript and set permissions.               |
+| `npm run prepare`        | Build on install (publishing helper).                 |
 | `npm run dev`            | Run from source in watch mode.                        |
 | `npm run dev:http`       | Alias of `npm run dev` (no HTTP transport yet).       |
+| `npm run watch`          | TypeScript compiler in watch mode.                    |
 | `npm run start`          | Run the compiled server from `dist/`.                 |
 | `npm run start:http`     | Alias of `npm run start` (no HTTP transport yet).     |
 | `npm run test`           | Run `node:test` once.                                 |
@@ -192,7 +213,6 @@ src/
   tools/          Tool implementations
   prompts/        MCP prompt templates
   schemas/        Zod input/output schemas
-  types/          Shared types
 
 tests/            node:test suites
 

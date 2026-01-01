@@ -25,13 +25,28 @@ PromptTuner checks that the correct API key environment variable is set at start
 
 Set `LLM_MODEL` to override the default model for the chosen provider.
 
+## CLI overrides
+
+CLI flags override environment variables. Flags only cover a subset of settings; retry options and `GOOGLE_SAFETY_DISABLED` are env-only.
+
+| Flag                           | Env var                 | Description                                 |
+| ------------------------------ | ----------------------- | ------------------------------------------- | --------------------------------------- |
+| `--log-format <text            | json>`                  | `LOG_FORMAT`                                | Override log format (currently unused). |
+| `--debug / --no-debug`         | `DEBUG`                 | Enable/disable debug logging.               |
+| `--include-error-context`      | `INCLUDE_ERROR_CONTEXT` | Include sanitized prompt snippet in errors. |
+| `--llm-provider <provider>`    | `LLM_PROVIDER`          | `openai`, `anthropic`, or `google`.         |
+| `--llm-model <name>`           | `LLM_MODEL`             | Override the default model.                 |
+| `--llm-timeout-ms <number>`    | `LLM_TIMEOUT_MS`        | Override request timeout (ms).              |
+| `--llm-max-tokens <number>`    | `LLM_MAX_TOKENS`        | Override output token cap.                  |
+| `--max-prompt-length <number>` | `MAX_PROMPT_LENGTH`     | Override max prompt length (chars).         |
+
 ## Limits and timeouts (optional)
 
 | Variable            | Default | Description                          |
 | ------------------- | ------- | ------------------------------------ |
 | `MAX_PROMPT_LENGTH` | `10000` | Max trimmed prompt length (chars).   |
 | `LLM_MAX_TOKENS`    | `8000`  | Upper bound for model output tokens. |
-| `LLM_TIMEOUT_MS`    | `60000` | Per-request timeout (ms).            |
+| `LLM_TIMEOUT_MS`    | `60000` | Request timeout (ms).                |
 
 All numeric values are parsed as integers. Invalid values or values below the minimum thresholds will fail startup validation.
 
@@ -40,7 +55,7 @@ Minimums: `MAX_PROMPT_LENGTH` >= 1, `LLM_MAX_TOKENS` >= 1, `LLM_TIMEOUT_MS` >= 1
 ### Prompt length enforcement
 
 - Input is trimmed before validation.
-- If raw input exceeds `MAX_PROMPT_LENGTH * 2`, it is rejected as excessive whitespace.
+- Raw input length is capped at `MAX_PROMPT_LENGTH * 2` before trimming.
 - If trimmed input exceeds `MAX_PROMPT_LENGTH`, it is rejected.
 
 ### Tool token caps
@@ -63,7 +78,7 @@ Tool max tokens are derived from `LLM_MAX_TOKENS`:
 | `RETRY_MAX_DELAY_MS`     | `10000`  | Max delay between retries.                     |
 | `RETRY_TOTAL_TIMEOUT_MS` | `180000` | Total time allowed across retries.             |
 
-Retries use exponential backoff with jitter and stop when the total timeout is exceeded.
+Retries use exponential backoff (no jitter) and stop when the total timeout is exceeded.
 
 Minimums: `RETRY_MAX_ATTEMPTS` >= 0, `RETRY_BASE_DELAY_MS` >= 100, `RETRY_MAX_DELAY_MS` >= 1000, `RETRY_TOTAL_TIMEOUT_MS` >= 10000.
 
@@ -74,6 +89,8 @@ Minimums: `RETRY_MAX_ATTEMPTS` >= 0, `RETRY_BASE_DELAY_MS` >= 100, `RETRY_MAX_DE
 | `DEBUG`                 | `false` | Enables debug logging (set to the string `true` or `false`). Logs are written to stderr. |
 | `LOG_FORMAT`            | `text`  | Accepted values: `json`, `text`. Currently ignored; output is always JSON via pino.      |
 | `INCLUDE_ERROR_CONTEXT` | `false` | Adds a sanitized prompt snippet (up to 200 chars) to errors.                             |
+
+When `DEBUG=true`, the server also logs diagnostics-channel telemetry for LLM requests and event-loop health.
 
 ## Provider-specific settings
 
