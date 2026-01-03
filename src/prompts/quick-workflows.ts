@@ -42,11 +42,9 @@ function promptArg(description: string): {
   parseArgs: (args: unknown) => QuickWorkflowArgs;
 } {
   const promptSchema = buildPromptSchema(description);
-  const schema = z
-    .object({
-      prompt: promptSchema,
-    })
-    .strict();
+  const schema = z.strictObject({
+    prompt: promptSchema,
+  });
   return {
     argsSchema: schema.shape,
     parseArgs: (args) => schema.parse(args),
@@ -55,7 +53,7 @@ function promptArg(description: string): {
 
 function buildPromptSchema(
   description: string
-): z.ZodType<string, z.ZodTypeDef, string> {
+): z.ZodType<string, string> {
   return z
     .string()
     .max(
@@ -66,9 +64,9 @@ function buildPromptSchema(
       const trimmed = value.trim();
       if (trimmed.length < 1) {
         ctx.addIssue({
-          code: z.ZodIssueCode.too_small,
+          code: 'too_small',
+          origin: 'string',
           minimum: 1,
-          type: 'string',
           inclusive: true,
           message:
             'Prompt is empty or contains only whitespace. Please provide a valid prompt.',
@@ -78,9 +76,9 @@ function buildPromptSchema(
 
       if (trimmed.length > MAX_PROMPT_LENGTH) {
         ctx.addIssue({
-          code: z.ZodIssueCode.too_big,
+          code: 'too_big',
+          origin: 'string',
           maximum: MAX_PROMPT_LENGTH,
-          type: 'string',
           inclusive: true,
           message: `Prompt exceeds maximum length after trimming: ${trimmed.length} characters (limit: ${MAX_PROMPT_LENGTH}). Please shorten your prompt.`,
         });

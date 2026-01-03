@@ -9,7 +9,7 @@ const booleanString = z
 const numberString = (
   def: number,
   min = 0
-): z.ZodType<number, z.ZodTypeDef, string | undefined> =>
+): z.ZodType<number, string | undefined> =>
   z
     .string()
     .optional()

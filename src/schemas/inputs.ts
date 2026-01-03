@@ -13,9 +13,9 @@ const promptSchema = z
     const trimmed = value.trim();
     if (trimmed.length < 1) {
       ctx.addIssue({
-        code: z.ZodIssueCode.too_small,
+        code: 'too_small',
+        origin: 'string',
         minimum: 1,
-        type: 'string',
         inclusive: true,
         message:
           'Prompt is empty or contains only whitespace. Please provide a valid prompt.',
@@ -25,9 +25,9 @@ const promptSchema = z
 
     if (trimmed.length > MAX_PROMPT_LENGTH) {
       ctx.addIssue({
-        code: z.ZodIssueCode.too_big,
+        code: 'too_big',
+        origin: 'string',
         maximum: MAX_PROMPT_LENGTH,
-        type: 'string',
         inclusive: true,
         message: `Prompt exceeds maximum length after trimming: ${trimmed.length} characters (limit: ${MAX_PROMPT_LENGTH}). Please shorten your prompt.`,
       });
@@ -46,58 +46,50 @@ const targetFormatSchema = z
   .enum(TARGET_FORMATS)
   .describe('auto | claude | gpt | json');
 
-export const RefinePromptInputSchema = z
-  .object({
-    prompt: promptSchema,
-    technique: techniqueSchema
-      .optional()
-      .default('basic')
-      .describe(
-        'basic | chainOfThought | fewShot | roleBased | structured | comprehensive'
-      ),
-    targetFormat: targetFormatSchema
-      .optional()
-      .default('auto')
-      .describe('auto | claude | gpt | json'),
-  })
-  .strict();
+export const RefinePromptInputSchema = z.strictObject({
+  prompt: promptSchema,
+  technique: techniqueSchema
+    .optional()
+    .default('basic')
+    .describe(
+      'basic | chainOfThought | fewShot | roleBased | structured | comprehensive'
+    ),
+  targetFormat: targetFormatSchema
+    .optional()
+    .default('auto')
+    .describe('auto | claude | gpt | json'),
+});
 
-export const AnalyzePromptInputSchema = z
-  .object({
-    prompt: promptSchema,
-  })
-  .strict();
+export const AnalyzePromptInputSchema = z.strictObject({
+  prompt: promptSchema,
+});
 
-export const OptimizePromptInputSchema = z
-  .object({
-    prompt: promptSchema,
-    techniques: z
-      .array(techniqueSchema)
-      .min(1, 'At least one technique required')
-      .max(6, 'Maximum 6 techniques allowed')
-      .default(['basic'])
-      .describe(
-        'Array of: basic, chainOfThought, fewShot, roleBased, structured, comprehensive'
-      ),
-    targetFormat: targetFormatSchema
-      .optional()
-      .default('auto')
-      .describe('auto | claude | gpt | json'),
-  })
-  .strict();
+export const OptimizePromptInputSchema = z.strictObject({
+  prompt: promptSchema,
+  techniques: z
+    .array(techniqueSchema)
+    .min(1, 'At least one technique required')
+    .max(6, 'Maximum 6 techniques allowed')
+    .default(['basic'])
+    .describe(
+      'Array of: basic, chainOfThought, fewShot, roleBased, structured, comprehensive'
+    ),
+  targetFormat: targetFormatSchema
+    .optional()
+    .default('auto')
+    .describe('auto | claude | gpt | json'),
+});
 
-export const ValidatePromptInputSchema = z
-  .object({
-    prompt: promptSchema.describe('Prompt to validate'),
-    targetModel: z
-      .enum(['claude', 'gpt', 'gemini', 'generic'])
-      .optional()
-      .default('generic')
-      .describe('Target AI model for token limit validation'),
-    checkInjection: z
-      .boolean()
-      .optional()
-      .default(true)
-      .describe('Check for prompt injection patterns'),
-  })
-  .strict();
+export const ValidatePromptInputSchema = z.strictObject({
+  prompt: promptSchema.describe('Prompt to validate'),
+  targetModel: z
+    .enum(['claude', 'gpt', 'gemini', 'generic'])
+    .optional()
+    .default('generic')
+    .describe('Target AI model for token limit validation'),
+  checkInjection: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe('Check for prompt injection patterns'),
+});

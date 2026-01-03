@@ -8,7 +8,7 @@ const ErrorSchema = z
     message: z.string().describe('Human-readable error message'),
     context: z.string().optional().describe('Safe, truncated context'),
     details: z
-      .record(z.unknown())
+      .record(z.string(), z.unknown())
       .optional()
       .describe('Additional error details'),
     recoveryHint: z.string().optional().describe('Suggested recovery action'),
@@ -100,7 +100,7 @@ const ScoreAdjustmentFields = {
 };
 
 export const RefinePromptOutputSchema = z
-  .object({
+  .strictObject({
     ok: z.boolean().describe('True if refinement succeeded'),
     original: z.string().optional().describe('Original prompt text'),
     refined: z.string().optional().describe('Refined prompt text'),
@@ -110,11 +110,10 @@ export const RefinePromptOutputSchema = z
     ...FallbackFields,
     ...ProviderModelErrorFields,
   })
-  .strict()
   .describe('Refine prompt response');
 
 export const AnalyzePromptOutputSchema = z
-  .object({
+  .strictObject({
     ok: z.boolean().describe('True if analysis succeeded'),
     hasTypos: z.boolean().optional().describe('Typos detected'),
     isVague: z.boolean().optional().describe('Vague language detected'),
@@ -131,11 +130,10 @@ export const AnalyzePromptOutputSchema = z
     ...ScoreAdjustmentFields,
     ...ProviderModelErrorFields,
   })
-  .strict()
   .describe('Analyze prompt response');
 
 export const OptimizePromptOutputSchema = z
-  .object({
+  .strictObject({
     ok: z.boolean().describe('True if optimization succeeded'),
     original: z.string().optional().describe('Original prompt text'),
     optimized: z.string().optional().describe('Optimized prompt text'),
@@ -158,11 +156,10 @@ export const OptimizePromptOutputSchema = z
     ...ScoreAdjustmentFields,
     ...ProviderModelErrorFields,
   })
-  .strict()
   .describe('Optimize prompt response');
 
 export const ValidatePromptOutputSchema = z
-  .object({
+  .strictObject({
     ok: z.boolean().describe('True if validation succeeded'),
     isValid: z.boolean().optional().describe('Overall validity'),
     issues: z
@@ -186,5 +183,4 @@ export const ValidatePromptOutputSchema = z
     securityFlags: z.array(z.string()).optional().describe('Security flags'),
     ...ProviderModelErrorFields,
   })
-  .strict()
   .describe('Validate prompt response');
