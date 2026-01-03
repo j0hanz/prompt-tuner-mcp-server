@@ -1,10 +1,9 @@
 import { z } from 'zod';
 
 const booleanString = z
-  .enum(['true', 'false'])
+  .stringbool({ truthy: ['true'], falsy: ['false'] })
   .optional()
-  .default('false')
-  .transform((v) => v === 'true');
+  .default(false);
 
 const numberString = (
   def: number,
@@ -30,10 +29,9 @@ const envSchema = z.object({
   LLM_TIMEOUT_MS: numberString(60000, 1000),
   LLM_MAX_TOKENS: numberString(8000, 1),
   GOOGLE_SAFETY_DISABLED: z
-    .enum(['true', 'false'])
+    .stringbool({ truthy: ['true'], falsy: ['false'] })
     .optional()
-    .default('false')
-    .transform((v) => v === 'true'),
+    .default(false),
 
   OPENAI_API_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),

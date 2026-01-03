@@ -51,9 +51,7 @@ function promptArg(description: string): {
   };
 }
 
-function buildPromptSchema(
-  description: string
-): z.ZodType<string, string> {
+function buildPromptSchema(description: string): z.ZodType<string, string> {
   return z
     .string()
     .max(

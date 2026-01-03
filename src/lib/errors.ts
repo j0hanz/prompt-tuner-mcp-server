@@ -1,7 +1,7 @@
 import { inspect } from 'node:util';
 
 import pino from 'pino';
-import type { ZodError } from 'zod';
+import { z, type ZodError } from 'zod';
 
 import { config } from '../config/env.js';
 import {
@@ -89,9 +89,10 @@ function buildZodStructuredError(
   if (!isZodError(error)) return null;
 
   const safeContext = resolveSafeContext(context);
+  const prettyMessage = z.prettifyError(error);
   return {
     code: ErrorCode.E_INVALID_INPUT,
-    message: `Invalid params: ${error.message}`,
+    message: prettyMessage,
     ...(safeContext ? { context: safeContext } : {}),
     details: { issues: error.issues },
     recoveryHint: DEFAULT_RECOVERY_HINTS[ErrorCode.E_INVALID_INPUT],

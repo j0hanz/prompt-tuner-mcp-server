@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { OPTIMIZATION_TECHNIQUES } from '../config/types.js';
 
-const ScoreSchema = z.number().int().min(0).max(100);
+const ScoreSchema = z.int().min(0).max(100);
 
 const OptimizeScoreSchema = z.object({
   clarity: ScoreSchema,
@@ -32,7 +32,7 @@ const AnalysisCharacteristicsSchema = z.object({
   hasExamples: z.boolean(),
   hasStructure: z.boolean(),
   hasStepByStep: z.boolean(),
-  wordCount: z.number().int().min(0),
+  wordCount: z.int().min(0),
   detectedFormat: z.enum(['claude', 'gpt', 'json', 'auto']),
   estimatedComplexity: z.enum(['simple', 'moderate', 'complex']),
 });
@@ -51,6 +51,6 @@ const ValidationIssueSchema = z.object({
 
 export const ValidationResponseSchema = z.object({
   isValid: z.boolean(),
-  tokenEstimate: z.number().int().min(0),
+  tokenEstimate: z.int().min(0),
   issues: z.array(ValidationIssueSchema),
 });
