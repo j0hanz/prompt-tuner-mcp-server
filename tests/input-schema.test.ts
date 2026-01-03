@@ -6,7 +6,7 @@ import {
   OptimizePromptInputSchema,
   RefinePromptInputSchema,
   ValidatePromptInputSchema,
-} from '../src/schemas/index.js';
+} from '../src/schemas/inputs.js';
 
 describe('input schemas', () => {
   it('rejects unknown fields for refine', () => {

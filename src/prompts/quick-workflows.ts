@@ -2,8 +2,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { z } from 'zod';
 
-import { MAX_PROMPT_LENGTH } from '../config/constants.js';
 import { wrapPromptData } from '../lib/prompt-policy.js';
+import { buildPromptSchema } from '../schemas/inputs.js';
 
 interface QuickWorkflowArgs {
   prompt: string;
@@ -49,41 +49,6 @@ function promptArg(description: string): {
     argsSchema: schema.shape,
     parseArgs: (args) => schema.parse(args),
   };
-}
-
-function buildPromptSchema(description: string): z.ZodType<string, string> {
-  return z
-    .string()
-    .max(
-      MAX_PROMPT_LENGTH * 2,
-      `Prompt rejected: raw input exceeds ${MAX_PROMPT_LENGTH * 2} characters (including whitespace). Trim or shorten your prompt.`
-    )
-    .superRefine((value, ctx) => {
-      const trimmed = value.trim();
-      if (trimmed.length < 1) {
-        ctx.addIssue({
-          code: 'too_small',
-          origin: 'string',
-          minimum: 1,
-          inclusive: true,
-          message:
-            'Prompt is empty or contains only whitespace. Please provide a valid prompt.',
-        });
-        return;
-      }
-
-      if (trimmed.length > MAX_PROMPT_LENGTH) {
-        ctx.addIssue({
-          code: 'too_big',
-          origin: 'string',
-          maximum: MAX_PROMPT_LENGTH,
-          inclusive: true,
-          message: `Prompt exceeds maximum length after trimming: ${trimmed.length} characters (limit: ${MAX_PROMPT_LENGTH}). Please shorten your prompt.`,
-        });
-      }
-    })
-    .transform((value) => value.trim())
-    .describe(description);
 }
 
 function renderTemplate(

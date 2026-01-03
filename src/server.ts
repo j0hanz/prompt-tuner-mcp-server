@@ -10,7 +10,7 @@ import {
   SERVER_VERSION,
 } from './config/constants.js';
 import { logger } from './lib/errors.js';
-import { registerAllPrompts } from './prompts/index.js';
+import { registerQuickWorkflowPrompts } from './prompts/quick-workflows.js';
 import { registerTemplateResources } from './resources/templates.js';
 import { registerAnalyzePromptTool } from './tools/analyze-prompt.js';
 import { registerOptimizePromptTool } from './tools/optimize-prompt.js';
@@ -47,7 +47,7 @@ export function createServer(): McpServer {
   registerOptimizePromptTool(server);
   registerValidatePromptTool(server);
   registerTemplateResources(server);
-  registerAllPrompts(server);
+  registerQuickWorkflowPrompts(server);
 
   return server;
 }

@@ -34,10 +34,8 @@ import {
 } from '../lib/tool-formatters.js';
 import { extractPromptFromInput } from '../lib/tool-helpers.js';
 import { validatePrompt } from '../lib/validation.js';
-import {
-  RefinePromptInputSchema,
-  RefinePromptOutputSchema,
-} from '../schemas/index.js';
+import { RefinePromptInputSchema } from '../schemas/inputs.js';
+import { RefinePromptOutputSchema } from '../schemas/outputs.js';
 
 const REFINE_PROMPT_TOOL = {
   title: 'Refine Prompt',
@@ -225,7 +223,7 @@ async function runRefinementAttempt(
     attempt.extraInstructions
   );
 
-  const { normalized } = normalizePromptText(refinedRaw);
+  const normalized = normalizePromptText(refinedRaw);
   const reason = validateRefinedOutput(
     normalized,
     attempt.technique,

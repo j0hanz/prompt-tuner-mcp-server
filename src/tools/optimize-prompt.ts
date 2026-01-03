@@ -39,11 +39,9 @@ import {
   extractPromptFromInput,
 } from '../lib/tool-helpers.js';
 import { validatePrompt } from '../lib/validation.js';
-import {
-  OptimizePromptInputSchema,
-  OptimizePromptOutputSchema,
-} from '../schemas/index.js';
+import { OptimizePromptInputSchema } from '../schemas/inputs.js';
 import { OptimizeResponseSchema } from '../schemas/llm-responses.js';
+import { OptimizePromptOutputSchema } from '../schemas/outputs.js';
 
 const TOOL_NAME = 'optimize_prompt' as const;
 
@@ -228,7 +226,7 @@ function normalizeOptimizeResult(result: OptimizeResponse): {
   techniquesApplied: readonly OptimizationTechnique[];
   appliedConcrete: readonly ConcreteTechnique[];
 } {
-  const { normalized } = normalizePromptText(result.optimized);
+  const normalized = normalizePromptText(result.optimized);
   const techniquesApplied = Array.from(new Set(result.techniquesApplied));
   const appliedConcrete = techniquesApplied.filter(isConcreteTechnique);
   return {

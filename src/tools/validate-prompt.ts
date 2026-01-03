@@ -29,11 +29,9 @@ import {
   executeLLMWithJsonResponse,
   extractPromptFromInput,
 } from '../lib/tool-helpers.js';
-import {
-  ValidatePromptInputSchema,
-  ValidatePromptOutputSchema,
-} from '../schemas/index.js';
+import { ValidatePromptInputSchema } from '../schemas/inputs.js';
 import { ValidationResponseSchema } from '../schemas/llm-responses.js';
+import { ValidatePromptOutputSchema } from '../schemas/outputs.js';
 
 const TOOL_NAME = 'validate_prompt' as const;
 

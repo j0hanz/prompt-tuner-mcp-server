@@ -31,16 +31,12 @@ function stripPromptLabel(text: string): string {
   return rest.join('\n').trim();
 }
 
-export function normalizePromptText(text: string): {
-  normalized: string;
-  changed: boolean;
-} {
+export function normalizePromptText(text: string): string {
   const trimmed = text.trim();
   let normalized = stripCodeFence(trimmed);
   normalized = stripPromptLabel(normalized);
   normalized = stripCodeFence(normalized);
-  const finalText = normalized || trimmed;
-  return { normalized: finalText, changed: finalText !== trimmed };
+  return normalized || trimmed;
 }
 
 export function containsOutputScaffolding(text: string): boolean {

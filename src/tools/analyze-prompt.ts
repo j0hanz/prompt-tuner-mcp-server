@@ -36,11 +36,9 @@ import {
   executeLLMWithJsonResponse,
   extractPromptFromInput,
 } from '../lib/tool-helpers.js';
-import {
-  AnalyzePromptInputSchema,
-  AnalyzePromptOutputSchema,
-} from '../schemas/index.js';
+import { AnalyzePromptInputSchema } from '../schemas/inputs.js';
 import { AnalysisResponseSchema } from '../schemas/llm-responses.js';
+import { AnalyzePromptOutputSchema } from '../schemas/outputs.js';
 
 const TOOL_NAME = 'analyze_prompt' as const;
 

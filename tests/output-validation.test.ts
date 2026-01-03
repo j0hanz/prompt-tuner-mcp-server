@@ -11,19 +11,18 @@ import {
   OptimizePromptOutputSchema,
   RefinePromptOutputSchema,
   ValidatePromptOutputSchema,
-} from '../src/schemas/index.js';
+} from '../src/schemas/outputs.js';
 
 describe('output validation', () => {
   it('normalizes wrapped code fences', () => {
     const result = normalizePromptText('```text\nHello\n```');
-    assert.strictEqual(result.normalized, 'Hello');
-    assert.strictEqual(result.changed, true);
+    assert.strictEqual(result, 'Hello');
   });
 
   it('normalizes prompt labels with fenced content', () => {
     const input = 'Refined Prompt:\n```text\nHello\n```';
     const result = normalizePromptText(input);
-    assert.strictEqual(result.normalized, 'Hello');
+    assert.strictEqual(result, 'Hello');
   });
 
   it('detects output scaffolding', () => {
