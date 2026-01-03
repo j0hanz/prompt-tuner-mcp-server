@@ -220,5 +220,5 @@ function resolveSafeContext(context?: string): string | undefined {
 export { ErrorCode };
 
 function isZodError(error: unknown): error is ZodError {
-  return typeof error === 'object' && error !== null && 'issues' in error;
+  return error instanceof z.ZodError;
 }

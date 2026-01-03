@@ -38,7 +38,6 @@ import {
   executeLLMWithJsonResponse,
   extractPromptFromInput,
 } from '../lib/tool-helpers.js';
-import { buildPromptResourceBlock } from '../lib/tool-resources.js';
 import { validatePrompt } from '../lib/validation.js';
 import {
   OptimizePromptInputSchema,
@@ -513,30 +512,22 @@ function buildOptimizeResponse(
 ): ReturnType<typeof createSuccessResponse> {
   const scoreDelta = result.afterScore.overall - result.beforeScore.overall;
   const output = formatOptimizeOutput(result, targetFormat, provider);
-  const promptResource = buildPromptResourceBlock(
-    result.optimized,
-    `optimized-prompt-${targetFormat}`
-  );
-  return createSuccessResponse(
-    output,
-    {
-      ok: true,
-      original,
-      optimized: result.optimized,
-      techniquesApplied: result.techniquesApplied,
-      targetFormat,
-      beforeScore: result.beforeScore,
-      afterScore: result.afterScore,
-      improvements: result.improvements,
-      usedFallback: meta.usedFallback,
-      scoreAdjusted: meta.scoreAdjusted,
-      overallSource: meta.overallSource,
-      scoreDelta,
-      provider: provider.provider,
-      model: provider.model,
-    },
-    [promptResource]
-  );
+  return createSuccessResponse(output, {
+    ok: true,
+    original,
+    optimized: result.optimized,
+    techniquesApplied: result.techniquesApplied,
+    targetFormat,
+    beforeScore: result.beforeScore,
+    afterScore: result.afterScore,
+    improvements: result.improvements,
+    usedFallback: meta.usedFallback,
+    scoreAdjusted: meta.scoreAdjusted,
+    overallSource: meta.overallSource,
+    scoreDelta,
+    provider: provider.provider,
+    model: provider.model,
+  });
 }
 
 async function handleOptimizePrompt(

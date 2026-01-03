@@ -33,7 +33,6 @@ import {
   formatProviderLine,
 } from '../lib/tool-formatters.js';
 import { extractPromptFromInput } from '../lib/tool-helpers.js';
-import { buildPromptResourceBlock } from '../lib/tool-resources.js';
 import { validatePrompt } from '../lib/validation.js';
 import {
   RefinePromptInputSchema,
@@ -121,25 +120,17 @@ function buildRefineResponse(
     techniqueUsed,
     provider
   );
-  const promptResource = buildPromptResourceBlock(
+  return createSuccessResponse(output, {
+    ok: true,
+    original: input.validatedPrompt,
     refined,
-    `refined-prompt-${techniqueUsed}-${input.resolvedFormat}`
-  );
-  return createSuccessResponse(
-    output,
-    {
-      ok: true,
-      original: input.validatedPrompt,
-      refined,
-      corrections,
-      technique: techniqueUsed,
-      targetFormat: input.resolvedFormat,
-      usedFallback,
-      provider: provider.provider,
-      model: provider.model,
-    },
-    [promptResource]
-  );
+    corrections,
+    technique: techniqueUsed,
+    targetFormat: input.resolvedFormat,
+    usedFallback,
+    provider: provider.provider,
+    model: provider.model,
+  });
 }
 
 function resolveInputs(input: RefinePromptInput): ResolvedRefineInputs {
