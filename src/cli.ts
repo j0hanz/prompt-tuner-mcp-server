@@ -14,7 +14,6 @@ export function writeCliOutput(message: string): void {
 const CLI_OPTIONS = {
   help: { type: 'boolean', short: 'h' },
   version: { type: 'boolean', short: 'v' },
-  logFormat: { type: 'string' },
   debug: { type: 'boolean' },
   includeErrorContext: { type: 'boolean' },
   llmProvider: { type: 'string' },
@@ -24,13 +23,11 @@ const CLI_OPTIONS = {
   maxPromptLength: { type: 'string' },
 } as const;
 
-const LOG_FORMATS = new Set(['text', 'json']);
 const LLM_PROVIDERS = new Set(['openai', 'anthropic', 'google']);
 
 export interface CliValues {
   help: boolean;
   version: boolean;
-  logFormat?: string;
   debug?: boolean;
   includeErrorContext?: boolean;
   llmProvider?: string;
@@ -47,7 +44,6 @@ type ParsedCliValues = Record<
 
 const BOOLEAN_KEYS = ['debug', 'includeErrorContext'] as const;
 const STRING_KEYS = [
-  'logFormat',
   'llmProvider',
   'llmModel',
   'llmTimeoutMs',
@@ -122,7 +118,6 @@ function applyNumberEnv(
 }
 
 export function applyEnvOverrides(values: CliValues): void {
-  applyEnumEnv('LOG_FORMAT', values.logFormat, LOG_FORMATS, '--log-format');
   applyBooleanEnv('DEBUG', values.debug);
   applyBooleanEnv('INCLUDE_ERROR_CONTEXT', values.includeErrorContext);
   applyEnumEnv(
@@ -147,7 +142,6 @@ export function printHelp(): void {
 Options:
   -h, --help                    Show help text
   -v, --version                 Print version
-  --log-format <text|json>      Override LOG_FORMAT
   --debug / --no-debug          Override DEBUG
   --include-error-context       Override INCLUDE_ERROR_CONTEXT
   --no-include-error-context

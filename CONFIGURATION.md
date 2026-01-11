@@ -30,8 +30,7 @@ Set `LLM_MODEL` to override the default model for the chosen provider.
 CLI flags override environment variables. Flags only cover a subset of settings; retry options and `GOOGLE_SAFETY_DISABLED` are env-only.
 
 | Flag                           | Env var                 | Description                                 |
-| ------------------------------ | ----------------------- | ------------------------------------------- | --------------------------------------- |
-| `--log-format <text            | json>`                  | `LOG_FORMAT`                                | Override log format (currently unused). |
+| ------------------------------ | ----------------------- | ------------------------------------------- |
 | `--debug / --no-debug`         | `DEBUG`                 | Enable/disable debug logging.               |
 | `--include-error-context`      | `INCLUDE_ERROR_CONTEXT` | Include sanitized prompt snippet in errors. |
 | `--llm-provider <provider>`    | `LLM_PROVIDER`          | `openai`, `anthropic`, or `google`.         |
@@ -85,7 +84,6 @@ Minimums: `RETRY_MAX_ATTEMPTS` >= 0, `RETRY_BASE_DELAY_MS` >= 100, `RETRY_MAX_DE
 | Variable                | Default | Description                                                                              |
 | ----------------------- | ------- | ---------------------------------------------------------------------------------------- |
 | `DEBUG`                 | `false` | Enables debug logging (set to the string `true` or `false`). Logs are written to stderr. |
-| `LOG_FORMAT`            | `text`  | Accepted values: `json`, `text`. Currently ignored; output is always JSON via pino.      |
 | `INCLUDE_ERROR_CONTEXT` | `false` | Adds a sanitized prompt snippet (up to 200 chars) to errors.                             |
 
 When `DEBUG=true`, the server also logs diagnostics-channel telemetry for LLM requests and event-loop health.

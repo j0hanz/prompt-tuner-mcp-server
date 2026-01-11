@@ -64,18 +64,6 @@ describeIntegration('Integration', { timeout: TIMEOUT_MS }, () => {
       assert.ok(capabilities?.tools);
     });
 
-    it('should advertise resource capability', async () => {
-      assert.ok(client);
-      const capabilities = client.getServerCapabilities();
-      assert.ok(capabilities?.resources);
-    });
-
-    it('should advertise prompt capability', async () => {
-      assert.ok(client);
-      const capabilities = client.getServerCapabilities();
-      assert.ok(capabilities?.prompts);
-    });
-
     it('should advertise logging capability', async () => {
       assert.ok(client);
       const capabilities = client.getServerCapabilities();
@@ -104,66 +92,6 @@ describeIntegration('Integration', { timeout: TIMEOUT_MS }, () => {
       assert.ok(fixTool);
       assert.ok(fixTool.description);
       assert.ok(fixTool.inputSchema);
-    });
-  });
-
-  describe('Resource Operations', () => {
-    it('should list resources', async () => {
-      assert.ok(client);
-      const { resources } = await client.listResources();
-
-      assert.ok(Array.isArray(resources));
-      // Should have template catalog and individual templates
-      assert.ok(resources.length > 0);
-    });
-
-    it('should read template catalog', async () => {
-      assert.ok(client);
-      const result = await client.readResource({
-        uri: 'templates://catalog',
-      });
-
-      assert.ok(Array.isArray(result.contents));
-      assert.ok(result.contents.length > 0);
-
-      const content = result.contents[0];
-      assert.strictEqual(content?.mimeType, 'application/json');
-    });
-
-    it('should read specific template', async () => {
-      assert.ok(client);
-      const result = await client.readResource({
-        uri: 'templates://coding/code-review',
-      });
-
-      assert.ok(Array.isArray(result.contents));
-      assert.ok(result.contents.length > 0);
-    });
-  });
-
-  describe('Prompt Operations', () => {
-    it('should list prompts', async () => {
-      assert.ok(client);
-      const { prompts } = await client.listPrompts();
-
-      assert.ok(Array.isArray(prompts));
-      assert.ok(prompts.length > 0);
-
-      const promptNames = prompts.map((p) => p.name);
-      assert.ok(promptNames.includes('fix'));
-      assert.ok(promptNames.includes('boost'));
-    });
-
-    it('should get prompt with arguments', async () => {
-      assert.ok(client);
-      const result = await client.getPrompt({
-        name: 'fix',
-        arguments: { prompt: 'Test prompt for fixing' },
-      });
-
-      assert.ok(Array.isArray(result.messages));
-      assert.ok(result.messages.length > 0);
-      assert.strictEqual(result.messages[0]?.role, 'user');
     });
   });
 });

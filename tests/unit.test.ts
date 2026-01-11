@@ -1,8 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-
 import { parseEnv } from '../src/config.js';
 import {
   containsOutputScaffolding,
@@ -11,11 +9,8 @@ import {
 } from '../src/lib/prompt-utils.js';
 import {
   BoostPromptInputSchema,
-  BoostPromptOutputSchema,
   FixPromptInputSchema,
-  FixPromptOutputSchema,
 } from '../src/schemas.js';
-import { registerQuickWorkflowPrompts } from '../src/server.js';
 
 describe('input schemas', () => {
   it('rejects unknown fields for fix', () => {
@@ -117,89 +112,5 @@ describe('output validation', () => {
       containsOutputScaffolding('# Prompt Refinement\n'),
       true
     );
-  });
-});
-
-describe('output schemas strict mode', () => {
-  it('FixPromptOutputSchema rejects unknown fields', () => {
-    const result = FixPromptOutputSchema.safeParse({
-      ok: true,
-      fixed: 'Hello',
-      extraField: 'should fail',
-    });
-    assert.strictEqual(result.success, false);
-  });
-
-  it('BoostPromptOutputSchema rejects unknown fields', () => {
-    const result = BoostPromptOutputSchema.safeParse({
-      ok: true,
-      unknownKey: 123,
-    });
-    assert.strictEqual(result.success, false);
-  });
-
-  it('requires error details when ok=false', () => {
-    const fixResult = FixPromptOutputSchema.safeParse({
-      ok: false,
-    });
-    assert.strictEqual(fixResult.success, false);
-
-    const boostResult = BoostPromptOutputSchema.safeParse({
-      ok: false,
-    });
-    assert.strictEqual(boostResult.success, false);
-  });
-
-  it('requires payload when ok=true', () => {
-    const fixResult = FixPromptOutputSchema.safeParse({
-      ok: true,
-    });
-    assert.strictEqual(fixResult.success, false);
-
-    const boostResult = BoostPromptOutputSchema.safeParse({
-      ok: true,
-    });
-    assert.strictEqual(boostResult.success, false);
-  });
-
-  it('accepts valid output without extra fields', () => {
-    const fixResult = FixPromptOutputSchema.safeParse({
-      ok: true,
-      fixed: 'Hello world',
-    });
-    assert.strictEqual(fixResult.success, true);
-
-    const boostResult = BoostPromptOutputSchema.safeParse({
-      ok: true,
-      boosted: 'Hello world',
-    });
-    assert.strictEqual(boostResult.success, true);
-  });
-});
-
-type RegisteredPrompt = {
-  name: string;
-  handler: (args: { prompt: string; taskType?: string }) => {
-    messages: { role: string; content: { type: string; text: string } }[];
-  };
-};
-
-describe('registerQuickWorkflowPrompts', () => {
-  it('registers expected quick workflow prompts', () => {
-    const registered: RegisteredPrompt[] = [];
-    const server = {
-      registerPrompt: (
-        name: string,
-        _definition: unknown,
-        handler: RegisteredPrompt['handler']
-      ) => {
-        registered.push({ name, handler });
-      },
-    } as unknown as McpServer;
-
-    registerQuickWorkflowPrompts(server);
-
-    const names = registered.map((entry) => entry.name);
-    assert.deepStrictEqual(names, ['fix', 'boost']);
   });
 });

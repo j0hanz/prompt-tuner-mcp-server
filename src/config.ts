@@ -23,7 +23,6 @@ const numberString = (def: number, min = 0): z.ZodType<number> =>
   createNumberString(def, min);
 
 const envSchema = z.object({
-  LOG_FORMAT: z.enum(['json', 'text']).optional().default('text'),
   DEBUG: booleanString,
   INCLUDE_ERROR_CONTEXT: booleanString,
 
@@ -69,7 +68,7 @@ A lean prompt editing toolkit.
 ## Tools
 
 ### fix_prompt
-Fix spelling and grammar only.
+Polish and refine a prompt for better clarity, readability, and flow.
 
 **Input:**
 \`\`\`json
@@ -77,17 +76,12 @@ Fix spelling and grammar only.
 \`\`\`
 
 ### boost_prompt
-Improve a prompt to be clearer and more effective.
+Transform a prompt using prompt engineering best practices for maximum clarity and effectiveness.
 
 **Input:**
 \`\`\`json
 { "prompt": "..." }
 \`\`\`
-
-## Prompts
-
-- \`fix\` - Generates a message asking to fix grammar/spelling.
-- \`boost\` - Generates a message asking to improve a prompt.
 `;
 
 const {

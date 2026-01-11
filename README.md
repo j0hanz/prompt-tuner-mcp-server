@@ -67,8 +67,7 @@ PromptTuner reads configuration from environment variables. CLI flags can overri
 CLI flags override environment variables (run `prompt-tuner-mcp-server --help`).
 
 | Flag                           | Env var                 | Description                                 |
-| ------------------------------ | ----------------------- | ------------------------------------------- | --------------------------------------- |
-| `--log-format <text            | json>`                  | `LOG_FORMAT`                                | Override log format (currently unused). |
+| ------------------------------ | ----------------------- | ------------------------------------------- |
 | `--debug / --no-debug`         | `DEBUG`                 | Enable/disable debug logging.               |
 | `--include-error-context`      | `INCLUDE_ERROR_CONTEXT` | Include sanitized prompt snippet in errors. |
 | `--llm-provider <provider>`    | `LLM_PROVIDER`          | `openai`, `anthropic`, or `google`.         |
@@ -107,15 +106,6 @@ Returns: `ok`, `boosted`.
 - `structuredContent`: machine-parseable results.
 - Errors return `structuredContent.ok=false` and an `error` object with `code`, `message`, optional `context` (sanitized, up to 200 chars), `details`, and `recoveryHint`.
 - Error responses also include `isError: true`.
-
-## Prompts
-
-| Name    | Description                                   |
-| ------- | --------------------------------------------- |
-| `fix`   | Fix spelling and grammar only.                |
-| `boost` | Boost a prompt for clarity and effectiveness. |
-
-All prompts accept a single argument: `{ "prompt": "..." }`.
 
 ## Development
 
