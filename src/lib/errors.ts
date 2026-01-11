@@ -1,4 +1,4 @@
-import { inspect } from 'node:util';
+import { getCallSites, inspect } from 'node:util';
 
 import pino from 'pino';
 import { z, type ZodError } from 'zod';
@@ -23,11 +23,44 @@ export const logger = pino(
   stderrDestination
 );
 
+interface CallSiteInfo {
+  readonly functionName: string;
+  readonly scriptName: string;
+  readonly lineNumber: number;
+  readonly columnNumber: number;
+}
+
+function getErrorCallSite(skipFrames = 1): CallSiteInfo | undefined {
+  if (!config.DEBUG) return undefined;
+  try {
+    const sites = getCallSites(skipFrames + 1);
+    const site = sites[0];
+    if (!site) return undefined;
+    return {
+      functionName: site.functionName || '<anonymous>',
+      scriptName: site.scriptName,
+      lineNumber: site.lineNumber,
+      columnNumber: site.columnNumber,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function formatCallSite(site: CallSiteInfo | undefined): string | undefined {
+  if (!site) return undefined;
+  const location = `${site.scriptName}:${site.lineNumber}:${site.columnNumber}`;
+  return site.functionName !== '<anonymous>'
+    ? `${site.functionName} (${location})`
+    : location;
+}
+
 export class McpError extends Error {
   readonly code: ErrorCodeType;
   readonly context?: string;
   readonly details?: Record<string, unknown>;
   readonly recoveryHint?: string;
+  readonly callSite?: CallSiteInfo;
 
   constructor(
     code: ErrorCodeType,
@@ -53,12 +86,18 @@ export class McpError extends Error {
     if (resolved.recoveryHint !== undefined) {
       this.recoveryHint = resolved.recoveryHint;
     }
+    const site = getErrorCallSite(2);
+    if (site !== undefined) {
+      this.callSite = site;
+    }
   }
 
   [inspect.custom](): string {
     const hint = this.recoveryHint ? ` (Hint: ${this.recoveryHint})` : '';
     const details = this.details ? ` ${JSON.stringify(this.details)}` : '';
-    return `McpError[${this.code}]: ${this.message}${hint}${details}`;
+    const location = formatCallSite(this.callSite);
+    const locationStr = location ? ` at ${location}` : '';
+    return `McpError[${this.code}]: ${this.message}${hint}${details}${locationStr}`;
   }
 }
 
