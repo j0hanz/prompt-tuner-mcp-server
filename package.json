@@ -34,7 +34,7 @@
     "test:watch": "node --test --watch --import=tsx --test-reporter=spec",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "type-check": "tsc --noEmit",
+    "type-check": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "duplication": "jscpd -f typescript,tsx -p \"**/*.ts\" -k 50 -t 3 src",
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js",
     "inspector:http": "npx @modelcontextprotocol/inspector -- node dist/index.js",

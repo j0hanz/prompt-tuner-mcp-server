@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomInt } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { setTimeout } from 'node:timers/promises';
 
@@ -22,7 +23,7 @@ import type {
 import { ErrorCode, logger, McpError } from './errors.js';
 import { publishLlmRequest } from './telemetry.js';
 
-const DEFAULT_TIMEOUT_MS = 60000;
+const DEFAULT_TIMEOUT_MS = config.LLM_TIMEOUT_MS;
 
 function buildAbortSignal(
   timeoutMs: number,
@@ -332,7 +333,10 @@ function isRetryable(error: McpError): boolean {
 
 function calculateDelay(attempt: number, settings: RetrySettings): number {
   const exponentialDelay = settings.baseDelayMs * Math.pow(2, attempt);
-  return Math.min(exponentialDelay, settings.maxDelayMs);
+  const cap = Math.min(exponentialDelay, settings.maxDelayMs);
+  const min = Math.floor(cap / 2);
+  // Equal jitter to spread retries without collapsing to 0ms delays.
+  return min + randomInt(0, cap - min + 1);
 }
 
 function ensureWithinTotalTimeout(

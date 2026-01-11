@@ -3,7 +3,15 @@ import { styleText } from 'node:util';
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
+import {
+  type InitializeRequest,
+  InitializeRequestSchema,
+  type InitializeResult,
+  type ReadResourceResult,
+  ErrorCode as RpcErrorCode,
+  McpError as RpcMcpError,
+  SUPPORTED_PROTOCOL_VERSIONS,
+} from '@modelcontextprotocol/sdk/types.js';
 
 import { z } from 'zod';
 
@@ -228,6 +236,51 @@ export function registerQuickWorkflowPrompts(server: McpServer): void {
   }
 }
 
+type InitializeHandler = (
+  request: InitializeRequest
+) => Promise<InitializeResult>;
+
+function enforceStrictProtocolVersion(server: McpServer): void {
+  const baseInitialize = (
+    server.server as unknown as { _oninitialize?: InitializeHandler }
+  )._oninitialize?.bind(server.server);
+  if (!baseInitialize) {
+    throw new Error('Strict protocol version check unavailable.');
+  }
+
+  server.server.setRequestHandler(
+    InitializeRequestSchema,
+    async (request): Promise<InitializeResult> => {
+      const { protocolVersion } = request.params;
+      if (!SUPPORTED_PROTOCOL_VERSIONS.includes(protocolVersion)) {
+        throw new RpcMcpError(
+          RpcErrorCode.InvalidParams,
+          `Unsupported protocol version: ${protocolVersion} (supported: ${SUPPORTED_PROTOCOL_VERSIONS.join(
+            ', '
+          )})`
+        );
+      }
+      return await baseInitialize(request);
+    }
+  );
+}
+
+type ToolInputValidator = (
+  tool: unknown,
+  args: unknown,
+  toolName: string
+) => Promise<unknown>;
+
+function disableSdkToolInputValidation(server: McpServer): void {
+  const validationTarget = server as unknown as {
+    validateToolInput?: ToolInputValidator;
+  };
+
+  if (!validationTarget.validateToolInput) return;
+  validationTarget.validateToolInput = (_tool, args): Promise<unknown> =>
+    Promise.resolve(args);
+}
+
 function createServer(): McpServer {
   const server = new McpServer(
     {
@@ -248,6 +301,8 @@ function createServer(): McpServer {
   registerPromptTools(server);
   registerTemplateResources(server);
   registerQuickWorkflowPrompts(server);
+  enforceStrictProtocolVersion(server);
+  disableSdkToolInputValidation(server);
 
   return server;
 }

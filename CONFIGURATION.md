@@ -76,7 +76,7 @@ Tool max tokens are derived from `LLM_MAX_TOKENS`:
 | `RETRY_MAX_DELAY_MS`     | `10000`  | Max delay between retries.                     |
 | `RETRY_TOTAL_TIMEOUT_MS` | `180000` | Total time allowed across retries.             |
 
-Retries use exponential backoff (no jitter) and stop when the total timeout is exceeded.
+Retries use exponential backoff with jitter and stop when the total timeout is exceeded.
 
 Minimums: `RETRY_MAX_ATTEMPTS` >= 0, `RETRY_BASE_DELAY_MS` >= 100, `RETRY_MAX_DELAY_MS` >= 1000, `RETRY_TOTAL_TIMEOUT_MS` >= 10000.
 

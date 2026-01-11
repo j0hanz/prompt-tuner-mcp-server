@@ -73,17 +73,27 @@ const ErrorSchema = z
   .describe('Error payload');
 
 export const FixPromptOutputSchema = z
-  .strictObject({
-    ok: z.boolean().describe('True if fixing succeeded'),
-    fixed: z.string().optional().describe('Fixed prompt text'),
-    error: ErrorSchema.optional().describe('Error details when ok=false'),
-  })
+  .discriminatedUnion('ok', [
+    z.strictObject({
+      ok: z.literal(true).describe('True if fixing succeeded'),
+      fixed: z.string().describe('Fixed prompt text'),
+    }),
+    z.strictObject({
+      ok: z.literal(false).describe('False if fixing failed'),
+      error: ErrorSchema.describe('Error details when ok=false'),
+    }),
+  ])
   .describe('Fix prompt response');
 
 export const BoostPromptOutputSchema = z
-  .strictObject({
-    ok: z.boolean().describe('True if boosting succeeded'),
-    boosted: z.string().optional().describe('Boosted prompt text'),
-    error: ErrorSchema.optional().describe('Error details when ok=false'),
-  })
+  .discriminatedUnion('ok', [
+    z.strictObject({
+      ok: z.literal(true).describe('True if boosting succeeded'),
+      boosted: z.string().describe('Boosted prompt text'),
+    }),
+    z.strictObject({
+      ok: z.literal(false).describe('False if boosting failed'),
+      error: ErrorSchema.describe('Error details when ok=false'),
+    }),
+  ])
   .describe('Boost prompt response');

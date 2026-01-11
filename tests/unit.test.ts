@@ -117,6 +117,30 @@ describe('output schemas strict mode', () => {
     assert.strictEqual(result.success, false);
   });
 
+  it('requires error details when ok=false', () => {
+    const fixResult = FixPromptOutputSchema.safeParse({
+      ok: false,
+    });
+    assert.strictEqual(fixResult.success, false);
+
+    const boostResult = BoostPromptOutputSchema.safeParse({
+      ok: false,
+    });
+    assert.strictEqual(boostResult.success, false);
+  });
+
+  it('requires payload when ok=true', () => {
+    const fixResult = FixPromptOutputSchema.safeParse({
+      ok: true,
+    });
+    assert.strictEqual(fixResult.success, false);
+
+    const boostResult = BoostPromptOutputSchema.safeParse({
+      ok: true,
+    });
+    assert.strictEqual(boostResult.success, false);
+  });
+
   it('accepts valid output without extra fields', () => {
     const fixResult = FixPromptOutputSchema.safeParse({
       ok: true,
