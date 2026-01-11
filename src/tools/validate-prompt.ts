@@ -1,19 +1,16 @@
-import { ValidatePromptInputSchema } from '../schemas/inputs.js';
-import { ValidatePromptOutputSchema } from '../schemas/outputs.js';
-import {
-  createErrorResponse,
-  ErrorCode,
-  extractPromptFromInput,
-  getProviderInfo,
-} from './tool-runtime.js';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type {
-  createSuccessResponse,
-  ErrorResponse,
-  McpServer,
-  RequestHandlerExtra,
   ServerNotification,
   ServerRequest,
-} from './tool-types.js';
+} from '@modelcontextprotocol/sdk/types.js';
+
+import type { ErrorResponse } from '../config/types.js';
+import { createErrorResponse, ErrorCode } from '../lib/errors.js';
+import { getProviderInfo } from '../lib/llm-client.js';
+import { extractPromptFromInput } from '../lib/llm-tool-execution.js';
+import { ValidatePromptInputSchema } from '../schemas/inputs.js';
+import { ValidatePromptOutputSchema } from '../schemas/outputs.js';
 import {
   TOKEN_LIMITS_BY_MODEL,
   TOOL_NAME,
@@ -39,7 +36,7 @@ const VALIDATE_PROMPT_TOOL = {
 async function handleValidatePrompt(
   input: ValidatePromptInput,
   extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-): Promise<ReturnType<typeof createSuccessResponse> | ErrorResponse> {
+): Promise<ReturnType<typeof buildValidationResponse> | ErrorResponse> {
   try {
     const parsed = ValidatePromptInputSchema.parse(input);
     const validationPrompt = buildValidationPrompt(

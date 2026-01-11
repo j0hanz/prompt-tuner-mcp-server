@@ -1,7 +1,7 @@
 import { LLM_TIMEOUT_MS, OPTIMIZE_MAX_TOKENS } from '../../config/constants.js';
 import type { OptimizeResponse } from '../../config/types.js';
 import { ErrorCode, McpError } from '../../lib/errors.js';
-import { executeLLMWithJsonResponse } from '../../lib/tool-helpers.js';
+import { executeLLMWithJsonResponse } from '../../lib/llm-tool-execution.js';
 import { OptimizeResponseSchema } from '../../schemas/llm-responses.js';
 import { STRICT_OPTIMIZE_RULES, TOOL_NAME } from './constants.js';
 import { buildOptimizePrompt } from './prompt.js';

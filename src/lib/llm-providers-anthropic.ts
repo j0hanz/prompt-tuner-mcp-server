@@ -10,7 +10,7 @@ import { runTextCompletion } from './llm-providers-completion.js';
 import {
   buildAnthropicRequest,
   extractAnthropicText,
-} from './llm-providers/helpers.js';
+} from './llm-providers/requests.js';
 
 export class AnthropicClient implements LLMClient {
   private readonly client: Anthropic;

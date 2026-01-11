@@ -1,5 +1,5 @@
 import type { LLMProvider, LLMRequestOptions } from '../config/types.js';
-import { createCompletion } from './llm-providers/helpers.js';
+import { createCompletion } from './llm-providers/requests.js';
 import { runGeneration } from './llm-runtime.js';
 
 export function runTextCompletion<TResponse>(

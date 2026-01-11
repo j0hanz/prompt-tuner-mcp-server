@@ -8,7 +8,7 @@ import type {
   LLMRequestOptions,
 } from '../config/types.js';
 import { buildAbortSignal } from './abort-signals.js';
-import { checkAborted, DEFAULT_TIMEOUT_MS } from './llm-providers/helpers.js';
+import { checkAborted, DEFAULT_TIMEOUT_MS } from './llm-providers/requests.js';
 import { runGeneration } from './llm-runtime.js';
 
 const GOOGLE_SAFETY_CATEGORIES = [

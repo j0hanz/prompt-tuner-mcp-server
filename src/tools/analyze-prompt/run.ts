@@ -1,7 +1,7 @@
 import { ANALYSIS_MAX_TOKENS, LLM_TIMEOUT_MS } from '../../config/constants.js';
 import type { AnalysisResponse, LLMToolOptions } from '../../config/types.js';
 import { ErrorCode } from '../../lib/errors.js';
-import { executeLLMWithJsonResponse } from '../../lib/tool-helpers.js';
+import { executeLLMWithJsonResponse } from '../../lib/llm-tool-execution.js';
 import { AnalysisResponseSchema } from '../../schemas/llm-responses.js';
 import { TOOL_NAME } from './constants.js';
 

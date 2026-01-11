@@ -76,25 +76,30 @@ export function normalizePromptText(text: string): string {
 }
 
 export function containsOutputScaffolding(text: string): boolean {
-  const lines = text.split(/\r?\n/);
-  for (const line of lines) {
+  for (const line of text.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     const lowered = trimmed.toLowerCase();
-    if (lowered.startsWith('#')) {
-      let index = 0;
-      while (lowered[index] === '#') index += 1;
-      const heading = lowered.slice(index).trim();
-      if (
-        SCAFFOLDING_PROMPT_TITLES.has(heading) ||
-        SCAFFOLDING_SECTION_TITLES.has(heading)
-      ) {
-        return true;
-      }
+    if (isScaffoldingHeading(lowered) || isScaffoldingLabel(lowered)) {
+      return true;
     }
-    if (SCAFFOLDING_LABELS.has(lowered)) return true;
   }
   return false;
+}
+
+function isScaffoldingHeading(line: string): boolean {
+  if (!line.startsWith('#')) return false;
+  let index = 0;
+  while (line[index] === '#') index += 1;
+  const heading = line.slice(index).trim();
+  return (
+    SCAFFOLDING_PROMPT_TITLES.has(heading) ||
+    SCAFFOLDING_SECTION_TITLES.has(heading)
+  );
+}
+
+function isScaffoldingLabel(line: string): boolean {
+  return SCAFFOLDING_LABELS.has(line);
 }
 
 const STRUCTURE_VALIDATORS: Record<TargetFormat, (text: string) => boolean> = {

@@ -1,3 +1,14 @@
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type {
+  ServerNotification,
+  ServerRequest,
+} from '@modelcontextprotocol/sdk/types.js';
+
+import type { ErrorResponse } from '../config/types.js';
+import { createErrorResponse, ErrorCode } from '../lib/errors.js';
+import { getProviderInfo } from '../lib/llm-client.js';
+import { extractPromptFromInput } from '../lib/llm-tool-execution.js';
 import { OptimizePromptInputSchema } from '../schemas/inputs.js';
 import { OptimizePromptOutputSchema } from '../schemas/outputs.js';
 import { TOOL_NAME } from './optimize-prompt/constants.js';
@@ -12,20 +23,6 @@ import type {
   OptimizePromptInput,
   ResolvedOptimizeInputs,
 } from './optimize-prompt/types.js';
-import {
-  createErrorResponse,
-  ErrorCode,
-  extractPromptFromInput,
-  getProviderInfo,
-} from './tool-runtime.js';
-import type {
-  createSuccessResponse,
-  ErrorResponse,
-  McpServer,
-  RequestHandlerExtra,
-  ServerNotification,
-  ServerRequest,
-} from './tool-types.js';
 
 const OPTIMIZE_PROMPT_TOOL = {
   title: 'Optimize Prompt',
@@ -43,7 +40,7 @@ const OPTIMIZE_PROMPT_TOOL = {
 async function buildOptimizationResponse(
   resolved: ResolvedOptimizeInputs,
   signal: AbortSignal
-): Promise<ReturnType<typeof createSuccessResponse>> {
+): Promise<ReturnType<typeof buildOptimizeResponse>> {
   const { result, usedFallback } = await runValidatedOptimization(
     resolved,
     signal
@@ -68,7 +65,7 @@ async function buildOptimizationResponse(
 async function handleOptimizePrompt(
   input: OptimizePromptInput,
   extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-): Promise<ReturnType<typeof createSuccessResponse> | ErrorResponse> {
+): Promise<ReturnType<typeof buildOptimizeResponse> | ErrorResponse> {
   try {
     const resolved = resolveOptimizeInputs(input);
     return await buildOptimizationResponse(resolved, extra.signal);

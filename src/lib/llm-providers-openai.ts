@@ -10,7 +10,7 @@ import { runTextCompletion } from './llm-providers-completion.js';
 import {
   buildOpenAIRequest,
   extractOpenAIText,
-} from './llm-providers/helpers.js';
+} from './llm-providers/requests.js';
 
 export class OpenAIClient implements LLMClient {
   private readonly client: OpenAI;

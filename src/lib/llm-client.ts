@@ -2,11 +2,9 @@ import { DEFAULT_MODELS } from '../config/constants.js';
 import { config } from '../config/env.js';
 import type { LLMClient, LLMProvider, ProviderInfo } from '../config/types.js';
 import { ErrorCode, logger, McpError } from './errors.js';
-import {
-  AnthropicClient,
-  GoogleClient,
-  OpenAIClient,
-} from './llm-providers.js';
+import { AnthropicClient } from './llm-providers-anthropic.js';
+import { GoogleClient } from './llm-providers-google.js';
+import { OpenAIClient } from './llm-providers-openai.js';
 
 const PROVIDER_CONFIG = {
   openai: {

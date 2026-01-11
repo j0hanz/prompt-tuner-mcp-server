@@ -9,14 +9,14 @@ export const TOKEN_LIMITS_BY_MODEL: Record<ValidationModel, number> = {
   generic: 8000,
 };
 
-export const VALIDATION_MODEL_ORDER: ValidationModel[] = [
+const VALIDATION_MODEL_ORDER: ValidationModel[] = [
   'claude',
   'gpt',
   'gemini',
   'generic',
 ];
 
-export const MODEL_LIMITS_LINE = VALIDATION_MODEL_ORDER.map(
+const MODEL_LIMITS_LINE = VALIDATION_MODEL_ORDER.map(
   (model) => `${model} ${TOKEN_LIMITS_BY_MODEL[model]}`
 ).join(' | ');
 

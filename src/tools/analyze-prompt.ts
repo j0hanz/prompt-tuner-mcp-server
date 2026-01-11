@@ -1,3 +1,14 @@
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type {
+  ServerNotification,
+  ServerRequest,
+} from '@modelcontextprotocol/sdk/types.js';
+
+import type { ErrorResponse } from '../config/types.js';
+import { createErrorResponse, ErrorCode, logger } from '../lib/errors.js';
+import { getProviderInfo } from '../lib/llm-client.js';
+import { extractPromptFromInput } from '../lib/llm-tool-execution.js';
 import { AnalyzePromptInputSchema } from '../schemas/inputs.js';
 import { AnalyzePromptOutputSchema } from '../schemas/outputs.js';
 import { TOOL_NAME } from './analyze-prompt/constants.js';
@@ -8,21 +19,6 @@ import {
 import { sendProgress } from './analyze-prompt/progress.js';
 import { buildAnalysisPrompt } from './analyze-prompt/prompt.js';
 import { runAnalysis } from './analyze-prompt/run.js';
-import {
-  createErrorResponse,
-  ErrorCode,
-  extractPromptFromInput,
-  getProviderInfo,
-  logger,
-} from './tool-runtime.js';
-import type {
-  createSuccessResponse,
-  ErrorResponse,
-  McpServer,
-  RequestHandlerExtra,
-  ServerNotification,
-  ServerRequest,
-} from './tool-types.js';
 
 const ANALYZE_PROMPT_TOOL = {
   title: 'Analyze Prompt',
@@ -40,7 +36,7 @@ const ANALYZE_PROMPT_TOOL = {
 async function buildAnalysisForPrompt(
   prompt: string,
   signal: AbortSignal | undefined
-): Promise<ReturnType<typeof createSuccessResponse>> {
+): Promise<ReturnType<typeof buildAnalysisResponse>> {
   const analysisPrompt = buildAnalysisPrompt(prompt);
   const { result, usedFallback } = await runAnalysis(analysisPrompt, signal);
   const normalized = normalizeAnalysisResult(result, prompt);
@@ -56,7 +52,7 @@ async function buildAnalysisForPrompt(
 async function handleAnalyzePrompt(
   input: { prompt: string },
   extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-): Promise<ReturnType<typeof createSuccessResponse> | ErrorResponse> {
+): Promise<ReturnType<typeof buildAnalysisResponse> | ErrorResponse> {
   try {
     const parsed = AnalyzePromptInputSchema.parse(input);
     logger.info(

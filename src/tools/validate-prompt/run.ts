@@ -4,7 +4,7 @@ import type {
   ValidationResponse,
 } from '../../config/types.js';
 import { ErrorCode } from '../../lib/errors.js';
-import { executeLLMWithJsonResponse } from '../../lib/tool-helpers.js';
+import { executeLLMWithJsonResponse } from '../../lib/llm-tool-execution.js';
 import { ValidationResponseSchema } from '../../schemas/llm-responses.js';
 import { TOOL_NAME } from './constants.js';
 
