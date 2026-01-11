@@ -20,6 +20,7 @@ PromptTuner MCP is an MCP server that fixes and boosts prompts using OpenAI, Ant
 
 - Polish and refine a prompt for clarity and flow (`fix_prompt`).
 - Boost and enhance a prompt for clarity and effectiveness (`boost_prompt`).
+- Craft a reusable workflow prompt for complex tasks (`crafting_prompt`).
 - Simple structured outputs.
 - Retry logic with exponential backoff for transient provider failures.
 
@@ -103,6 +104,22 @@ Refine and enhance a prompt for clarity and effectiveness.
 | `prompt`  | string | Yes      | Trimmed, length-checked; extra fields rejected. |
 
 Returns: `ok`, `boosted`.
+
+### crafting_prompt
+
+Generate a structured, reusable workflow prompt for complex tasks based on a raw request and a few settings.
+
+| Parameter     | Type   | Required | Notes                                        |
+| ------------- | ------ | -------- | -------------------------------------------- |
+| `request`     | string | Yes      | Trimmed, length-checked; strict input.       |
+| `objective`   | string | No       | Acceptance criteria / “definition of done”.  |
+| `constraints` | string | No       | Constraints to respect.                      |
+| `mode`        | string | No       | `general`, `plan`, `review`, `troubleshoot`. |
+| `approach`    | string | No       | `conservative`, `balanced`, `creative`.      |
+| `tone`        | string | No       | `direct`, `neutral`, `friendly`.             |
+| `verbosity`   | string | No       | `brief`, `normal`, `detailed`.               |
+
+Returns: `ok`, `prompt`, `settings`.
 
 ## Response Format
 

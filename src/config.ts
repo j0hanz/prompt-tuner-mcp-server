@@ -76,6 +76,22 @@ Transform a prompt using prompt engineering best practices for maximum clarity a
 \`\`\`json
 { "prompt": "..." }
 \`\`\`
+
+### crafting_prompt
+Generate a structured, reusable workflow prompt for complex tasks based on a raw request and a few settings.
+
+**Input:**
+\`\`\`json
+{
+  "request": "...",
+  "objective": "...",
+  "constraints": "...",
+  "mode": "general|plan|review|troubleshoot",
+  "approach": "conservative|balanced|creative",
+  "tone": "direct|neutral|friendly",
+  "verbosity": "brief|normal|detailed"
+}
+\`\`\`
 `;
 
 const { MAX_PROMPT_LENGTH, LLM_MAX_TOKENS } = config;
