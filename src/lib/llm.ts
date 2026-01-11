@@ -77,7 +77,6 @@ function buildOpenAIRequest(
     model,
     messages: [{ role: 'user', content: prompt }],
     max_tokens: maxTokens,
-    temperature: 0.7,
     stream: false,
   };
 }
