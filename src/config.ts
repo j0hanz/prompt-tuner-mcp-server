@@ -3,8 +3,7 @@ import { z } from 'zod';
 import packageJson from '../package.json' with { type: 'json' };
 
 // Hardcoded defaults (not user-configurable)
-export const LLM_TIMEOUT_MS = 60000;
-export const LLM_MAX_TOKENS = 8000;
+export const LLM_TIMEOUT_MS = 15000;
 export const MAX_PROMPT_LENGTH = 10000;
 export const RETRY_MAX_ATTEMPTS = 3;
 export const RETRY_BASE_DELAY_MS = 1000;

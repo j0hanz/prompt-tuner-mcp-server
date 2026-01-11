@@ -11,7 +11,6 @@ import OpenAI from 'openai';
 
 import {
   DEFAULT_MODELS,
-  LLM_MAX_TOKENS,
   LLM_TIMEOUT_MS,
   RETRY_BASE_DELAY_MS,
   RETRY_MAX_ATTEMPTS,
@@ -708,7 +707,7 @@ class OpenAIClient implements LLMClient {
 
   generateText(
     prompt: string,
-    maxTokens = LLM_MAX_TOKENS,
+    maxTokens: number,
     options?: LLMRequestOptions
   ): Promise<string> {
     const request = buildOpenAIRequest(this.model, prompt, maxTokens);
@@ -743,7 +742,7 @@ class AnthropicClient implements LLMClient {
 
   generateText(
     prompt: string,
-    maxTokens = LLM_MAX_TOKENS,
+    maxTokens: number,
     options?: LLMRequestOptions
   ): Promise<string> {
     const request = buildAnthropicRequest(this.model, prompt, maxTokens);
@@ -803,7 +802,7 @@ class GoogleClient implements LLMClient {
 
   generateText(
     prompt: string,
-    maxTokens = LLM_MAX_TOKENS,
+    maxTokens: number,
     options?: LLMRequestOptions
   ): Promise<string> {
     return runGeneration(
