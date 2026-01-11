@@ -1,5 +1,8 @@
 import eslint from '@eslint/js';
 import eslintConfigPrettier from 'eslint-config-prettier';
+import deMorgan from 'eslint-plugin-de-morgan';
+import depend from 'eslint-plugin-depend';
+import sonarjs from 'eslint-plugin-sonarjs';
 import unusedImports from 'eslint-plugin-unused-imports';
 import { defineConfig } from 'eslint/config';
 import tseslint from 'typescript-eslint';
@@ -8,9 +11,10 @@ export default defineConfig(
   {
     ignores: ['dist', 'node_modules', '*.config.mjs', '*.config.js'],
   },
-
   eslint.configs.recommended,
-
+  sonarjs.configs.recommended,
+  deMorgan.configs.recommended,
+  depend.configs['flat/recommended'],
   {
     files: ['src/**/*.ts'],
     extends: [
@@ -21,7 +25,7 @@ export default defineConfig(
       ecmaVersion: 2022,
       sourceType: 'module',
       parserOptions: {
-        projectService: true,
+        project: ['./tsconfig.json'],
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -29,13 +33,6 @@ export default defineConfig(
       'unused-imports': unusedImports,
     },
     rules: {
-      complexity: ['error', { max: 5, variant: 'classic' }],
-      'max-lines-per-function': [
-        'error',
-        { max: 40, skipBlankLines: true, skipComments: true },
-      ],
-      'max-depth': ['error', 2],
-
       'unused-imports/no-unused-imports': 'error',
       'unused-imports/no-unused-vars': [
         'warn',
