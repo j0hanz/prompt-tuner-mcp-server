@@ -11,13 +11,14 @@ PromptTuner MCP is an MCP server that fixes and boosts prompts using OpenAI, Ant
 ## What it does
 
 1. Validates and trims input prompts (enforces `MAX_PROMPT_LENGTH`).
-2. Calls the selected provider.
-3. Normalizes LLM output (strips code fences / labels if present).
-4. Returns human-readable text plus machine-friendly `structuredContent`.
+2. Wraps the prompt as JSON inside sentinel markers (sanitizing markers, bidi control chars, and null bytes).
+3. Calls the selected provider.
+4. Normalizes LLM output (strips code fences / labels if present).
+5. Returns human-readable text plus machine-friendly `structuredContent`.
 
 ## Features
 
-- Fix spelling and grammar only (`fix_prompt`).
+- Polish and refine a prompt for clarity and flow (`fix_prompt`).
 - Boost and enhance a prompt for clarity and effectiveness (`boost_prompt`).
 - Simple structured outputs.
 - Retry logic with exponential backoff for transient provider failures.
@@ -66,27 +67,30 @@ PromptTuner reads configuration from environment variables. CLI flags can overri
 
 CLI flags override environment variables (run `prompt-tuner-mcp-server --help`).
 
-| Flag                           | Env var                 | Description                                 |
-| ------------------------------ | ----------------------- | ------------------------------------------- |
-| `--debug / --no-debug`         | `DEBUG`                 | Enable/disable debug logging.               |
-| `--include-error-context`      | `INCLUDE_ERROR_CONTEXT` | Include sanitized prompt snippet in errors. |
-| `--llm-provider <provider>`    | `LLM_PROVIDER`          | `openai`, `anthropic`, or `google`.         |
-| `--llm-model <name>`           | `LLM_MODEL`             | Override the default model.                 |
-| `--llm-timeout-ms <number>`    | `LLM_TIMEOUT_MS`        | Override request timeout (ms).              |
-| `--llm-max-tokens <number>`    | `LLM_MAX_TOKENS`        | Override output token cap.                  |
-| `--max-prompt-length <number>` | `MAX_PROMPT_LENGTH`     | Override max prompt length (chars).         |
+| Flag                                                   | Env var                 | Description                                 |
+| ------------------------------------------------------ | ----------------------- | ------------------------------------------- |
+| `--debug / --no-debug`                                 | `DEBUG`                 | Enable/disable debug logging.               |
+| `--include-error-context / --no-include-error-context` | `INCLUDE_ERROR_CONTEXT` | Include sanitized prompt snippet in errors. |
+| `--llm-provider <provider>`                            | `LLM_PROVIDER`          | `openai`, `anthropic`, or `google`.         |
+| `--llm-model <name>`                                   | `LLM_MODEL`             | Override the default model.                 |
+| `--llm-timeout-ms <number>`                            | `LLM_TIMEOUT_MS`        | Override request timeout (ms).              |
+| `--llm-max-tokens <number>`                            | `LLM_MAX_TOKENS`        | Override output token cap.                  |
+| `--max-prompt-length <number>`                         | `MAX_PROMPT_LENGTH`     | Override max prompt length (chars).         |
+| `--help`                                               | -                       | Show help text.                             |
+| `--version`                                            | -                       | Print the current version.                  |
 
 ## Tools
 
 All tools accept plain text, Markdown, or XML prompts. Responses include `content` (human-readable) and `structuredContent` (machine-readable).
+Inputs are strict: only the `prompt` field is accepted; extra fields are rejected.
 
 ### fix_prompt
 
-Fix spelling and grammar only.
+Polish and refine a prompt for clarity and flow while preserving intent and structure.
 
-| Parameter | Type   | Required | Notes                       |
-| --------- | ------ | -------- | --------------------------- |
-| `prompt`  | string | Yes      | Trimmed and length-checked. |
+| Parameter | Type   | Required | Notes                                           |
+| --------- | ------ | -------- | ----------------------------------------------- |
+| `prompt`  | string | Yes      | Trimmed, length-checked; extra fields rejected. |
 
 Returns: `ok`, `fixed`.
 
@@ -94,15 +98,15 @@ Returns: `ok`, `fixed`.
 
 Refine and enhance a prompt for clarity and effectiveness.
 
-| Parameter | Type   | Required | Notes                       |
-| --------- | ------ | -------- | --------------------------- |
-| `prompt`  | string | Yes      | Trimmed and length-checked. |
+| Parameter | Type   | Required | Notes                                           |
+| --------- | ------ | -------- | ----------------------------------------------- |
+| `prompt`  | string | Yes      | Trimmed, length-checked; extra fields rejected. |
 
 Returns: `ok`, `boosted`.
 
 ## Response Format
 
-- `content`: array of content blocks (human-readable Markdown text plus optional resources).
+- `content`: array of content blocks. First block is JSON for `structuredContent`, second is a short human message (or `Error: ...`).
 - `structuredContent`: machine-parseable results.
 - Errors return `structuredContent.ok=false` and an `error` object with `code`, `message`, optional `context` (sanitized, up to 200 chars), `details`, and `recoveryHint`.
 - Error responses also include `isError: true`.
@@ -134,6 +138,7 @@ Returns: `ok`, `boosted`.
 | `npm run inspector`      | Run MCP Inspector against `dist/index.js`.            |
 | `npm run inspector:http` | Alias of `npm run inspector` (no HTTP transport yet). |
 | `npm run duplication`    | Run jscpd duplication report.                         |
+| `npm run prepublishOnly` | Lint, type-check, and build before publish.           |
 
 ## Project Structure
 

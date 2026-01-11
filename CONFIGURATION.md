@@ -29,15 +29,17 @@ Set `LLM_MODEL` to override the default model for the chosen provider.
 
 CLI flags override environment variables. Flags only cover a subset of settings; retry options and `GOOGLE_SAFETY_DISABLED` are env-only.
 
-| Flag                           | Env var                 | Description                                 |
-| ------------------------------ | ----------------------- | ------------------------------------------- |
-| `--debug / --no-debug`         | `DEBUG`                 | Enable/disable debug logging.               |
-| `--include-error-context`      | `INCLUDE_ERROR_CONTEXT` | Include sanitized prompt snippet in errors. |
-| `--llm-provider <provider>`    | `LLM_PROVIDER`          | `openai`, `anthropic`, or `google`.         |
-| `--llm-model <name>`           | `LLM_MODEL`             | Override the default model.                 |
-| `--llm-timeout-ms <number>`    | `LLM_TIMEOUT_MS`        | Override request timeout (ms).              |
-| `--llm-max-tokens <number>`    | `LLM_MAX_TOKENS`        | Override output token cap.                  |
-| `--max-prompt-length <number>` | `MAX_PROMPT_LENGTH`     | Override max prompt length (chars).         |
+| Flag                                                   | Env var                 | Description                                 |
+| ------------------------------------------------------ | ----------------------- | ------------------------------------------- |
+| `--debug / --no-debug`                                 | `DEBUG`                 | Enable/disable debug logging.               |
+| `--include-error-context / --no-include-error-context` | `INCLUDE_ERROR_CONTEXT` | Include sanitized prompt snippet in errors. |
+| `--llm-provider <provider>`                            | `LLM_PROVIDER`          | `openai`, `anthropic`, or `google`.         |
+| `--llm-model <name>`                                   | `LLM_MODEL`             | Override the default model.                 |
+| `--llm-timeout-ms <number>`                            | `LLM_TIMEOUT_MS`        | Override request timeout (ms).              |
+| `--llm-max-tokens <number>`                            | `LLM_MAX_TOKENS`        | Override output token cap.                  |
+| `--max-prompt-length <number>`                         | `MAX_PROMPT_LENGTH`     | Override max prompt length (chars).         |
+| `--help`                                               | -                       | Show help text.                             |
+| `--version`                                            | -                       | Print the current version.                  |
 
 ## Limits and timeouts (optional)
 
@@ -177,11 +179,13 @@ When `DEBUG=true`, the server also logs diagnostics-channel telemetry for LLM re
 
 The following behaviors are hardcoded for stability:
 
-- Scoring weights: clarity 0.25, specificity 0.25, completeness 0.2, structure 0.15, effectiveness 0.15.
-- Prompt format detection patterns and scoring heuristics.
-- OpenAI temperature (0.7). Other providers use SDK defaults.
-- LLM response length cap (500000 chars) and JSON parsing safeguards.
-- Error context truncation length (200 chars when enabled).
+- Stdio transport only (no HTTP listener).
+- Tool schemas are strict: only `prompt` is accepted; extra fields are rejected.
+- Raw input hard cap is `MAX_PROMPT_LENGTH * 2` before trimming.
+- Prompt input is JSON-encoded between sentinel markers and sanitized (markers, bidi control chars, null bytes).
+- Tool token caps are fixed at 800 (fix) and 1200 (boost), bounded by `LLM_MAX_TOKENS`.
+- Output normalization always strips code fences and leading prompt labels.
+- Error context sanitization/truncation is fixed at 200 chars when enabled.
 
 ## Migration notes (older configs)
 
