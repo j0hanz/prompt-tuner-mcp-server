@@ -94,6 +94,66 @@ function shouldRetryParse(error: unknown, allowRetry: boolean): boolean {
   );
 }
 
+async function executeOnce<T>(
+  prompt: string,
+  client: Awaited<ReturnType<typeof getLLMClient>>,
+  resolved: ResolvedRequestOptions,
+  parseSchema: (value: unknown) => T,
+  errorCode: ErrorCodeType,
+  debugLabel: string
+): Promise<T> {
+  const request = buildRequestContext(resolved);
+  return runAndParse(
+    prompt,
+    client,
+    request,
+    parseSchema,
+    errorCode,
+    debugLabel
+  );
+}
+
+interface AttemptContext<T> {
+  client: Awaited<ReturnType<typeof getLLMClient>>;
+  resolved: ResolvedRequestOptions;
+  parseSchema: (value: unknown) => T;
+  errorCode: ErrorCodeType;
+  debugLabel: string;
+}
+
+async function executeAttempt<T>(
+  prompt: string,
+  context: AttemptContext<T>
+): Promise<T> {
+  return executeOnce(
+    prompt,
+    context.client,
+    context.resolved,
+    context.parseSchema,
+    context.errorCode,
+    context.debugLabel
+  );
+}
+
+async function runWithOptionalRetry<T>(
+  prompt: string,
+  context: AttemptContext<T>
+): Promise<{ value: T; usedFallback: boolean }> {
+  try {
+    const value = await executeAttempt(prompt, context);
+    return { value, usedFallback: false };
+  } catch (error) {
+    if (!shouldRetryParse(error, context.resolved.retryOnParseFailure)) {
+      throw error;
+    }
+    const value = await executeAttempt(
+      `${prompt}${context.resolved.retryPromptSuffix}`,
+      context
+    );
+    return { value, usedFallback: true };
+  }
+}
+
 export async function executeLLMWithJsonResponse<T>(
   prompt: string,
   parseSchema: (value: unknown) => T,
@@ -105,29 +165,13 @@ export async function executeLLMWithJsonResponse<T>(
   } = {}
 ): Promise<{ value: T; usedFallback: boolean }> {
   const resolved = resolveRequestOptions(options);
-  const buildCtx = (): RequestContext => buildRequestContext(resolved);
   const client = await getLLMClient();
-
-  try {
-    const value = await runAndParse(
-      prompt,
-      client,
-      buildCtx(),
-      parseSchema,
-      errorCode,
-      debugLabel
-    );
-    return { value, usedFallback: false };
-  } catch (error) {
-    if (!shouldRetryParse(error, resolved.retryOnParseFailure)) throw error;
-    const value = await runAndParse(
-      prompt + resolved.retryPromptSuffix,
-      client,
-      buildCtx(),
-      parseSchema,
-      errorCode,
-      debugLabel
-    );
-    return { value, usedFallback: true };
-  }
+  const context: AttemptContext<T> = {
+    client,
+    resolved,
+    parseSchema,
+    errorCode,
+    debugLabel,
+  };
+  return runWithOptionalRetry(prompt, context);
 }

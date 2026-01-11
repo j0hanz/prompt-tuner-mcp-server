@@ -5,13 +5,13 @@ import { z, type ZodError } from 'zod';
 
 import { config } from '../config/env.js';
 import {
-  type ContentBlock,
   ErrorCode,
   type ErrorCodeType,
   type ErrorResponse,
   type McpErrorOptions,
-  type SuccessResponse,
 } from '../config/types.js';
+
+export { createSuccessResponse } from './success-response.js';
 
 const stderrDestination = pino.destination({ fd: 2 });
 
@@ -39,27 +39,19 @@ export class McpError extends Error {
     super(message);
     this.name = 'McpError';
     this.code = code;
-
-    if (contextOrOptions && typeof contextOrOptions === 'object') {
-      if (contextOrOptions.context !== undefined) {
-        this.context = contextOrOptions.context;
-      }
-      if (contextOrOptions.details !== undefined) {
-        this.details = contextOrOptions.details;
-      }
-      if (contextOrOptions.recoveryHint !== undefined) {
-        this.recoveryHint = contextOrOptions.recoveryHint;
-      }
-    } else {
-      if (contextOrOptions !== undefined) {
-        this.context = contextOrOptions;
-      }
-      if (details !== undefined) {
-        this.details = details;
-      }
-      if (recoveryHint !== undefined) {
-        this.recoveryHint = recoveryHint;
-      }
+    const resolved = resolveMcpErrorFields(
+      contextOrOptions,
+      details,
+      recoveryHint
+    );
+    if (resolved.context !== undefined) {
+      this.context = resolved.context;
+    }
+    if (resolved.details !== undefined) {
+      this.details = resolved.details;
+    }
+    if (resolved.recoveryHint !== undefined) {
+      this.recoveryHint = resolved.recoveryHint;
     }
   }
 
@@ -70,19 +62,35 @@ export class McpError extends Error {
   }
 }
 
-export function createSuccessResponse<T extends Record<string, unknown>>(
-  text: string,
-  structured: T,
-  extraContent: readonly ContentBlock[] = []
-): SuccessResponse<T> {
-  const structuredBlock: ContentBlock = {
-    type: 'text',
-    text: JSON.stringify(structured),
-  };
-  const messageBlock: ContentBlock = { type: 'text', text };
+interface ResolvedErrorFields {
+  context?: string;
+  details?: Record<string, unknown>;
+  recoveryHint?: string;
+}
+
+function resolveMcpErrorFields(
+  contextOrOptions?: string | McpErrorOptions,
+  details?: Record<string, unknown>,
+  recoveryHint?: string
+): ResolvedErrorFields {
+  if (contextOrOptions && typeof contextOrOptions === 'object') {
+    return {
+      ...(contextOrOptions.context !== undefined
+        ? { context: contextOrOptions.context }
+        : {}),
+      ...(contextOrOptions.details !== undefined
+        ? { details: contextOrOptions.details }
+        : {}),
+      ...(contextOrOptions.recoveryHint !== undefined
+        ? { recoveryHint: contextOrOptions.recoveryHint }
+        : {}),
+    };
+  }
+
   return {
-    content: [structuredBlock, messageBlock, ...extraContent],
-    structuredContent: structured,
+    ...(contextOrOptions !== undefined ? { context: contextOrOptions } : {}),
+    ...(details !== undefined ? { details } : {}),
+    ...(recoveryHint !== undefined ? { recoveryHint } : {}),
   };
 }
 

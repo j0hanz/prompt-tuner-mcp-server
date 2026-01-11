@@ -4,9 +4,8 @@ import {
 } from '../config/constants.js';
 import type { ErrorCodeType } from '../config/types.js';
 import { logger, McpError } from './errors.js';
+import { stripCodeBlockMarkers } from './llm-json/fences.js';
 import { extractFirstJsonFragment } from './llm-json/scan.js';
-
-const CODE_FENCE = '```';
 
 interface ParseFailureDetail {
   stage: string;
@@ -16,52 +15,6 @@ interface ParseFailureDetail {
 type ParseAttempt<T> =
   | { success: true; value: T }
   | { success: false; error: ParseFailureDetail };
-
-function isWhitespace(char: string): boolean {
-  return char.trim() === '';
-}
-
-function stripStartFence(text: string): string {
-  let cursor = 0;
-  while (cursor < text.length && isWhitespace(text.charAt(cursor))) {
-    cursor += 1;
-  }
-  if (!text.startsWith(CODE_FENCE, cursor)) return text;
-  let index = cursor + CODE_FENCE.length;
-
-  if (index < text.length && !isWhitespace(text.charAt(index))) {
-    let tokenEnd = index;
-    while (tokenEnd < text.length && !isWhitespace(text.charAt(tokenEnd))) {
-      tokenEnd += 1;
-    }
-    const token = text.slice(index, tokenEnd);
-    if (token.toLowerCase() !== 'json') return text;
-    index = tokenEnd;
-  }
-
-  while (index < text.length && isWhitespace(text.charAt(index))) {
-    index += 1;
-  }
-
-  return text.slice(index);
-}
-
-function stripEndFence(text: string): string {
-  let end = text.length - 1;
-  while (end >= 0 && isWhitespace(text.charAt(end))) {
-    end -= 1;
-  }
-  if (end < CODE_FENCE.length - 1) return text;
-  const fenceStart = end - (CODE_FENCE.length - 1);
-  if (text.slice(fenceStart, end + 1) !== CODE_FENCE) return text;
-  return text.slice(0, fenceStart);
-}
-
-function stripCodeBlockMarkers(text: string): string {
-  const withoutStart = stripStartFence(text);
-  const withoutEnd = stripEndFence(withoutStart);
-  return withoutEnd.trim();
-}
 
 function enforceMaxInputLength(
   llmResponseText: string,

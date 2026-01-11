@@ -1,0 +1,171 @@
+import { GoogleGenAI, HarmBlockThreshold, HarmCategory } from '@google/genai';
+
+import { LLM_MAX_TOKENS } from '../config/constants.js';
+import { config } from '../config/env.js';
+import type {
+  LLMClient,
+  LLMProvider,
+  LLMRequestOptions,
+} from '../config/types.js';
+import { buildAbortSignal } from './abort-signals.js';
+import { checkAborted, DEFAULT_TIMEOUT_MS } from './llm-providers/helpers.js';
+import { runGeneration } from './llm-runtime.js';
+
+const GOOGLE_SAFETY_CATEGORIES = [
+  HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+  HarmCategory.HARM_CATEGORY_HARASSMENT,
+  HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+  HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+  HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY,
+] as const;
+
+type GoogleGenerateResponse = Awaited<
+  ReturnType<GoogleGenAI['models']['generateContent']>
+>;
+type GoogleGenerateRequest = Parameters<
+  GoogleGenAI['models']['generateContent']
+>[0];
+
+interface SafetySetting {
+  category: HarmCategory;
+  threshold: HarmBlockThreshold;
+}
+
+interface SafetyCache {
+  disabled: boolean;
+  settings: SafetySetting[];
+}
+
+export class GoogleClient implements LLMClient {
+  private readonly client: GoogleGenAI;
+  private readonly model: string;
+  private readonly provider: LLMProvider = 'google';
+  private safetySettingsCache: SafetyCache | null = null;
+
+  constructor(apiKey: string, model: string) {
+    this.client = new GoogleGenAI({ apiKey });
+    this.model = model;
+  }
+
+  generateText(
+    prompt: string,
+    maxTokens = LLM_MAX_TOKENS,
+    options?: LLMRequestOptions
+  ): Promise<string> {
+    return runGeneration(
+      this.provider,
+      this.model,
+      () => this.requestCompletion(prompt, maxTokens, options),
+      options?.signal
+    );
+  }
+
+  private async requestCompletion(
+    prompt: string,
+    maxTokens: number,
+    options?: LLMRequestOptions
+  ): Promise<string> {
+    const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const signal = buildAbortSignal(timeoutMs, options?.signal);
+    checkAborted(signal);
+    const response = await this.executeRequest(prompt, maxTokens, {
+      ...options,
+      timeoutMs,
+      signal,
+    });
+    return response.trim();
+  }
+
+  private buildSafetySettings(): SafetySetting[] {
+    const disabled = config.GOOGLE_SAFETY_DISABLED;
+    if (this.safetySettingsCache?.disabled === disabled) {
+      return this.safetySettingsCache.settings;
+    }
+
+    const threshold = disabled
+      ? HarmBlockThreshold.OFF
+      : HarmBlockThreshold.BLOCK_ONLY_HIGH;
+    const settings = GOOGLE_SAFETY_CATEGORIES.map((category) => ({
+      category,
+      threshold,
+    }));
+    this.safetySettingsCache = { disabled, settings };
+    return settings;
+  }
+
+  private buildRequest(
+    prompt: string,
+    maxTokens: number,
+    timeoutMs?: number,
+    signal?: AbortSignal
+  ): GoogleGenerateRequest {
+    return {
+      model: this.model,
+      contents: prompt,
+      config: {
+        maxOutputTokens: maxTokens,
+        safetySettings: this.buildSafetySettings(),
+        ...(timeoutMs ? { httpOptions: { timeout: timeoutMs } } : {}),
+        ...(signal ? { abortSignal: signal } : {}),
+      },
+    };
+  }
+
+  private async executeRequest(
+    prompt: string,
+    maxTokens: number,
+    options?: LLMRequestOptions
+  ): Promise<string> {
+    const { signal, timeoutMs } = options ?? {};
+    const request = this.buildRequest(prompt, maxTokens, timeoutMs, signal);
+    const generatePromise = this.client.models.generateContent(request);
+
+    if (!signal) {
+      const response = await generatePromise;
+      return this.finalizeResponse(response);
+    }
+
+    return this.executeWithAbort(generatePromise, signal);
+  }
+
+  private async executeWithAbort(
+    generatePromise: Promise<GoogleGenerateResponse>,
+    signal: AbortSignal
+  ): Promise<string> {
+    const abortPromise = new Promise<never>((_, reject) => {
+      const onAbort = (): void => {
+        reject(new Error('Request aborted'));
+      };
+      signal.addEventListener('abort', onAbort);
+      void generatePromise.finally(() => {
+        signal.removeEventListener('abort', onAbort);
+      });
+    });
+
+    try {
+      const response = await Promise.race([generatePromise, abortPromise]);
+      return this.finalizeResponse(response);
+    } catch (error) {
+      if (signal.aborted) {
+        void generatePromise.catch(() => {});
+      }
+      throw error;
+    }
+  }
+
+  private finalizeResponse(response: GoogleGenerateResponse): string {
+    if (String(response.candidates?.[0]?.finishReason) === 'SAFETY') {
+      throw new Error('Content filtered by safety settings');
+    }
+
+    return response.text ?? '';
+  }
+
+  getProvider(): LLMProvider {
+    return this.provider;
+  }
+
+  getModel(): string {
+    return this.model;
+  }
+}
