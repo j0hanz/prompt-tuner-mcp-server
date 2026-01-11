@@ -245,7 +245,10 @@ function enforceStrictProtocolVersion(server: McpServer): void {
     server.server as unknown as { _oninitialize?: InitializeHandler }
   )._oninitialize?.bind(server.server);
   if (!baseInitialize) {
-    throw new Error('Strict protocol version check unavailable.');
+    logger.warn(
+      'Strict protocol version check unavailable (SDK internals changed). Falling back to SDK default initialize handler.'
+    );
+    return;
   }
 
   server.server.setRequestHandler(

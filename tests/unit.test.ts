@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
+import { parseEnv } from '../src/config.js';
 import {
   containsOutputScaffolding,
   normalizePromptText,
@@ -76,6 +77,26 @@ describe('prompt wrapping', () => {
     const normal = 'Hello 123 !? cafe';
     const result = wrapPromptData(normal);
     assert.ok(result.includes('Hello 123 !? cafe'));
+  });
+});
+
+describe('config parsing', () => {
+  it('rejects malformed numeric env values (no parseInt truncation)', () => {
+    assert.throws(() => {
+      parseEnv({
+        ...process.env,
+        LLM_TIMEOUT_MS: '60000oops',
+      });
+    });
+  });
+
+  it('enforces minimum numeric thresholds', () => {
+    assert.throws(() => {
+      parseEnv({
+        ...process.env,
+        LLM_TIMEOUT_MS: '10',
+      });
+    });
   });
 });
 

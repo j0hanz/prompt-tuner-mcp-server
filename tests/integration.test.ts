@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { type ChildProcess, spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
@@ -23,16 +22,9 @@ const describeIntegration = hasApiKey ? describe : describe.skip;
 describeIntegration('Integration', { timeout: TIMEOUT_MS }, () => {
   let client: Client | undefined;
   let transport: StdioClientTransport | undefined;
-  let serverProcess: ChildProcess | undefined;
 
   before(
     async () => {
-      // Start the server process
-      serverProcess = spawn('node', [SERVER_PATH], {
-        env: { ...process.env },
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-
       // Create transport and client
       transport = new StdioClientTransport({
         command: 'node',
@@ -54,9 +46,8 @@ describeIntegration('Integration', { timeout: TIMEOUT_MS }, () => {
     if (client) {
       await client.close();
     }
-    if (serverProcess) {
-      serverProcess.kill();
-    }
+    // Client.close() should close the underlying stdio transport process.
+    void transport;
   });
 
   describe('Capability Negotiation', () => {

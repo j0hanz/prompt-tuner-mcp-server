@@ -12,7 +12,11 @@ import {
   ErrorCode,
 } from './lib/errors.js';
 import { getLLMClient } from './lib/llm.js';
-import { normalizePromptText } from './lib/prompt-utils.js';
+import {
+  INPUT_HANDLING_SECTION,
+  normalizePromptText,
+  wrapPromptData,
+} from './lib/prompt-utils.js';
 import {
   BoostPromptInputSchema,
   BoostPromptOutputSchema,
@@ -66,8 +70,11 @@ function buildFixInstruction(prompt: string): string {
     '- Preserve formatting, bulleting, and code blocks as much as possible.',
     '- Output ONLY the corrected text (no preamble, no quotes, no code fences).',
     '',
-    'TEXT:',
-    prompt,
+    INPUT_HANDLING_SECTION,
+    '',
+    'Output the corrected text only (not JSON).',
+    '',
+    wrapPromptData(prompt),
   ].join('\n');
 }
 
@@ -82,8 +89,11 @@ function buildBoostInstruction(prompt: string): string {
     '- Avoid unnecessary verbosity.',
     '- Output ONLY the improved prompt (no preamble, no quotes, no code fences).',
     '',
-    'PROMPT:',
-    prompt,
+    INPUT_HANDLING_SECTION,
+    '',
+    'Output the improved prompt text only (not JSON).',
+    '',
+    wrapPromptData(prompt),
   ].join('\n');
 }
 

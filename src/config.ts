@@ -15,7 +15,10 @@ const numberString = (
     .string()
     .optional()
     .default(String(def))
-    .transform((v) => parseInt(v, 10))
+    .refine((value) => /^\d+$/.test(value), {
+      message: 'Must be an integer (digits only)',
+    })
+    .transform((value) => parseInt(value, 10))
     .refine((n) => n >= min, { message: `Must be >= ${min}` });
 
 const envSchema = z.object({
@@ -47,7 +50,13 @@ const envSchema = z.object({
   RETRY_TOTAL_TIMEOUT_MS: numberString(180000, 10000),
 });
 
-export const config = envSchema.parse(process.env);
+export type Config = z.infer<typeof envSchema>;
+
+export function parseEnv(env: NodeJS.ProcessEnv): Config {
+  return envSchema.parse(env);
+}
+
+export const config = parseEnv(process.env);
 
 export const SERVER_NAME = 'prompttuner-mcp';
 export const SERVER_VERSION = packageJson.version;

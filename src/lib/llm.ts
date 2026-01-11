@@ -197,6 +197,32 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function isAbortLikeError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const e = error as { name?: unknown; message?: unknown; code?: unknown };
+
+  if (e.name === 'AbortError') return true;
+  if (e.code === 'ABORT_ERR') return true;
+  if (typeof e.message === 'string' && /\babort(ed|ing)?\b/i.test(e.message)) {
+    return true;
+  }
+
+  return false;
+}
+
+function isTimeoutLikeError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const e = error as { name?: unknown; message?: unknown; code?: unknown };
+
+  if (e.name === 'TimeoutError') return true;
+  if (e.code === 'ETIMEDOUT') return true;
+  if (typeof e.message === 'string' && /\btime(d)?\s*out\b/i.test(e.message)) {
+    return true;
+  }
+
+  return false;
+}
+
 function getSafeErrorDetails(error: unknown): SafeErrorDetails {
   if (typeof error === 'object' && error !== null) {
     const e = error as LLMError;
@@ -288,6 +314,15 @@ function classifyLLMError(error: unknown, provider: LLMProvider): McpError {
 
 function coerceMcpError(error: unknown, provider: LLMProvider): McpError {
   if (error instanceof McpError) return error;
+
+  if (isAbortLikeError(error)) {
+    return new McpError(ErrorCode.E_TIMEOUT, 'Request aborted');
+  }
+
+  if (isTimeoutLikeError(error)) {
+    return new McpError(ErrorCode.E_TIMEOUT, 'Request timed out');
+  }
+
   return classifyLLMError(error, provider);
 }
 
@@ -402,10 +437,7 @@ async function waitForRetry(
     await setTimeout(delayMs, undefined, { signal, ref: false });
   } catch (error) {
     if (signal?.aborted) {
-      throw new McpError(
-        ErrorCode.E_TIMEOUT,
-        'Request aborted during retry backoff'
-      );
+      throw new McpError(ErrorCode.E_TIMEOUT, 'Request aborted');
     }
     throw error;
   }
