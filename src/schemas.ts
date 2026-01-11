@@ -37,7 +37,7 @@ function enforcePromptLength(value: string, ctx: z.RefinementCtx): void {
 
 export function buildPromptSchema(
   description: string
-): z.ZodType<string, string> {
+): z.ZodPipe<z.ZodString, z.ZodTransform<string, string>> {
   return z
     .string()
     .max(

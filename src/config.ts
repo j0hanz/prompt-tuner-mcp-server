@@ -7,11 +7,8 @@ const booleanString = z
   .optional()
   .default(false);
 
-const numberString = (
-  def: number,
-  min = 0
-): z.ZodType<number, string | undefined> =>
-  z
+function createNumberString(def: number, min: number): z.ZodType<number> {
+  return z
     .string()
     .optional()
     .default(String(def))
@@ -20,6 +17,10 @@ const numberString = (
     })
     .transform((value) => parseInt(value, 10))
     .refine((n) => n >= min, { message: `Must be >= ${min}` });
+}
+
+const numberString = (def: number, min = 0): z.ZodType<number> =>
+  createNumberString(def, min);
 
 const envSchema = z.object({
   LOG_FORMAT: z.enum(['json', 'text']).optional().default('text'),

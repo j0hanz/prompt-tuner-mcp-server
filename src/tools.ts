@@ -17,12 +17,7 @@ import {
   normalizePromptText,
   wrapPromptData,
 } from './lib/prompt-utils.js';
-import {
-  BoostPromptInputSchema,
-  BoostPromptOutputSchema,
-  FixPromptInputSchema,
-  FixPromptOutputSchema,
-} from './schemas.js';
+import { BoostPromptInputSchema, FixPromptInputSchema } from './schemas.js';
 import type { ErrorResponse } from './types.js';
 
 const FIX_PROMPT_TOOL_NAME = 'fix_prompt';
@@ -33,7 +28,6 @@ const FIX_PROMPT_TOOL = {
   description:
     'Fix spelling and grammar only. Does not rewrite or add content.',
   inputSchema: FixPromptInputSchema,
-  outputSchema: FixPromptOutputSchema,
   annotations: {
     readOnlyHint: true,
     idempotentHint: false,
@@ -45,7 +39,6 @@ const BOOST_PROMPT_TOOL = {
   title: 'Boost Prompt',
   description: 'Refine and enhance a prompt to be clearer and more effective.',
   inputSchema: BoostPromptInputSchema,
-  outputSchema: BoostPromptOutputSchema,
   annotations: {
     readOnlyHint: true,
     idempotentHint: false,
