@@ -28,6 +28,9 @@ type InitializeHandler = (
   request: InitializeRequest
 ) => Promise<InitializeResult>;
 
+type OnRequestHandler = (request: unknown, extra?: unknown) => void;
+type OnInitializedHandler = () => void;
+
 function enforceStrictProtocolVersion(server: McpServer): void {
   const baseInitialize = (
     server.server as unknown as { _oninitialize?: InitializeHandler }
@@ -54,6 +57,57 @@ function enforceStrictProtocolVersion(server: McpServer): void {
       return await baseInitialize(request);
     }
   );
+}
+
+function enforceInitializeFirst(server: McpServer): void {
+  const protocol = server.server as unknown as {
+    _onrequest?: OnRequestHandler;
+    oninitialized?: OnInitializedHandler;
+    _transport?: { send: (message: unknown) => Promise<void> };
+  };
+
+  const baseOnRequest = protocol._onrequest?.bind(server.server);
+  if (!baseOnRequest) {
+    logger.warn(
+      'Initialize gating unavailable (SDK internals changed). Proceeding without lifecycle guard.'
+    );
+    return;
+  }
+
+  let initialized = false;
+  const baseOnInitialized = protocol.oninitialized?.bind(server.server);
+  protocol.oninitialized = (): void => {
+    initialized = true;
+    baseOnInitialized?.();
+  };
+
+  protocol._onrequest = (request: unknown, extra?: unknown): void => {
+    const method =
+      typeof request === 'object' && request !== null && 'method' in request
+        ? (request as { method?: unknown }).method
+        : undefined;
+    if (!initialized && method !== 'initialize') {
+      const id =
+        typeof request === 'object' && request !== null && 'id' in request
+          ? (request as { id?: unknown }).id
+          : undefined;
+      const errorResponse = {
+        jsonrpc: '2.0',
+        id,
+        error: {
+          code: RpcErrorCode.InvalidRequest,
+          message: 'Server not initialized',
+        },
+      };
+      protocol._transport
+        ?.send(errorResponse)
+        .catch((error: unknown) => {
+          logger.error({ err: error }, 'Failed to send initialize error');
+        });
+      return;
+    }
+    baseOnRequest(request, extra);
+  };
 }
 
 type ToolInputValidator = (
@@ -89,6 +143,7 @@ function createServer(): McpServer {
 
   registerPromptTools(server);
   enforceStrictProtocolVersion(server);
+  enforceInitializeFirst(server);
   disableSdkToolInputValidation(server);
 
   return server;
