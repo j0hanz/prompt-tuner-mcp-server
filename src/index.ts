@@ -35,10 +35,8 @@ async function main(): Promise<void> {
     cleanupTelemetry();
   });
 
-  const { getLLMClient } = await import('./lib/llm.js');
   const { startServer } = await import('./server.js');
 
-  await getLLMClient();
   const server = await startServer();
   setServer(server);
 }

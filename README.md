@@ -53,14 +53,16 @@ Add to `claude_desktop_config.json`:
 
 PromptTuner uses minimal configuration. Set the provider and API key, and you're ready to go.
 
-| Variable            | Default  | Description                          |
-| ------------------- | -------- | ------------------------------------ |
-| `LLM_PROVIDER`      | `openai` | `openai`, `anthropic`, or `google`.  |
-| `OPENAI_API_KEY`    | -        | Required when `LLM_PROVIDER=openai`. |
-| `ANTHROPIC_API_KEY` | -        | Required for Anthropic.              |
-| `GOOGLE_API_KEY`    | -        | Required for Google.                 |
-| `LLM_MODEL`         | -        | Override the default model.          |
-| `DEBUG`             | `false`  | Enable debug logging.                |
+| Variable            | Default  | Description                                                             |
+| ------------------- | -------- | ----------------------------------------------------------------------- |
+| `LLM_PROVIDER`      | `openai` | `openai`, `anthropic`, or `google`.                                     |
+| `OPENAI_API_KEY`    | -        | Required for `fix_prompt`/`boost_prompt` when `LLM_PROVIDER=openai`.    |
+| `ANTHROPIC_API_KEY` | -        | Required for `fix_prompt`/`boost_prompt` when `LLM_PROVIDER=anthropic`. |
+| `GOOGLE_API_KEY`    | -        | Required for `fix_prompt`/`boost_prompt` when `LLM_PROVIDER=google`.    |
+| `LLM_MODEL`         | -        | Override the default model.                                             |
+| `DEBUG`             | `false`  | Enable debug logging.                                                   |
+
+All tools are LLM-backed and require an API key for the selected provider.
 
 ### Default Models
 

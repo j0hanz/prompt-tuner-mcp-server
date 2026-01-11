@@ -357,6 +357,37 @@ type AttemptOutcome =
   | { type: 'retry'; delayMs: number }
   | { type: 'fail'; error: McpError };
 
+function attachAttemptsUsed(error: McpError, attemptsUsed: number): McpError {
+  if (!Number.isFinite(attemptsUsed) || attemptsUsed <= 0) return error;
+  const existing = error.details;
+  const withAttempts = {
+    ...(existing ?? {}),
+    attemptsUsed,
+  };
+  return new McpError(error.code, error.message, {
+    ...(error.context !== undefined ? { context: error.context } : {}),
+    details: withAttempts,
+    ...(error.recoveryHint !== undefined
+      ? { recoveryHint: error.recoveryHint }
+      : {}),
+  });
+}
+
+function resolveAttemptsUsed(error: unknown, fallback: number): number {
+  if (error instanceof McpError) {
+    const attempts = (error.details as { attemptsUsed?: unknown } | undefined)
+      ?.attemptsUsed;
+    if (
+      typeof attempts === 'number' &&
+      Number.isFinite(attempts) &&
+      attempts > 0
+    ) {
+      return attempts;
+    }
+  }
+  return fallback;
+}
+
 interface RetrySettings {
   maxRetries: number;
   baseDelayMs: number;
@@ -451,10 +482,12 @@ async function waitForRetry(
 
 async function handleOutcome(
   outcome: AttemptOutcome,
-  signal: AbortSignal | undefined
+  signal: AbortSignal | undefined,
+  attemptsUsed: number
 ): Promise<string | null> {
   if (outcome.type === 'success') return outcome.content;
-  if (outcome.type === 'fail') throw outcome.error;
+  if (outcome.type === 'fail')
+    throw attachAttemptsUsed(outcome.error, attemptsUsed);
   await waitForRetry(outcome.delayMs, signal);
   return null;
 }
@@ -499,7 +532,15 @@ async function executeAttempts(
       startTime,
       attempt
     );
-    const content = await handleOutcome(outcome, signal);
+    let content: string | null;
+    try {
+      content = await handleOutcome(outcome, signal, attemptsUsed);
+    } catch (error) {
+      if (error instanceof McpError) {
+        throw attachAttemptsUsed(error, attemptsUsed);
+      }
+      throw error;
+    }
     if (content !== null) {
       return { content, attemptsUsed };
     }
@@ -583,10 +624,11 @@ async function runGeneration(
     publishSuccessEvent(provider, model, attemptsUsed, startPerf);
     return content;
   } catch (error) {
+    const attemptsForTelemetry = resolveAttemptsUsed(error, attemptsUsed);
     publishFailureEvent(
       provider,
       model,
-      attemptsUsed,
+      attemptsForTelemetry,
       startPerf,
       resolveFailureDetails(error)
     );

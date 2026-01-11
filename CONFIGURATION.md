@@ -4,12 +4,14 @@ PromptTuner MCP uses minimal configuration. Set the provider and API key, and yo
 
 ## Required Configuration
 
-| Variable            | Default  | Description                          |
-| ------------------- | -------- | ------------------------------------ |
-| `LLM_PROVIDER`      | `openai` | `openai`, `anthropic`, or `google`.  |
-| `OPENAI_API_KEY`    | -        | Required when `LLM_PROVIDER=openai`. |
-| `ANTHROPIC_API_KEY` | -        | Required for Anthropic.              |
-| `GOOGLE_API_KEY`    | -        | Required for Google.                 |
+| Variable            | Default  | Description                                                             |
+| ------------------- | -------- | ----------------------------------------------------------------------- |
+| `LLM_PROVIDER`      | `openai` | `openai`, `anthropic`, or `google`.                                     |
+| `OPENAI_API_KEY`    | -        | Required for `fix_prompt`/`boost_prompt` when `LLM_PROVIDER=openai`.    |
+| `ANTHROPIC_API_KEY` | -        | Required for `fix_prompt`/`boost_prompt` when `LLM_PROVIDER=anthropic`. |
+| `GOOGLE_API_KEY`    | -        | Required for `fix_prompt`/`boost_prompt` when `LLM_PROVIDER=google`.    |
+
+All tools are LLM-backed and require an API key for the selected provider.
 
 ## Optional Configuration
 

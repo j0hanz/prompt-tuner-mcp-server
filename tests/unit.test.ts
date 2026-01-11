@@ -111,4 +111,30 @@ describe('output validation', () => {
     const result = normalizePromptText(input);
     assert.strictEqual(result, 'Hello');
   });
+
+  it('strips assistant preamble before fenced content', () => {
+    const input = "Sure, here's the refined prompt:\n```text\nHello\n```";
+    const result = normalizePromptText(input);
+    assert.strictEqual(result, 'Hello');
+  });
+
+  it('strips assistant preamble before plain prompt text', () => {
+    const input = "Sure, here's the improved prompt:\n\nHello";
+    const result = normalizePromptText(input);
+    assert.strictEqual(result, 'Hello');
+  });
+
+  it('strips output scaffolding sections (header + changes)', () => {
+    const input =
+      '# Prompt Refinement\nChanges:\n- Fixed grammar\n\nHello world';
+    const result = normalizePromptText(input);
+    assert.strictEqual(result, 'Hello world');
+  });
+
+  it('does not strip legitimate prompts that start with conversational language', () => {
+    const input =
+      'Sure, you are a helpful assistant. Follow the instructions carefully.';
+    const result = normalizePromptText(input);
+    assert.strictEqual(result, input);
+  });
 });
