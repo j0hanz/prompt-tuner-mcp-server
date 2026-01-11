@@ -148,14 +148,15 @@ All prompts accept a single argument: `{ "prompt": "..." }`.
 ## Project Structure
 
 ```text
-src/
-  index.ts        Entry point
-  server.ts       MCP server setup (stdio transport)
-  config/         Configuration and constants
-  lib/            Shared utilities (LLM, retry, validation)
-  tools/          Tool implementations
-  prompts/        MCP prompt templates
-  schemas/        Zod input/output schemas
+  src/
+    index.ts        Entry point
+    cli.ts          CLI parsing, logging bootstrap, shutdown handling
+    server.ts       MCP server setup (stdio transport)
+    tools.ts        Tool implementations
+    schemas.ts      Zod input/output schemas
+    config.ts       Configuration and constants
+    types.ts        Shared types and error codes
+    lib/            Shared utilities (LLM, retry, telemetry, prompt utils)
 
 tests/            node:test suites
 

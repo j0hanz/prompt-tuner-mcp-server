@@ -1,13 +1,15 @@
 #!/usr/bin/env node
-import { applyEnvOverrides, parseCli, printHelp } from './cli/config.js';
-import { initLogger } from './cli/logger.js';
-import { writeCliOutput } from './cli/output.js';
 import {
+  applyEnvOverrides,
+  configureTelemetry,
+  initLogger,
+  parseCli,
+  printHelp,
   registerProcessHandlers,
   setServer,
   shutdown,
-} from './cli/shutdown.js';
-import { configureTelemetry } from './cli/telemetry.js';
+  writeCliOutput,
+} from './cli.js';
 
 registerProcessHandlers();
 
@@ -21,8 +23,7 @@ async function main(): Promise<void> {
   }
 
   if (cli.version) {
-    const { SERVER_NAME, SERVER_VERSION } =
-      await import('./config/constants.js');
+    const { SERVER_NAME, SERVER_VERSION } = await import('./config.js');
     writeCliOutput(`${SERVER_NAME} v${SERVER_VERSION}`);
     return;
   }
@@ -34,7 +35,7 @@ async function main(): Promise<void> {
     cleanupTelemetry();
   });
 
-  const { getLLMClient } = await import('./lib/llm-client.js');
+  const { getLLMClient } = await import('./lib/llm.js');
   const { startServer } = await import('./server.js');
 
   await getLLMClient();

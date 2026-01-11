@@ -3,15 +3,15 @@ import { inspect } from 'node:util';
 import pino from 'pino';
 import { z, type ZodError } from 'zod';
 
-import { config } from '../config/env.js';
-import {
-  ErrorCode,
-  type ErrorCodeType,
-  type ErrorResponse,
-  type McpErrorOptions,
-} from '../config/types.js';
-
-export { createSuccessResponse } from './success-response.js';
+import { config } from '../config.js';
+import type {
+  ContentBlock,
+  ErrorCodeType,
+  ErrorResponse,
+  McpErrorOptions,
+  SuccessResponse,
+} from '../types.js';
+import { ErrorCode } from '../types.js';
 
 const stderrDestination = pino.destination({ fd: 2 });
 
@@ -184,6 +184,22 @@ export function createErrorResponse(
   };
 }
 
+export function createSuccessResponse<T extends Record<string, unknown>>(
+  text: string,
+  structured: T,
+  extraContent: readonly ContentBlock[] = []
+): SuccessResponse<T> {
+  const structuredBlock: ContentBlock = {
+    type: 'text',
+    text: JSON.stringify(structured),
+  };
+  const messageBlock: ContentBlock = { type: 'text', text };
+  return {
+    content: [structuredBlock, messageBlock, ...extraContent],
+    structuredContent: structured,
+  };
+}
+
 function sanitizeErrorContext(context?: string): string | undefined {
   if (!context) return undefined;
 
@@ -238,8 +254,8 @@ function resolveSafeContext(context?: string): string | undefined {
     : undefined;
 }
 
-export { ErrorCode };
-
 function isZodError(error: unknown): error is ZodError {
   return error instanceof z.ZodError;
 }
+
+export { ErrorCode };

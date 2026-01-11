@@ -1,7 +1,7 @@
 import diagnosticsChannel from 'node:diagnostics_channel';
 import { monitorEventLoopDelay, performance } from 'node:perf_hooks';
 
-import type { ErrorCodeType, LLMProvider } from '../config/types.js';
+import type { ErrorCodeType, LLMProvider } from '../types.js';
 
 const LLM_REQUEST_CHANNEL = 'prompt-tuner:llm.request';
 const EVENT_LOOP_CHANNEL = 'prompt-tuner:event-loop';
