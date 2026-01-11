@@ -26,7 +26,7 @@ const BOOST_PROMPT_TOOL_NAME = 'boost_prompt';
 const FIX_PROMPT_TOOL = {
   title: 'Fix Prompt',
   description:
-    'Fix spelling and grammar only. Does not rewrite or add content.',
+    'Polish and refine a prompt for better clarity, readability, and flow.',
   inputSchema: FixPromptInputSchema,
   annotations: {
     readOnlyHint: true,
@@ -37,7 +37,8 @@ const FIX_PROMPT_TOOL = {
 
 const BOOST_PROMPT_TOOL = {
   title: 'Boost Prompt',
-  description: 'Refine and enhance a prompt to be clearer and more effective.',
+  description:
+    'Transform a prompt using prompt engineering best practices for maximum clarity and effectiveness.',
   inputSchema: BoostPromptInputSchema,
   annotations: {
     readOnlyHint: true,
@@ -54,18 +55,23 @@ function extractPromptFromInput(input: unknown): string | undefined {
 
 function buildFixInstruction(prompt: string): string {
   return [
-    'You are a careful editor.',
+    'You are a prompt editor specializing in clarity and readability.',
     '',
-    'Task: Fix ONLY spelling and grammar in the text below.',
-    'Rules:',
-    '- Do not rewrite, rephrase, or add new information.',
-    '- Do not remove information.',
-    '- Preserve formatting, bulleting, and code blocks as much as possible.',
-    '- Output ONLY the corrected text (no preamble, no quotes, no code fences).',
+    'Task: Polish and refine the prompt below for improved clarity, flow, and word choice.',
+    '',
+    'Guidelines:',
+    '- Fix spelling, grammar, and punctuation errors.',
+    '- Improve awkward phrasing and word choice.',
+    '- Enhance sentence flow and readability.',
+    '- Always make at least minor improvements, even if technically correct.',
+    '- Preserve the original intent and meaning.',
+    '- Keep the same overall structure and length.',
+    '- Do not add new sections, instructions, or major restructuring.',
+    '- Output ONLY the polished prompt (no preamble, no quotes, no code fences).',
     '',
     INPUT_HANDLING_SECTION,
     '',
-    'Output the corrected text only (not JSON).',
+    'Output the polished prompt text only (not JSON).',
     '',
     wrapPromptData(prompt),
   ].join('\n');
@@ -73,18 +79,24 @@ function buildFixInstruction(prompt: string): string {
 
 function buildBoostInstruction(prompt: string): string {
   return [
-    'You are a prompt improvement assistant.',
+    'You are a prompt engineering expert.',
     '',
-    'Task: Improve the prompt below to be clearer, more specific, and easier to follow.',
-    'Guidelines:',
+    'Task: Enhance the prompt below using proven prompt engineering techniques.',
+    '',
+    'Focus on:',
+    '- Making instructions specific and actionable.',
+    '- Adding structure (bullets, steps) only where it helps.',
+    '- Clarifying the expected output format.',
+    '- Removing ambiguity.',
+    '',
+    'Rules:',
     "- Preserve the user's intent.",
-    '- Add only helpful structure (headings/bullets) when it improves clarity.',
-    '- Avoid unnecessary verbosity.',
-    '- Output ONLY the improved prompt (no preamble, no quotes, no code fences).',
+    '- Keep it concise—no bloat.',
+    '- Output ONLY the enhanced prompt (no preamble, no quotes, no code fences).',
     '',
     INPUT_HANDLING_SECTION,
     '',
-    'Output the improved prompt text only (not JSON).',
+    'Output the boosted prompt text only (not JSON).',
     '',
     wrapPromptData(prompt),
   ].join('\n');

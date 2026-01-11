@@ -52,11 +52,11 @@ export function buildPromptSchema(
 const basePromptSchema = buildPromptSchema('Prompt text');
 
 export const FixPromptInputSchema = z.strictObject({
-  prompt: basePromptSchema.describe('Prompt to fix'),
+  prompt: basePromptSchema.describe('Prompt to polish and refine'),
 });
 
 export const BoostPromptInputSchema = z.strictObject({
-  prompt: basePromptSchema.describe('Prompt to boost'),
+  prompt: basePromptSchema.describe('Prompt to transform and optimize'),
 });
 
 const ErrorSchema = z
@@ -75,11 +75,11 @@ const ErrorSchema = z
 export const FixPromptOutputSchema = z
   .discriminatedUnion('ok', [
     z.strictObject({
-      ok: z.literal(true).describe('True if fixing succeeded'),
-      fixed: z.string().describe('Fixed prompt text'),
+      ok: z.literal(true).describe('True if polishing succeeded'),
+      fixed: z.string().describe('Polished prompt text'),
     }),
     z.strictObject({
-      ok: z.literal(false).describe('False if fixing failed'),
+      ok: z.literal(false).describe('False if polishing failed'),
       error: ErrorSchema.describe('Error details when ok=false'),
     }),
   ])
@@ -88,11 +88,11 @@ export const FixPromptOutputSchema = z
 export const BoostPromptOutputSchema = z
   .discriminatedUnion('ok', [
     z.strictObject({
-      ok: z.literal(true).describe('True if boosting succeeded'),
-      boosted: z.string().describe('Boosted prompt text'),
+      ok: z.literal(true).describe('True if transformation succeeded'),
+      boosted: z.string().describe('Transformed and optimized prompt text'),
     }),
     z.strictObject({
-      ok: z.literal(false).describe('False if boosting failed'),
+      ok: z.literal(false).describe('False if transformation failed'),
       error: ErrorSchema.describe('Error details when ok=false'),
     }),
   ])
