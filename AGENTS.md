@@ -121,7 +121,3 @@ Integration tests:
   - Set `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY` before running `npm run test`.
 - Confusion about HTTP scripts:
   - `dev:http` and `start:http` are compatibility aliases; the server currently runs over stdio.
-
-## Open Questions / TODO
-
-- CI/publish workflow uses Node `20` in `.github/workflows/publish.yml`, while `package.json` requires Node `>=22.0.0`. Decide whether to update the workflow Node version or relax `engines.node`.
