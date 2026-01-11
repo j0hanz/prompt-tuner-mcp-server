@@ -6,25 +6,21 @@
 [![License](https://img.shields.io/npm/l/@j0hanz/prompt-tuner-mcp-server)](LICENSE)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen)](https://nodejs.org/)
 
-PromptTuner MCP is an MCP server that refines, analyzes, optimizes, and validates prompts using OpenAI, Anthropic, or Google Gemini.
+PromptTuner MCP is an MCP server that fixes and boosts prompts using OpenAI, Anthropic, or Google Gemini.
 
 ## What it does
 
 1. Validates and trims input prompts (enforces `MAX_PROMPT_LENGTH`).
-2. Resolves the target format (`auto` uses heuristics; falls back to `gpt` if no format is detected).
-3. Calls the selected provider with retry and timeout controls.
-4. Validates and normalizes LLM output, falling back to stricter prompts or the `basic` technique when needed.
-5. Returns human-readable text plus machine-friendly `structuredContent` (and resource blocks for refined/optimized outputs).
+2. Calls the selected provider.
+3. Normalizes LLM output (strips code fences / labels if present).
+4. Returns human-readable text plus machine-friendly `structuredContent`.
 
 ## Features
 
-- Refine prompts with single techniques or full multi-technique optimization.
-- Analyze quality with scores, characteristics, and actionable suggestions.
-- Validate prompts for issues, token limits, and injection risks.
-- Auto-detect target format (Claude XML, GPT Markdown, or JSON).
-- Structured outputs with provider/model metadata, fallback indicators, and score normalization.
+- Fix spelling and grammar only (`fix_prompt`).
+- Boost and enhance a prompt for clarity and effectiveness (`boost_prompt`).
+- Simple structured outputs.
 - Retry logic with exponential backoff for transient provider failures.
-- Emits MCP progress notifications for `analyze_prompt` when a progress token is provided.
 
 ## Quick Start
 
@@ -85,53 +81,25 @@ CLI flags override environment variables (run `prompt-tuner-mcp-server --help`).
 
 All tools accept plain text, Markdown, or XML prompts. Responses include `content` (human-readable) and `structuredContent` (machine-readable).
 
-### refine_prompt
+### fix_prompt
 
-Fix grammar, improve clarity, and apply a single technique.
+Fix spelling and grammar only.
 
-| Parameter      | Type   | Required | Default | Notes                                                                             |
-| -------------- | ------ | -------- | ------- | --------------------------------------------------------------------------------- |
-| `prompt`       | string | Yes      | -       | Trimmed and length-checked.                                                       |
-| `technique`    | string | No       | `basic` | `basic`, `chainOfThought`, `fewShot`, `roleBased`, `structured`, `comprehensive`. |
-| `targetFormat` | string | No       | `auto`  | `auto`, `claude`, `gpt`, `json`. `auto` uses heuristics.                          |
+| Parameter | Type   | Required | Notes                       |
+| --------- | ------ | -------- | --------------------------- |
+| `prompt`  | string | Yes      | Trimmed and length-checked. |
 
-Returns (structuredContent): `ok`, `original`, `refined`, `corrections`, `technique`, `targetFormat`, `usedFallback`, `provider`, `model`.
+Returns: `ok`, `fixed`.
 
-### analyze_prompt
+### boost_prompt
 
-Score prompt quality (0-100) and provide suggestions.
+Refine and enhance a prompt for clarity and effectiveness.
 
-| Parameter | Type   | Required | Default | Notes                       |
-| --------- | ------ | -------- | ------- | --------------------------- |
-| `prompt`  | string | Yes      | -       | Trimmed and length-checked. |
+| Parameter | Type   | Required | Notes                       |
+| --------- | ------ | -------- | --------------------------- |
+| `prompt`  | string | Yes      | Trimmed and length-checked. |
 
-Returns: `ok`, `hasTypos`, `isVague`, `missingContext`, `suggestions`, `score`, `characteristics`, `usedFallback`, `scoreAdjusted`, `overallSource`, `provider`, `model`.
-
-### optimize_prompt
-
-Apply multiple techniques sequentially and return before/after scores.
-
-| Parameter      | Type     | Required | Default     | Notes                                                                                                                        |
-| -------------- | -------- | -------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `prompt`       | string   | Yes      | -           | Trimmed and length-checked.                                                                                                  |
-| `techniques`   | string[] | No       | `["basic"]` | 1-6 techniques; order preserved. `comprehensive` expands to `basic -> roleBased -> structured -> fewShot -> chainOfThought`. |
-| `targetFormat` | string   | No       | `auto`      | `auto`, `claude`, `gpt`, `json`.                                                                                             |
-
-Returns: `ok`, `original`, `optimized`, `techniquesApplied`, `targetFormat`, `beforeScore`, `afterScore`, `scoreDelta`, `improvements`, `usedFallback`, `scoreAdjusted`, `overallSource`, `provider`, `model`.
-
-### validate_prompt
-
-Pre-flight validation: issues, token estimate, and injection risks.
-
-| Parameter        | Type    | Required | Default   | Notes                                                      |
-| ---------------- | ------- | -------- | --------- | ---------------------------------------------------------- |
-| `prompt`         | string  | Yes      | -         | Trimmed and length-checked.                                |
-| `targetModel`    | string  | No       | `generic` | `claude`, `gpt`, `gemini`, `generic` (token limits below). |
-| `checkInjection` | boolean | No       | `true`    | When true, security risks are flagged as errors.           |
-
-Returns: `ok`, `isValid`, `issues`, `tokenEstimate`, `tokenLimit`, `tokenUtilization`, `overLimit`, `targetModel`, `securityFlags`, `provider`, `model`.
-
-Token limits used for `validate_prompt`: `claude` 200000, `gpt` 128000, `gemini` 1000000, `generic` 8000.
+Returns: `ok`, `boosted`.
 
 ## Response Format
 
@@ -139,40 +107,15 @@ Token limits used for `validate_prompt`: `claude` 200000, `gpt` 128000, `gemini`
 - `structuredContent`: machine-parseable results.
 - Errors return `structuredContent.ok=false` and an `error` object with `code`, `message`, optional `context` (sanitized, up to 200 chars), `details`, and `recoveryHint`.
 - Error responses also include `isError: true`.
-- `refine_prompt` and `optimize_prompt` include a `resource` content block with a `file:///` URI and the prompt text in `resource.text` (Markdown).
 
 ## Prompts
 
-| Name             | Description                                                     |
-| ---------------- | --------------------------------------------------------------- |
-| `quick-optimize` | Fast prompt improvement with grammar and clarity fixes.         |
-| `deep-optimize`  | Comprehensive optimization using the `comprehensive` technique. |
-| `analyze`        | Score prompt quality and return suggestions.                    |
+| Name    | Description                                   |
+| ------- | --------------------------------------------- |
+| `fix`   | Fix spelling and grammar only.                |
+| `boost` | Boost a prompt for clarity and effectiveness. |
 
 All prompts accept a single argument: `{ "prompt": "..." }`.
-
-## Prompt Optimization Workflow
-
-### Technique selection guide
-
-| Task type         | Recommended techniques         |
-| ----------------- | ------------------------------ |
-| Simple cleanup    | `basic`                        |
-| Code tasks        | `roleBased` + `structured`     |
-| Complex reasoning | `roleBased` + `chainOfThought` |
-| Data extraction   | `structured` + `fewShot`       |
-| Maximum quality   | `comprehensive`                |
-
-### Recommended prompt architecture
-
-1. Role or identity
-2. Context or background
-3. Task or objective
-4. Steps or instructions
-5. Requirements or constraints (ALWAYS or NEVER)
-6. Output format
-7. Examples (if helpful)
-8. Final reminder
 
 ## Development
 

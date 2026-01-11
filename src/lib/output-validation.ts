@@ -1,7 +1,3 @@
-import { PATTERNS } from '../config/constants.js';
-import type { OptimizationTechnique, TargetFormat } from '../config/types.js';
-
-const ROLE_STATEMENT_RE = /\bYou are (a|an|the)\b/i;
 const PROMPT_LABEL_RE = /^(refined|optimized)?\s*prompt\s*:/i;
 
 const CODE_FENCE = '```';
@@ -23,11 +19,6 @@ const SCAFFOLDING_LABELS = new Set([
   'techniques applied:',
   'improvements:',
 ]);
-
-function safeTest(pattern: RegExp, text: string): boolean {
-  pattern.lastIndex = 0;
-  return pattern.test(text);
-}
 
 function stripSingleLineLang(value: string): string {
   const firstWhitespace = value.search(/\s/);
@@ -100,39 +91,4 @@ function isScaffoldingHeading(line: string): boolean {
 
 function isScaffoldingLabel(line: string): boolean {
   return SCAFFOLDING_LABELS.has(line);
-}
-
-const STRUCTURE_VALIDATORS: Record<TargetFormat, (text: string) => boolean> = {
-  claude: (text) =>
-    safeTest(PATTERNS.xmlStructure, text) ||
-    safeTest(PATTERNS.claudePatterns, text),
-  gpt: (text) => safeTest(PATTERNS.markdownStructure, text),
-  json: (text) => safeTest(PATTERNS.jsonStructure, text) || /json/i.test(text),
-  auto: () => true,
-};
-
-const TECHNIQUE_VALIDATORS: Record<
-  OptimizationTechnique,
-  (text: string, targetFormat: TargetFormat) => { ok: boolean; reason?: string }
-> = {
-  structured: (text, targetFormat) =>
-    STRUCTURE_VALIDATORS[targetFormat](text)
-      ? { ok: true }
-      : { ok: false, reason: 'Structured format not detected' },
-  roleBased: (text) =>
-    ROLE_STATEMENT_RE.test(text.slice(0, 200))
-      ? { ok: true }
-      : { ok: false, reason: 'Role statement not detected' },
-  chainOfThought: () => ({ ok: true }),
-  fewShot: () => ({ ok: true }),
-  basic: () => ({ ok: true }),
-  comprehensive: () => ({ ok: true }),
-};
-
-export function validateTechniqueOutput(
-  text: string,
-  technique: OptimizationTechnique,
-  targetFormat: TargetFormat
-): { ok: boolean; reason?: string } {
-  return TECHNIQUE_VALIDATORS[technique](text, targetFormat);
 }

@@ -12,10 +12,8 @@ import {
 import { logger } from './lib/errors.js';
 import { registerQuickWorkflowPrompts } from './prompts/quick-workflows.js';
 import { registerTemplateResources } from './resources/templates.js';
-import { registerAnalyzePromptTool } from './tools/analyze-prompt.js';
-import { registerOptimizePromptTool } from './tools/optimize-prompt.js';
-import { registerRefinePromptTool } from './tools/refine-prompt.js';
-import { registerValidatePromptTool } from './tools/validate-prompt.js';
+import { registerBoostPromptTool } from './tools/boost-prompt.js';
+import { registerFixPromptTool } from './tools/fix-prompt.js';
 
 process.on('warning', (warning) => {
   const code = 'code' in warning ? warning.code : undefined;
@@ -42,10 +40,8 @@ function createServer(): McpServer {
     }
   );
 
-  registerRefinePromptTool(server);
-  registerAnalyzePromptTool(server);
-  registerOptimizePromptTool(server);
-  registerValidatePromptTool(server);
+  registerFixPromptTool(server);
+  registerBoostPromptTool(server);
   registerTemplateResources(server);
   registerQuickWorkflowPrompts(server);
 

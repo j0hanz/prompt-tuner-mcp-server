@@ -101,20 +101,18 @@ describeIntegration('Integration', { timeout: TIMEOUT_MS }, () => {
       assert.ok(tools.length > 0);
 
       const toolNames = tools.map((t) => t.name);
-      assert.ok(toolNames.includes('refine_prompt'));
-      assert.ok(toolNames.includes('analyze_prompt'));
-      assert.ok(toolNames.includes('optimize_prompt'));
-      assert.ok(toolNames.includes('validate_prompt'));
+      assert.ok(toolNames.includes('fix_prompt'));
+      assert.ok(toolNames.includes('boost_prompt'));
     });
 
     it('should have proper tool metadata', async () => {
       assert.ok(client);
       const { tools } = await client.listTools();
-      const refineTool = tools.find((t) => t.name === 'refine_prompt');
+      const fixTool = tools.find((t) => t.name === 'fix_prompt');
 
-      assert.ok(refineTool);
-      assert.ok(refineTool.description);
-      assert.ok(refineTool.inputSchema);
+      assert.ok(fixTool);
+      assert.ok(fixTool.description);
+      assert.ok(fixTool.inputSchema);
     });
   });
 
@@ -161,15 +159,15 @@ describeIntegration('Integration', { timeout: TIMEOUT_MS }, () => {
       assert.ok(prompts.length > 0);
 
       const promptNames = prompts.map((p) => p.name);
-      assert.ok(promptNames.includes('quick-optimize'));
-      assert.ok(promptNames.includes('analyze'));
+      assert.ok(promptNames.includes('fix'));
+      assert.ok(promptNames.includes('boost'));
     });
 
     it('should get prompt with arguments', async () => {
       assert.ok(client);
       const result = await client.getPrompt({
-        name: 'quick-optimize',
-        arguments: { prompt: 'Test prompt for optimization' },
+        name: 'fix',
+        arguments: { prompt: 'Test prompt for fixing' },
       });
 
       assert.ok(Array.isArray(result.messages));

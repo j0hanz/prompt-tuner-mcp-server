@@ -4,11 +4,6 @@ import { z } from 'zod';
 
 import { wrapPromptData } from '../lib/prompt-policy.js';
 import { buildPromptSchema } from '../schemas/inputs.js';
-import {
-  TEMPLATE_ANALYZE,
-  TEMPLATE_DEEP_OPTIMIZE,
-  TEMPLATE_QUICK_OPTIMIZE,
-} from './quick-workflows-templates.js';
 
 interface QuickWorkflowArgs {
   prompt: string;
@@ -56,49 +51,31 @@ function promptArg(description: string): {
   };
 }
 
-function renderTemplate(
-  template: string,
-  replacements: Record<string, string>
-): string {
-  let rendered = template;
-  for (const [key, value] of Object.entries(replacements)) {
-    const token = `{{${key}}}`;
-    if (!rendered.includes(token)) continue;
-    rendered = rendered.replaceAll(token, value);
-  }
-  return rendered;
-}
-
 const QUICK_WORKFLOW_PROMPTS: QuickWorkflowDefinition[] = [
   {
-    name: 'quick-optimize',
-    title: 'Quick Optimize',
-    description: 'Fast prompt improvement with grammar and clarity fixes.',
-    ...promptArg('The prompt to optimize'),
+    name: 'fix',
+    title: 'Fix Prompt',
+    description: 'Fix spelling and grammar only.',
+    ...promptArg('The prompt to fix'),
     buildText: ({ prompt }) =>
-      renderTemplate(TEMPLATE_QUICK_OPTIMIZE, {
-        PROMPT: wrapPromptData(prompt),
-      }),
+      [
+        'Fix spelling and grammar in the following text. Do not rewrite or add content.',
+        '',
+        wrapPromptData(prompt),
+      ].join('\n'),
   },
   {
-    name: 'deep-optimize',
-    title: 'Deep Optimize',
-    description: 'Comprehensive optimization with all techniques applied.',
-    ...promptArg('The prompt to optimize'),
+    name: 'boost',
+    title: 'Boost Prompt',
+    description: 'Refine and enhance a prompt for clarity and effectiveness.',
+    ...promptArg('The prompt to boost'),
     buildText: ({ prompt }) =>
-      renderTemplate(TEMPLATE_DEEP_OPTIMIZE, {
-        PROMPT: wrapPromptData(prompt),
-      }),
-  },
-  {
-    name: 'analyze',
-    title: 'Analyze Prompt',
-    description: 'Score prompt quality and get improvement suggestions.',
-    ...promptArg('The prompt to analyze'),
-    buildText: ({ prompt }) =>
-      renderTemplate(TEMPLATE_ANALYZE, {
-        PROMPT: wrapPromptData(prompt),
-      }),
+      [
+        'Improve the following prompt to be clearer and more effective while preserving intent.',
+        'Return only the improved prompt.',
+        '',
+        wrapPromptData(prompt),
+      ].join('\n'),
   },
 ];
 

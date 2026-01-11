@@ -62,12 +62,10 @@ Minimums: `MAX_PROMPT_LENGTH` >= 1, `LLM_MAX_TOKENS` >= 1, `LLM_TIMEOUT_MS` >= 1
 
 Tool max tokens are derived from `LLM_MAX_TOKENS`:
 
-| Tool              | Max tokens                  |
-| ----------------- | --------------------------- |
-| `analyze_prompt`  | `min(LLM_MAX_TOKENS, 4000)` |
-| `refine_prompt`   | `min(LLM_MAX_TOKENS, 2000)` |
-| `optimize_prompt` | `min(LLM_MAX_TOKENS, 3000)` |
-| `validate_prompt` | `min(LLM_MAX_TOKENS, 1000)` |
+| Tool           | Max tokens                  |
+| -------------- | --------------------------- |
+| `fix_prompt`   | `min(LLM_MAX_TOKENS, 800)`  |
+| `boost_prompt` | `min(LLM_MAX_TOKENS, 1200)` |
 
 ## Retry behavior (optional)
 
@@ -97,17 +95,6 @@ When `DEBUG=true`, the server also logs diagnostics-channel telemetry for LLM re
 | Variable                 | Default | Description                                |
 | ------------------------ | ------- | ------------------------------------------ |
 | `GOOGLE_SAFETY_DISABLED` | `false` | When true, disables Gemini safety filters. |
-
-## validate_prompt token limits
-
-`validate_prompt` uses fixed limits when calculating `tokenUtilization`:
-
-| targetModel | Token limit |
-| ----------- | ----------- |
-| `claude`    | `200000`    |
-| `gpt`       | `128000`    |
-| `gemini`    | `1000000`   |
-| `generic`   | `8000`      |
 
 ## Example configurations
 

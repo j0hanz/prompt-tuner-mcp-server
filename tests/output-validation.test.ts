@@ -4,13 +4,10 @@ import { describe, it } from 'node:test';
 import {
   containsOutputScaffolding,
   normalizePromptText,
-  validateTechniqueOutput,
 } from '../src/lib/output-validation.js';
 import {
-  AnalyzePromptOutputSchema,
-  OptimizePromptOutputSchema,
-  RefinePromptOutputSchema,
-  ValidatePromptOutputSchema,
+  BoostPromptOutputSchema,
+  FixPromptOutputSchema,
 } from '../src/schemas/outputs.js';
 
 describe('output validation', () => {
@@ -31,76 +28,37 @@ describe('output validation', () => {
       true
     );
   });
-
-  it('validates structured output for gpt format', () => {
-    const result = validateTechniqueOutput(
-      '## Title\n- Item',
-      'structured',
-      'gpt'
-    );
-    assert.strictEqual(result.ok, true);
-  });
-
-  it('rejects roleBased output without a role statement', () => {
-    const result = validateTechniqueOutput(
-      'Please answer succinctly.',
-      'roleBased',
-      'gpt'
-    );
-    assert.strictEqual(result.ok, false);
-  });
 });
 
 describe('output schemas strict mode', () => {
-  it('RefinePromptOutputSchema rejects unknown fields', () => {
-    const result = RefinePromptOutputSchema.safeParse({
+  it('FixPromptOutputSchema rejects unknown fields', () => {
+    const result = FixPromptOutputSchema.safeParse({
       ok: true,
-      refined: 'Hello',
+      fixed: 'Hello',
       extraField: 'should fail',
     });
     assert.strictEqual(result.success, false);
   });
 
-  it('AnalyzePromptOutputSchema rejects unknown fields', () => {
-    const result = AnalyzePromptOutputSchema.safeParse({
+  it('BoostPromptOutputSchema rejects unknown fields', () => {
+    const result = BoostPromptOutputSchema.safeParse({
       ok: true,
-      suggestions: [],
       unknownKey: 123,
     });
     assert.strictEqual(result.success, false);
   });
 
-  it('OptimizePromptOutputSchema rejects unknown fields', () => {
-    const result = OptimizePromptOutputSchema.safeParse({
-      ok: true,
-      optimized: 'test',
-      badField: true,
-    });
-    assert.strictEqual(result.success, false);
-  });
-
-  it('ValidatePromptOutputSchema rejects unknown fields', () => {
-    const result = ValidatePromptOutputSchema.safeParse({
-      ok: true,
-      isValid: true,
-      notInSchema: 'nope',
-    });
-    assert.strictEqual(result.success, false);
-  });
-
   it('accepts valid output without extra fields', () => {
-    const refineResult = RefinePromptOutputSchema.safeParse({
+    const fixResult = FixPromptOutputSchema.safeParse({
       ok: true,
-      refined: 'Hello world',
-      technique: 'basic',
+      fixed: 'Hello world',
     });
-    assert.strictEqual(refineResult.success, true);
+    assert.strictEqual(fixResult.success, true);
 
-    const validateResult = ValidatePromptOutputSchema.safeParse({
+    const boostResult = BoostPromptOutputSchema.safeParse({
       ok: true,
-      isValid: true,
-      tokenEstimate: 100,
+      boosted: 'Hello world',
     });
-    assert.strictEqual(validateResult.success, true);
+    assert.strictEqual(boostResult.success, true);
   });
 });

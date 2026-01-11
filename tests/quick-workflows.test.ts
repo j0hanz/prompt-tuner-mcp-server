@@ -28,10 +28,6 @@ describe('registerQuickWorkflowPrompts', () => {
     registerQuickWorkflowPrompts(server);
 
     const names = registered.map((entry) => entry.name);
-    assert.deepStrictEqual(names, [
-      'quick-optimize',
-      'deep-optimize',
-      'analyze',
-    ]);
+    assert.deepStrictEqual(names, ['fix', 'boost']);
   });
 });

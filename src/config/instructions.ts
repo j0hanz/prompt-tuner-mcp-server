@@ -1,92 +1,27 @@
 export const SERVER_INSTRUCTIONS = `# PromptTuner MCP
 
-A lean prompt optimization toolkit for refining, analyzing, and validating prompts.
-
-## Quick Start
-
-| Goal | Tool | When to Use |
-|------|------|-------------|
-| Quick fix | \`refine_prompt\` | Fix typos and clarity issues |
-| Deep optimization | \`optimize_prompt\` | Apply multiple techniques |
-| Quality check | \`analyze_prompt\` | Get scores and suggestions |
-| Safety check | \`validate_prompt\` | Find issues and estimate tokens |
+A lean prompt editing toolkit.
 
 ## Tools
 
-### refine_prompt
-Improves a prompt using a single optimization technique.
+### fix_prompt
+Fix spelling and grammar only.
 
-**Techniques:**
-- \`basic\` (default) - Fix grammar, spelling, and clarity
-- \`chainOfThought\` - Add step-by-step reasoning guidance
-- \`fewShot\` - Add input/output examples
-- \`roleBased\` - Add expert persona/role context
-- \`structured\` - Add XML (Claude) or Markdown (GPT) structure
-- \`comprehensive\` - Apply all techniques intelligently
-
-**Example:**
+**Input:**
 \`\`\`json
-{ "prompt": "help me code", "technique": "roleBased", "targetFormat": "claude" }
+{ "prompt": "..." }
 \`\`\`
 
-### analyze_prompt
-Scores your prompt (0-100) across clarity, specificity, completeness, structure, and effectiveness.
+### boost_prompt
+Improve a prompt to be clearer and more effective.
 
-### optimize_prompt
-Chains multiple techniques for maximum improvement and returns before/after scores plus improvements.
-
-**Example:**
+**Input:**
 \`\`\`json
-{ "prompt": "write code", "techniques": ["basic", "roleBased", "structured"] }
+{ "prompt": "..." }
 \`\`\`
 
-### validate_prompt
-Checks for prompt issues, estimates token usage, and optionally detects injection risks.
+## Prompts
 
-## Target Formats
-
-| Format | Best For | Structure |
-|--------|----------|-----------|
-| \`claude\` | Anthropic Claude | XML tags: \`<context>\`, \`<task>\`, \`<requirements>\` |
-| \`gpt\` | OpenAI GPT | Markdown: \`## Context\`, \`## Task\`, \`**bold**\` |
-| \`json\` | Structured output | JSON schema specification |
-| \`auto\` | Auto-detect | Uses prompt heuristics to pick format |
-
-## Technique Selection Guide
-
-| Task Type | Recommended Techniques |
-|-----------|----------------------|
-| Simple query | \`basic\` only |
-| Code task | \`roleBased\` + \`structured\` |
-| Complex analysis | \`roleBased\` + \`chainOfThought\` |
-| Data extraction | \`structured\` + \`fewShot\` |
-| Creative writing | \`roleBased\` + \`fewShot\` |
-| Maximum quality | \`comprehensive\` |
-
-## Workflow Prompts
-- \`quick-optimize\` - Single-step refinement
-- \`deep-optimize\` - Comprehensive optimization
-- \`analyze\` - Quality analysis
-
-## Modern Best Practices (2024-2025)
-
-1. **Be Specific** - Replace vague words with concrete terms
-2. **Add Role Context** - Use specific expert personas
-3. **Use Structure** - XML for Claude, Markdown for GPT (never mix)
-4. **Show Examples** - 2-3 diverse examples for pattern tasks
-5. **Add Constraints** - Clear ALWAYS/NEVER rules
-6. **Specify Output** - Define the expected format explicitly
-7. **Enable Reasoning** - Add task-specific reasoning triggers when needed
-8. **Place Key Instructions Twice** - Start and end for long prompts
-
-## Prompt Architecture (Recommended Order)
-\`\`\`
-1. Role/Identity (if applicable)
-2. Context/Background
-3. Task/Objective
-4. Instructions/Steps
-5. Requirements/Constraints (ALWAYS/NEVER)
-6. Output Format
-7. Examples (if helpful)
-8. Final Reminder (reiterate critical instruction)
-\`\`\``;
+- \`fix\` - Generates a message asking to fix grammar/spelling.
+- \`boost\` - Generates a message asking to improve a prompt.
+`;
