@@ -5,7 +5,7 @@
 - TypeScript MCP server that improves user prompts via three tools:
   - `fix_prompt`: polish and refine a prompt for clarity and flow.
   - `boost_prompt`: enhance a prompt using prompt-engineering best practices.
-  - `crafting_prompt`: generate a reusable “workflow prompt” from a request (no LLM call).
+  - `crafting_prompt`: generate a reusable “workflow prompt” from a request.
 - Runs over **stdio transport** (no HTTP transport in this repo).
 - Uses `@modelcontextprotocol/sdk`, `zod` (v4), and provider SDKs (`openai`, `@anthropic-ai/sdk`, `@google/genai`).
 

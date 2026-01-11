@@ -129,11 +129,10 @@ export const CraftingPromptInputSchema = z.strictObject({
   request: baseRequestSchema.describe(
     'Raw user request / task description to turn into a workflow prompt'
   ),
-  objective: baseRequestSchema
-    .describe('Optional: what success looks like (acceptance criteria)')
-    .optional(),
   constraints: baseRequestSchema
-    .describe('Optional: constraints to respect (e.g., no breaking changes)')
+    .describe(
+      'Optional: hard requirements to enforce (e.g., no breaking changes)'
+    )
     .optional(),
 
   mode: z.enum(CRAFTING_PROMPT_MODES).optional().default('general'),

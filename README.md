@@ -53,14 +53,14 @@ Add to `claude_desktop_config.json`:
 
 PromptTuner uses minimal configuration. Set the provider and API key, and you're ready to go.
 
-| Variable            | Default  | Description                                                             |
-| ------------------- | -------- | ----------------------------------------------------------------------- |
-| `LLM_PROVIDER`      | `openai` | `openai`, `anthropic`, or `google`.                                     |
-| `OPENAI_API_KEY`    | -        | Required for `fix_prompt`/`boost_prompt` when `LLM_PROVIDER=openai`.    |
-| `ANTHROPIC_API_KEY` | -        | Required for `fix_prompt`/`boost_prompt` when `LLM_PROVIDER=anthropic`. |
-| `GOOGLE_API_KEY`    | -        | Required for `fix_prompt`/`boost_prompt` when `LLM_PROVIDER=google`.    |
-| `LLM_MODEL`         | -        | Override the default model.                                             |
-| `DEBUG`             | `false`  | Enable debug logging.                                                   |
+| Variable            | Default  | Description                                           |
+| ------------------- | -------- | ----------------------------------------------------- |
+| `LLM_PROVIDER`      | `openai` | `openai`, `anthropic`, or `google`.                   |
+| `OPENAI_API_KEY`    | -        | Required for all tools when `LLM_PROVIDER=openai`.    |
+| `ANTHROPIC_API_KEY` | -        | Required for all tools when `LLM_PROVIDER=anthropic`. |
+| `GOOGLE_API_KEY`    | -        | Required for all tools when `LLM_PROVIDER=google`.    |
+| `LLM_MODEL`         | -        | Override the default model.                           |
+| `DEBUG`             | `false`  | Enable debug logging.                                 |
 
 All tools are LLM-backed and require an API key for the selected provider.
 
@@ -85,7 +85,7 @@ All tools are LLM-backed and require an API key for the selected provider.
 ## Tools
 
 All tools accept plain text, Markdown, or XML prompts. Responses include `content` (human-readable) and `structuredContent` (machine-readable).
-Inputs are strict: only the `prompt` field is accepted; extra fields are rejected.
+Inputs are strict: extra fields are rejected. For `fix_prompt`/`boost_prompt`, only the `prompt` field is accepted.
 
 ### fix_prompt
 
@@ -111,15 +111,14 @@ Returns: `ok`, `boosted`.
 
 Generate a structured, reusable workflow prompt for complex tasks based on a raw request and a few settings.
 
-| Parameter     | Type   | Required | Notes                                        |
-| ------------- | ------ | -------- | -------------------------------------------- |
-| `request`     | string | Yes      | Trimmed, length-checked; strict input.       |
-| `objective`   | string | No       | Acceptance criteria / “definition of done”.  |
-| `constraints` | string | No       | Constraints to respect.                      |
-| `mode`        | string | No       | `general`, `plan`, `review`, `troubleshoot`. |
-| `approach`    | string | No       | `conservative`, `balanced`, `creative`.      |
-| `tone`        | string | No       | `direct`, `neutral`, `friendly`.             |
-| `verbosity`   | string | No       | `brief`, `normal`, `detailed`.               |
+| Parameter     | Type   | Required | Notes                                                   |
+| ------------- | ------ | -------- | ------------------------------------------------------- |
+| `request`     | string | Yes      | Trimmed, length-checked; strict input.                  |
+| `constraints` | string | No       | Hard requirements to enforce (bullet list recommended). |
+| `mode`        | string | No       | `general`, `plan`, `review`, `troubleshoot`.            |
+| `approach`    | string | No       | `conservative`, `balanced`, `creative`.                 |
+| `tone`        | string | No       | `direct`, `neutral`, `friendly`.                        |
+| `verbosity`   | string | No       | `brief`, `normal`, `detailed`.                          |
 
 Returns: `ok`, `prompt`, `settings`.
 

@@ -4,12 +4,12 @@ PromptTuner MCP uses minimal configuration. Set the provider and API key, and yo
 
 ## Required Configuration
 
-| Variable            | Default  | Description                                                             |
-| ------------------- | -------- | ----------------------------------------------------------------------- |
-| `LLM_PROVIDER`      | `openai` | `openai`, `anthropic`, or `google`.                                     |
-| `OPENAI_API_KEY`    | -        | Required for `fix_prompt`/`boost_prompt` when `LLM_PROVIDER=openai`.    |
-| `ANTHROPIC_API_KEY` | -        | Required for `fix_prompt`/`boost_prompt` when `LLM_PROVIDER=anthropic`. |
-| `GOOGLE_API_KEY`    | -        | Required for `fix_prompt`/`boost_prompt` when `LLM_PROVIDER=google`.    |
+| Variable            | Default  | Description                                           |
+| ------------------- | -------- | ----------------------------------------------------- |
+| `LLM_PROVIDER`      | `openai` | `openai`, `anthropic`, or `google`.                   |
+| `OPENAI_API_KEY`    | -        | Required for all tools when `LLM_PROVIDER=openai`.    |
+| `ANTHROPIC_API_KEY` | -        | Required for all tools when `LLM_PROVIDER=anthropic`. |
+| `GOOGLE_API_KEY`    | -        | Required for all tools when `LLM_PROVIDER=google`.    |
 
 All tools are LLM-backed and require an API key for the selected provider.
 
@@ -98,17 +98,16 @@ CLI flags override environment variables.
 
 The following are optimized defaults and not user-configurable:
 
-| Setting             | Value     | Purpose                       |
-| ------------------- | --------- | ----------------------------- |
-| Request timeout     | 60s       | Per-LLM-request timeout       |
-| Max prompt length   | 10,000    | Input character limit         |
-| Retry attempts      | 3         | Retries on transient failures |
-| Retry base delay    | 1s        | Exponential backoff base      |
-| Retry max delay     | 10s       | Backoff cap                   |
-| Retry total timeout | 180s      | Total retry window            |
-| fix_prompt tokens   | 800 max   | Output token cap              |
-| boost_prompt tokens | 1,200 max | Output token cap              |
-| Google safety       | Enabled   | Content filtering             |
+| Setting             | Value   | Purpose                                     |
+| ------------------- | ------- | ------------------------------------------- |
+| Request timeout     | 15s     | Per-LLM-request timeout                     |
+| Max prompt length   | 10,000  | Input character limit                       |
+| Retry attempts      | 3       | Retries on transient failures               |
+| Retry base delay    | 1s      | Exponential backoff base                    |
+| Retry max delay     | 10s     | Backoff cap                                 |
+| Retry total timeout | 180s    | Total retry window                          |
+| Max output tokens   | 10,000  | Output token cap (scales with input length) |
+| Google safety       | Enabled | Content filtering                           |
 
 ## Troubleshooting
 

@@ -44,15 +44,21 @@ describe('input schemas', () => {
     assert.strictEqual(result.success, false);
   });
 
+  it('rejects objective field for crafting', () => {
+    const result = CraftingPromptInputSchema.safeParse({
+      request: 'Do the thing',
+      objective: 'Tests pass',
+    });
+    assert.strictEqual(result.success, false);
+  });
+
   it('trims request fields and applies defaults', () => {
     const crafted = CraftingPromptInputSchema.parse({
       request: '  Implement a new feature  ',
-      objective: '  Tests pass  ',
       constraints: '  No breaking changes  ',
     });
 
     assert.strictEqual(crafted.request, 'Implement a new feature');
-    assert.strictEqual(crafted.objective, 'Tests pass');
     assert.strictEqual(crafted.constraints, 'No breaking changes');
 
     assert.strictEqual(crafted.mode, 'general');
