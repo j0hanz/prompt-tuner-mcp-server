@@ -1,28 +1,64 @@
 import { PATTERNS } from '../config/constants.js';
 import type { OptimizationTechnique, TargetFormat } from '../config/types.js';
 
-const WRAPPED_CODE_BLOCK_RE = /^```(?:[a-zA-Z0-9_-]+)?\s*([\s\S]*?)\s*```$/;
 const ROLE_STATEMENT_RE = /\bYou are (a|an|the)\b/i;
 const PROMPT_LABEL_RE = /^(refined|optimized)?\s*prompt\s*:/i;
 
-const DISALLOWED_SCAFFOLDING_PATTERNS: RegExp[] = [
-  /^#\s*Prompt (Refinement|Optimization|Analysis)\b/im,
-  /^##\s*(Changes|Scores|Techniques Applied|Improvements)\b/im,
-  /^\s*Changes:\s*$/im,
-  /^\s*Scores:\s*$/im,
-  /^\s*Techniques Applied:\s*$/im,
-  /^\s*Improvements:\s*$/im,
-];
+const CODE_FENCE = '```';
+const CODE_BLOCK_LANG_RE = /^[a-zA-Z0-9_-]+$/;
+const SCAFFOLDING_PROMPT_TITLES = new Set([
+  'prompt refinement',
+  'prompt optimization',
+  'prompt analysis',
+]);
+const SCAFFOLDING_SECTION_TITLES = new Set([
+  'changes',
+  'scores',
+  'techniques applied',
+  'improvements',
+]);
+const SCAFFOLDING_LABELS = new Set([
+  'changes:',
+  'scores:',
+  'techniques applied:',
+  'improvements:',
+]);
 
 function safeTest(pattern: RegExp, text: string): boolean {
   pattern.lastIndex = 0;
   return pattern.test(text);
 }
 
+function stripSingleLineLang(value: string): string {
+  const firstWhitespace = value.search(/\s/);
+  if (firstWhitespace === -1) return value;
+  const token = value.slice(0, firstWhitespace);
+  if (!CODE_BLOCK_LANG_RE.test(token)) return value;
+  return value.slice(firstWhitespace + 1);
+}
+
 function stripCodeFence(text: string): string {
-  if (!text.startsWith('```')) return text;
-  const match = WRAPPED_CODE_BLOCK_RE.exec(text);
-  return match?.[1]?.trim() ?? text;
+  const trimmed = text.trim();
+  if (!trimmed.startsWith(CODE_FENCE) || !trimmed.endsWith(CODE_FENCE)) {
+    return text;
+  }
+
+  const inner = trimmed.slice(CODE_FENCE.length, -CODE_FENCE.length);
+  const innerTrimmedStart = inner.trimStart();
+  if (!innerTrimmedStart) return '';
+
+  const newlineIndex = innerTrimmedStart.indexOf('\n');
+  if (newlineIndex === -1) {
+    return stripSingleLineLang(innerTrimmedStart).trim();
+  }
+
+  const firstLine = innerTrimmedStart.slice(0, newlineIndex).trim();
+  const rest = innerTrimmedStart.slice(newlineIndex + 1);
+  if (!firstLine || CODE_BLOCK_LANG_RE.test(firstLine)) {
+    return rest.trim();
+  }
+
+  return innerTrimmedStart.trim();
 }
 
 function stripPromptLabel(text: string): string {
@@ -40,9 +76,25 @@ export function normalizePromptText(text: string): string {
 }
 
 export function containsOutputScaffolding(text: string): boolean {
-  return DISALLOWED_SCAFFOLDING_PATTERNS.some((pattern) =>
-    safeTest(pattern, text)
-  );
+  const lines = text.split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const lowered = trimmed.toLowerCase();
+    if (lowered.startsWith('#')) {
+      let index = 0;
+      while (lowered[index] === '#') index += 1;
+      const heading = lowered.slice(index).trim();
+      if (
+        SCAFFOLDING_PROMPT_TITLES.has(heading) ||
+        SCAFFOLDING_SECTION_TITLES.has(heading)
+      ) {
+        return true;
+      }
+    }
+    if (SCAFFOLDING_LABELS.has(lowered)) return true;
+  }
+  return false;
 }
 
 const STRUCTURE_VALIDATORS: Record<TargetFormat, (text: string) => boolean> = {

@@ -18,10 +18,15 @@ function buildTimeoutOptions(options?: LLMRequestOptions): {
   timeout: number;
   signal?: AbortSignal;
 } {
-  return {
+  const resolved: { timeout: number; signal?: AbortSignal } = {
     timeout: options?.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-    signal: options?.signal,
   };
+
+  if (options?.signal !== undefined) {
+    resolved.signal = options.signal;
+  }
+
+  return resolved;
 }
 
 export async function createCompletion<TResponse, TResult>(

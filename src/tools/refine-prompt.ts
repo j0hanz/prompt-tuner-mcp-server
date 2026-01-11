@@ -284,9 +284,10 @@ async function refineWithLLM(
     lastReason = result.reason;
   }
 
+  const reasonSuffix = lastReason ? `: ${lastReason}` : '';
   throw new McpError(
     ErrorCode.E_LLM_FAILED,
-    `Refined prompt failed validation${lastReason ? `: ${lastReason}` : ''}`
+    `Refined prompt failed validation${reasonSuffix}`
   );
 }
 

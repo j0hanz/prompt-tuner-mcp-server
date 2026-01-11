@@ -197,9 +197,23 @@ async function requestValidation(
   validationPrompt: string,
   signal: AbortSignal
 ): Promise<ValidationResponse> {
+  const parseResponse = (response: unknown): ValidationResponse => {
+    const parsed = ValidationResponseSchema.parse(response);
+    const issues = parsed.issues.map((issue) => {
+      return {
+        type: issue.type,
+        message: issue.message,
+        ...(issue.suggestion !== undefined
+          ? { suggestion: issue.suggestion }
+          : {}),
+      };
+    });
+    return { ...parsed, issues };
+  };
+
   const { value } = await executeLLMWithJsonResponse<ValidationResponse>(
     validationPrompt,
-    (response) => ValidationResponseSchema.parse(response),
+    parseResponse,
     ErrorCode.E_LLM_FAILED,
     TOOL_NAME,
     {

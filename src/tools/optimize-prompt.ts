@@ -380,7 +380,7 @@ async function runOptimizationAttempt(
     ok: false,
     result: validation.result,
     usedFallback: attempt.usedFallback,
-    reason: validation.reason,
+    ...(validation.reason !== undefined ? { reason: validation.reason } : {}),
   };
 }
 
@@ -454,8 +454,11 @@ function formatScoreLines(
   after: OptimizeResponse['afterScore']
 ): string[] {
   const delta = after.overall - before.overall;
-  const deltaText =
-    delta === 0 ? 'Delta: 0' : `Delta: ${delta > 0 ? '+' : ''}${delta}`;
+  let deltaText = 'Delta: 0';
+  if (delta !== 0) {
+    const sign = delta > 0 ? '+' : '';
+    deltaText = `Delta: ${sign}${delta}`;
+  }
 
   const beforeLine =
     `Before: ${before.overall}/100 (clarity ${before.clarity}, ` +

@@ -40,14 +40,26 @@ export class McpError extends Error {
     this.name = 'McpError';
     this.code = code;
 
-    if (typeof contextOrOptions === 'object') {
-      this.context = contextOrOptions.context;
-      this.details = contextOrOptions.details;
-      this.recoveryHint = contextOrOptions.recoveryHint;
+    if (contextOrOptions && typeof contextOrOptions === 'object') {
+      if (contextOrOptions.context !== undefined) {
+        this.context = contextOrOptions.context;
+      }
+      if (contextOrOptions.details !== undefined) {
+        this.details = contextOrOptions.details;
+      }
+      if (contextOrOptions.recoveryHint !== undefined) {
+        this.recoveryHint = contextOrOptions.recoveryHint;
+      }
     } else {
-      this.context = contextOrOptions;
-      this.details = details;
-      this.recoveryHint = recoveryHint;
+      if (contextOrOptions !== undefined) {
+        this.context = contextOrOptions;
+      }
+      if (details !== undefined) {
+        this.details = details;
+      }
+      if (recoveryHint !== undefined) {
+        this.recoveryHint = recoveryHint;
+      }
     }
   }
 
@@ -90,12 +102,13 @@ function buildZodStructuredError(
 
   const safeContext = resolveSafeContext(context);
   const prettyMessage = z.prettifyError(error);
+  const recoveryHint = DEFAULT_RECOVERY_HINTS[ErrorCode.E_INVALID_INPUT];
   return {
     code: ErrorCode.E_INVALID_INPUT,
     message: prettyMessage,
     ...(safeContext ? { context: safeContext } : {}),
     details: { issues: error.issues },
-    recoveryHint: DEFAULT_RECOVERY_HINTS[ErrorCode.E_INVALID_INPUT],
+    ...(recoveryHint !== undefined ? { recoveryHint } : {}),
   };
 }
 

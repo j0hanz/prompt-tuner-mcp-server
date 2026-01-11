@@ -42,26 +42,26 @@ function enterStringIfNeeded(state: JsonScanState, char: string): boolean {
   return true;
 }
 
-function advanceStringState(state: JsonScanState, char: string): boolean {
+function advanceStringState(state: JsonScanState, char: string): void {
   if (state.escaped) {
     state.escaped = false;
-    return true;
+    return;
   }
   if (char === '\\') {
     state.escaped = true;
-    return true;
+    return;
   }
   if (char === '"') {
     state.inString = false;
   }
-  return true;
 }
 
 function updateStringState(state: JsonScanState, char: string): boolean {
   if (!state.inString) {
     return enterStringIfNeeded(state, char);
   }
-  return advanceStringState(state, char);
+  advanceStringState(state, char);
+  return true;
 }
 
 function pushBracketIfOpen(state: JsonScanState, char: string): boolean {

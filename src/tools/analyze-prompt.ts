@@ -9,6 +9,7 @@ import { ANALYSIS_MAX_TOKENS, LLM_TIMEOUT_MS } from '../config/constants.js';
 import type {
   AnalysisResponse,
   ErrorResponse,
+  LLMToolOptions,
   ProviderInfo,
 } from '../config/types.js';
 import {
@@ -194,18 +195,20 @@ async function runAnalysis(
   analysisPrompt: string,
   signal?: AbortSignal
 ): Promise<{ result: AnalysisResponse; usedFallback: boolean }> {
+  const options: LLMToolOptions & { retryOnParseFailure?: boolean } = {
+    maxTokens: ANALYSIS_MAX_TOKENS,
+    timeoutMs: LLM_TIMEOUT_MS,
+    retryOnParseFailure: true,
+    ...(signal !== undefined ? { signal } : {}),
+  };
+
   const { value, usedFallback } =
     await executeLLMWithJsonResponse<AnalysisResponse>(
       analysisPrompt,
       (response) => AnalysisResponseSchema.parse(response),
       ErrorCode.E_LLM_FAILED,
       TOOL_NAME,
-      {
-        maxTokens: ANALYSIS_MAX_TOKENS,
-        timeoutMs: LLM_TIMEOUT_MS,
-        signal,
-        retryOnParseFailure: true,
-      }
+      options
     );
   return { result: value, usedFallback };
 }

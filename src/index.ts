@@ -93,18 +93,25 @@ function parseCli(): CliValues {
     allowNegative: true,
   });
 
-  return {
+  const cli: CliValues = {
     help: values.help ?? false,
     version: values.version ?? false,
-    logFormat: values.logFormat,
-    debug: values.debug,
-    includeErrorContext: values.includeErrorContext,
-    llmProvider: values.llmProvider,
-    llmModel: values.llmModel,
-    llmTimeoutMs: values.llmTimeoutMs,
-    llmMaxTokens: values.llmMaxTokens,
-    maxPromptLength: values.maxPromptLength,
   };
+
+  if (values.logFormat !== undefined) cli.logFormat = values.logFormat;
+  if (values.debug !== undefined) cli.debug = values.debug;
+  if (values.includeErrorContext !== undefined) {
+    cli.includeErrorContext = values.includeErrorContext;
+  }
+  if (values.llmProvider !== undefined) cli.llmProvider = values.llmProvider;
+  if (values.llmModel !== undefined) cli.llmModel = values.llmModel;
+  if (values.llmTimeoutMs !== undefined) cli.llmTimeoutMs = values.llmTimeoutMs;
+  if (values.llmMaxTokens !== undefined) cli.llmMaxTokens = values.llmMaxTokens;
+  if (values.maxPromptLength !== undefined) {
+    cli.maxPromptLength = values.maxPromptLength;
+  }
+
+  return cli;
 }
 
 function applyBooleanEnv(name: string, value: boolean | undefined): void {

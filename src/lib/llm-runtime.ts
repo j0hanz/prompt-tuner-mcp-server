@@ -26,8 +26,8 @@ function getSafeErrorDetails(error: unknown): SafeErrorDetails {
   if (typeof error === 'object' && error !== null) {
     const e = error as LLMError;
     return {
-      status: typeof e.status === 'number' ? e.status : undefined,
-      code: typeof e.code === 'string' ? e.code : undefined,
+      ...(typeof e.status === 'number' ? { status: e.status } : {}),
+      ...(typeof e.code === 'string' ? { code: e.code } : {}),
     };
   }
   return {};
@@ -308,7 +308,11 @@ function resolveFailureDetails(error: unknown): RunFailureDetails {
     typeof error.details?.status === 'number'
       ? error.details.status
       : undefined;
-  return { errorCode: error.code, status };
+  const details: RunFailureDetails = { errorCode: error.code };
+  if (status !== undefined) {
+    details.status = status;
+  }
+  return details;
 }
 
 async function executeAttempts(
@@ -367,8 +371,10 @@ function publishFailureEvent(
     attempts,
     durationMs: performance.now() - startPerf,
     ok: false,
-    errorCode: details.errorCode,
-    status: details.status,
+    ...(details.errorCode !== undefined
+      ? { errorCode: details.errorCode }
+      : {}),
+    ...(details.status !== undefined ? { status: details.status } : {}),
   });
 }
 

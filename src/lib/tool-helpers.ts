@@ -43,13 +43,18 @@ function resolveRequestOptions(
     retryPromptSuffix = STRICT_JSON_SUFFIX,
   } = options;
 
-  return {
+  const resolved: ResolvedRequestOptions = {
     maxTokens,
     timeoutMs,
-    signal,
     retryOnParseFailure,
     retryPromptSuffix,
   };
+
+  if (signal !== undefined) {
+    resolved.signal = signal;
+  }
+
+  return resolved;
 }
 
 function buildRequestContext(options: ResolvedRequestOptions): RequestContext {
