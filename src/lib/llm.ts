@@ -17,7 +17,6 @@ import type {
   LLMError,
   LLMProvider,
   LLMRequestOptions,
-  ProviderInfo,
   SafeErrorDetails,
 } from '../types.js';
 import { ErrorCode, logger, McpError } from './errors.js';
@@ -647,12 +646,7 @@ export async function getLLMClient(): Promise<LLMClient> {
   return llmClientPromise;
 }
 
-export async function getProviderInfo(): Promise<ProviderInfo> {
-  const client = await getLLMClient();
-  return { provider: client.getProvider(), model: client.getModel() };
-}
-
-export class OpenAIClient implements LLMClient {
+class OpenAIClient implements LLMClient {
   private readonly client: OpenAI;
   private readonly model: string;
   private readonly provider: LLMProvider = 'openai';
@@ -687,7 +681,7 @@ export class OpenAIClient implements LLMClient {
   }
 }
 
-export class AnthropicClient implements LLMClient {
+class AnthropicClient implements LLMClient {
   private readonly client: Anthropic;
   private readonly model: string;
   private readonly provider: LLMProvider = 'anthropic';
@@ -746,7 +740,7 @@ interface SafetyCache {
   settings: SafetySetting[];
 }
 
-export class GoogleClient implements LLMClient {
+class GoogleClient implements LLMClient {
   private readonly client: GoogleGenAI;
   private readonly model: string;
   private readonly provider: LLMProvider = 'google';

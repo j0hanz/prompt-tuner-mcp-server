@@ -35,7 +35,7 @@ function enforcePromptLength(value: string, ctx: z.RefinementCtx): void {
   }
 }
 
-export function buildPromptSchema(
+function buildPromptSchema(
   description: string
 ): z.ZodPipe<z.ZodString, z.ZodTransform<string, string>> {
   return z

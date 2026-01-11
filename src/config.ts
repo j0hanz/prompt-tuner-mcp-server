@@ -50,13 +50,7 @@ const envSchema = z.object({
   RETRY_TOTAL_TIMEOUT_MS: numberString(180000, 10000),
 });
 
-export type Config = z.infer<typeof envSchema>;
-
-export function parseEnv(env: NodeJS.ProcessEnv): Config {
-  return envSchema.parse(env);
-}
-
-export const config = parseEnv(process.env);
+export const config = envSchema.parse(process.env);
 
 export const SERVER_NAME = 'prompttuner-mcp';
 export const SERVER_VERSION = packageJson.version;
@@ -84,17 +78,9 @@ Transform a prompt using prompt engineering best practices for maximum clarity a
 \`\`\`
 `;
 
-const {
-  MAX_PROMPT_LENGTH: ENV_MAX_PROMPT_LENGTH,
-  LLM_TIMEOUT_MS: ENV_LLM_TIMEOUT_MS,
-  LLM_MAX_TOKENS: ENV_LLM_MAX_TOKENS,
-} = config;
+const { MAX_PROMPT_LENGTH, LLM_MAX_TOKENS } = config;
 
-export const MAX_PROMPT_LENGTH = ENV_MAX_PROMPT_LENGTH;
-export const MIN_PROMPT_LENGTH = 1;
-
-export const LLM_TIMEOUT_MS = ENV_LLM_TIMEOUT_MS;
-export const LLM_MAX_TOKENS = ENV_LLM_MAX_TOKENS;
+export { MAX_PROMPT_LENGTH, LLM_MAX_TOKENS };
 
 export const DEFAULT_MODELS = {
   openai: 'gpt-4o',

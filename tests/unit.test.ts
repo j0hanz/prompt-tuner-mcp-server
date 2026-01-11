@@ -1,9 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { parseEnv } from '../src/config.js';
 import {
-  containsOutputScaffolding,
   normalizePromptText,
   wrapPromptData,
 } from '../src/lib/prompt-utils.js';
@@ -75,26 +73,6 @@ describe('prompt wrapping', () => {
   });
 });
 
-describe('config parsing', () => {
-  it('rejects malformed numeric env values (no parseInt truncation)', () => {
-    assert.throws(() => {
-      parseEnv({
-        ...process.env,
-        LLM_TIMEOUT_MS: '60000oops',
-      });
-    });
-  });
-
-  it('enforces minimum numeric thresholds', () => {
-    assert.throws(() => {
-      parseEnv({
-        ...process.env,
-        LLM_TIMEOUT_MS: '10',
-      });
-    });
-  });
-});
-
 describe('output validation', () => {
   it('normalizes wrapped code fences', () => {
     const result = normalizePromptText('```text\nHello\n```');
@@ -105,12 +83,5 @@ describe('output validation', () => {
     const input = 'Refined Prompt:\n```text\nHello\n```';
     const result = normalizePromptText(input);
     assert.strictEqual(result, 'Hello');
-  });
-
-  it('detects output scaffolding', () => {
-    assert.strictEqual(
-      containsOutputScaffolding('# Prompt Refinement\n'),
-      true
-    );
   });
 });

@@ -35,11 +35,6 @@ export interface SuccessResponse<T extends Record<string, unknown>> {
 
 export type LLMProvider = 'openai' | 'anthropic' | 'google';
 
-export interface ProviderInfo {
-  readonly provider: LLMProvider;
-  readonly model: string;
-}
-
 export interface SafeErrorDetails {
   readonly status?: number;
   readonly code?: string;
@@ -54,9 +49,6 @@ export interface LLMError {
 export interface LLMRequestOptions {
   readonly timeoutMs?: number;
   readonly signal?: AbortSignal;
-  readonly requestId?: string;
-  readonly sessionId?: string;
-  readonly metadata?: Record<string, unknown>;
 }
 
 export interface LLMClient {
