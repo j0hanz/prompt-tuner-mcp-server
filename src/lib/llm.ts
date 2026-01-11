@@ -9,7 +9,15 @@ import { GoogleGenAI, HarmBlockThreshold, HarmCategory } from '@google/genai';
 
 import OpenAI from 'openai';
 
-import { DEFAULT_MODELS, LLM_MAX_TOKENS } from '../config.js';
+import {
+  DEFAULT_MODELS,
+  LLM_MAX_TOKENS,
+  LLM_TIMEOUT_MS,
+  RETRY_BASE_DELAY_MS,
+  RETRY_MAX_ATTEMPTS,
+  RETRY_MAX_DELAY_MS,
+  RETRY_TOTAL_TIMEOUT_MS,
+} from '../config.js';
 import { config } from '../config.js';
 import type {
   ErrorCodeType,
@@ -22,7 +30,7 @@ import type {
 import { ErrorCode, logger, McpError } from './errors.js';
 import { publishLlmRequest } from './telemetry.js';
 
-const DEFAULT_TIMEOUT_MS = config.LLM_TIMEOUT_MS;
+const DEFAULT_TIMEOUT_MS = LLM_TIMEOUT_MS;
 
 function buildAbortSignal(
   timeoutMs: number,
@@ -337,10 +345,10 @@ function resolveRetrySettings(): {
   totalTimeoutMs: number;
 } {
   return {
-    maxRetries: config.RETRY_MAX_ATTEMPTS,
-    baseDelayMs: config.RETRY_BASE_DELAY_MS,
-    maxDelayMs: config.RETRY_MAX_DELAY_MS,
-    totalTimeoutMs: config.RETRY_TOTAL_TIMEOUT_MS,
+    maxRetries: RETRY_MAX_ATTEMPTS,
+    baseDelayMs: RETRY_BASE_DELAY_MS,
+    maxDelayMs: RETRY_MAX_DELAY_MS,
+    totalTimeoutMs: RETRY_TOTAL_TIMEOUT_MS,
   };
 }
 
@@ -781,19 +789,17 @@ class GoogleClient implements LLMClient {
   }
 
   private buildSafetySettings(): SafetySetting[] {
-    const disabled = config.GOOGLE_SAFETY_DISABLED;
-    if (this.safetySettingsCache?.disabled === disabled) {
+    // Safety is always enabled (GOOGLE_SAFETY_DISABLED = false)
+    if (this.safetySettingsCache !== null) {
       return this.safetySettingsCache.settings;
     }
 
-    const threshold = disabled
-      ? HarmBlockThreshold.OFF
-      : HarmBlockThreshold.BLOCK_ONLY_HIGH;
+    const threshold = HarmBlockThreshold.BLOCK_ONLY_HIGH;
     const settings = GOOGLE_SAFETY_CATEGORIES.map((category) => ({
       category,
       threshold,
     }));
-    this.safetySettingsCache = { disabled, settings };
+    this.safetySettingsCache = { disabled: false, settings };
     return settings;
   }
 

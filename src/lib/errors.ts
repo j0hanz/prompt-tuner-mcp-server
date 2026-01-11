@@ -288,9 +288,8 @@ function resolveRecoveryHint(mcpError: McpError | null): string | undefined {
 }
 
 function resolveSafeContext(context?: string): string | undefined {
-  return config.INCLUDE_ERROR_CONTEXT
-    ? sanitizeErrorContext(context)
-    : undefined;
+  // Include error context when DEBUG is enabled
+  return config.DEBUG ? sanitizeErrorContext(context) : undefined;
 }
 
 function isZodError(error: unknown): error is ZodError {

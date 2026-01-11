@@ -5,7 +5,7 @@ import type {
   ServerRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { config } from './config.js';
+import { LLM_MAX_TOKENS } from './config.js';
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -245,7 +245,7 @@ async function handleFixPrompt(
     const parsed = FixPromptInputSchema.parse(input);
 
     const client = await getLLMClient();
-    const maxTokens = Math.min(config.LLM_MAX_TOKENS, 800);
+    const maxTokens = Math.min(LLM_MAX_TOKENS, 800);
     const text = await client.generateText(
       buildFixInstruction(parsed.prompt),
       maxTokens,
@@ -277,7 +277,7 @@ async function handleBoostPrompt(
     const parsed = BoostPromptInputSchema.parse(input);
 
     const client = await getLLMClient();
-    const maxTokens = Math.min(config.LLM_MAX_TOKENS, 1200);
+    const maxTokens = Math.min(LLM_MAX_TOKENS, 1200);
     const text = await client.generateText(
       buildBoostInstruction(parsed.prompt),
       maxTokens,

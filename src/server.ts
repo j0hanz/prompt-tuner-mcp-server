@@ -99,11 +99,9 @@ function enforceInitializeFirst(server: McpServer): void {
           message: 'Server not initialized',
         },
       };
-      protocol._transport
-        ?.send(errorResponse)
-        .catch((error: unknown) => {
-          logger.error({ err: error }, 'Failed to send initialize error');
-        });
+      protocol._transport?.send(errorResponse).catch((error: unknown) => {
+        logger.error({ err: error }, 'Failed to send initialize error');
+      });
       return;
     }
     baseOnRequest(request, extra);
