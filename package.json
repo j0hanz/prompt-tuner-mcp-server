@@ -22,8 +22,9 @@
   },
   "homepage": "https://github.com/j0hanz/prompt-tuner-mcp-server#readme",
   "scripts": {
+    "clean": "node -e \"require('fs').rmSync('dist', {recursive:true, force:true}); ['tsconfig.tsbuildinfo', 'tsconfig.build.tsbuildinfo', 'tsconfig.test.tsbuildinfo'].forEach(f => require('fs').rmSync(f, {force:true}))\"",
     "validate:instructions": "node -e \"require('fs').accessSync('src/instructions.md')\"",
-    "build": "tsc -p tsconfig.json && npm run validate:instructions && npm run copy:assets && node -e \"require('fs').chmodSync('dist/index.js', '755')\"",
+    "build": "npm run clean && tsc -p tsconfig.json && npm run validate:instructions && npm run copy:assets && node -e \"require('fs').chmodSync('dist/index.js', '755')\"",
     "copy:assets": "node -e \"require('fs').copyFileSync('src/instructions.md', 'dist/instructions.md')\"",
     "prepare": "npm run build",
     "watch": "tsc --watch",
