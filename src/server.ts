@@ -47,12 +47,21 @@ function enforceStrictProtocolVersion(server: McpServer): void {
     async (request): Promise<InitializeResult> => {
       const { protocolVersion } = request.params;
       if (!SUPPORTED_PROTOCOL_VERSIONS.includes(protocolVersion)) {
-        throw new RpcMcpError(
+        const error = new RpcMcpError(
           RpcErrorCode.InvalidParams,
           `Unsupported protocol version: ${protocolVersion} (supported: ${SUPPORTED_PROTOCOL_VERSIONS.join(
             ', '
           )})`
         );
+        setTimeout(() => {
+          server.close().catch((closeError: unknown) => {
+            logger.error(
+              { err: closeError, protocolVersion },
+              'Failed to close server after protocol mismatch'
+            );
+          });
+        }, 0);
+        throw error;
       }
       return await baseInitialize(request);
     }
@@ -86,7 +95,7 @@ function enforceInitializeFirst(server: McpServer): void {
       typeof request === 'object' && request !== null && 'method' in request
         ? (request as { method?: unknown }).method
         : undefined;
-    if (!initialized && method !== 'initialize') {
+    if (!initialized && method !== 'initialize' && method !== 'ping') {
       const id =
         typeof request === 'object' && request !== null && 'id' in request
           ? (request as { id?: unknown }).id
@@ -134,7 +143,7 @@ function createServer(): McpServer {
       instructions: SERVER_INSTRUCTIONS,
       capabilities: {
         logging: {},
-        tools: { listChanged: true },
+        tools: { listChanged: false },
       },
     }
   );
@@ -154,6 +163,15 @@ export async function startServer(): Promise<McpServer> {
   logger.info(
     `${styleText('green', SERVER_NAME)} v${styleText('blue', SERVER_VERSION)} started`
   );
+  try {
+    await server.sendLoggingMessage({
+      level: 'info',
+      logger: SERVER_NAME,
+      data: { event: 'start', version: SERVER_VERSION },
+    });
+  } catch (error) {
+    logger.debug({ err: error }, 'Failed to send MCP log message');
+  }
 
   return server;
 }

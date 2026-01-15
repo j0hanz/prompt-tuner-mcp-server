@@ -7,8 +7,7 @@ export function writeStderr(message: string): void {
 }
 
 export function writeCliOutput(message: string): void {
-  const stream = process.stdout.isTTY ? process.stdout : process.stderr;
-  stream.write(message.endsWith('\n') ? message : `${message}\n`);
+  writeStderr(message);
 }
 
 const CLI_OPTIONS = {
@@ -92,6 +91,7 @@ Environment variables:
   ANTHROPIC_API_KEY           Required for Anthropic
   GOOGLE_API_KEY              Required for Google
   LLM_MODEL                   Override default model
+  LLM_TIMEOUT_MS              Override request timeout (milliseconds)
   DEBUG                       Enable debug logging (true/false)
 
 CLI flags override environment variables.`);
@@ -151,6 +151,27 @@ const SIGNALS = ['SIGHUP', 'SIGINT', 'SIGTERM'] as const;
 
 let server: McpServer | null = null;
 let shuttingDown = false;
+
+type LogLevel =
+  | 'error'
+  | 'debug'
+  | 'info'
+  | 'notice'
+  | 'warning'
+  | 'critical'
+  | 'alert'
+  | 'emergency';
+
+async function sendMcpLog(level: LogLevel, data: unknown): Promise<void> {
+  const current = server;
+  if (!current?.isConnected()) return;
+  try {
+    await current.sendLoggingMessage({ level, data });
+  } catch (error) {
+    const log = getLogger();
+    log.debug({ err: error }, 'Failed to send MCP log message');
+  }
+}
 
 function logSecondShutdown(reason: string): void {
   const log = getLogger();
@@ -217,6 +238,11 @@ export async function shutdown(reason: string, err?: unknown): Promise<void> {
 
   const timeout = startForcedShutdownTimer();
   let exitCode = err ? 1 : 0;
+  await sendMcpLog(err ? 'error' : 'info', {
+    event: 'shutdown',
+    reason,
+    ...(err instanceof Error ? { message: err.message } : {}),
+  });
   if (!(await closeServer())) exitCode = 1;
 
   clearTimeout(timeout);

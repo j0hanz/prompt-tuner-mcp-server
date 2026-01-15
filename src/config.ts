@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 import packageJson from '../package.json' with { type: 'json' };
 
-// Hardcoded defaults (not user-configurable)
-export const LLM_TIMEOUT_MS = 15000;
+// Defaults (some can be overridden via env)
+const DEFAULT_LLM_TIMEOUT_MS = 15000;
 export const MAX_PROMPT_LENGTH = 10000;
 export const MAX_OUTPUT_TOKENS = 10000;
 export const RETRY_MAX_ATTEMPTS = 3;
@@ -24,6 +24,12 @@ const envSchema = z.object({
     .optional()
     .default('openai'),
   LLM_MODEL: z.string().optional(),
+  LLM_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .default(DEFAULT_LLM_TIMEOUT_MS),
 
   OPENAI_API_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
@@ -32,8 +38,9 @@ const envSchema = z.object({
 
 export const config = envSchema.parse(process.env);
 
+export const { LLM_TIMEOUT_MS } = config;
 export const SERVER_NAME = 'prompttuner-mcp';
-export const SERVER_VERSION = packageJson.version;
+export const { version: SERVER_VERSION } = packageJson;
 
 export const SERVER_INSTRUCTIONS = `# PromptTuner MCP
 

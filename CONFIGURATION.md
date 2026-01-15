@@ -15,10 +15,11 @@ All tools are LLM-backed and require an API key for the selected provider.
 
 ## Optional Configuration
 
-| Variable    | Default | Description                 |
-| ----------- | ------- | --------------------------- |
-| `LLM_MODEL` | -       | Override the default model. |
-| `DEBUG`     | `false` | Enable debug logging.       |
+| Variable         | Default | Description                                      |
+| ---------------- | ------- | ------------------------------------------------ |
+| `LLM_MODEL`      | -       | Override the default model.                      |
+| `LLM_TIMEOUT_MS` | `15000` | Override per-request LLM timeout (milliseconds). |
+| `DEBUG`          | `false` | Enable debug logging.                            |
 
 ## Default Models
 
@@ -94,13 +95,12 @@ CLI flags override environment variables.
 }
 ```
 
-## Hardcoded Defaults
+## Default Settings
 
-The following are optimized defaults and not user-configurable:
+The following are optimized defaults:
 
 | Setting             | Value   | Purpose                                     |
 | ------------------- | ------- | ------------------------------------------- |
-| Request timeout     | 15s     | Per-LLM-request timeout                     |
 | Max prompt length   | 10,000  | Input character limit                       |
 | Retry attempts      | 3       | Retries on transient failures               |
 | Retry base delay    | 1s      | Exponential backoff base                    |
