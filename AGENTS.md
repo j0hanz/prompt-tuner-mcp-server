@@ -1,115 +1,76 @@
 # AGENTS.md
 
-## Project Overview
+> **Purpose:** Context and strict guidelines for AI agents working in this repository.
 
-- TypeScript MCP server that improves user prompts via three tools:
-  - `fix_prompt`: polish and refine a prompt for clarity and flow.
-  - `boost_prompt`: enhance a prompt using prompt-engineering best practices.
-  - `crafting_prompt`: generate a reusable “workflow prompt” from a request.
-- Runs over **stdio transport** (no HTTP transport in this repo).
-- Uses `@modelcontextprotocol/sdk`, `zod` (v4), and provider SDKs (`openai`, `@anthropic-ai/sdk`, `@google/genai`).
+## 1. Project Context
 
-## Repo Map / Structure
+- **Domain:** Model Context Protocol (MCP) stdio server that refines user prompts (fix/boost/crafting) via an LLM provider.
+- **Tech Stack:**
+  - **Language:** TypeScript (compiler: TypeScript 5.9.3)
+  - **Runtime:** Node.js (package `engines.node` is `>=22.0.0`)
+  - **Framework/Protocol:** `@modelcontextprotocol/sdk` (MCP server + stdio transport)
+  - **Key Libraries:** `zod` (schemas), `pino` (logging), provider SDKs (`openai`, `@anthropic-ai/sdk`, `@google/genai`)
+- **Architecture:** Layered single-package server: CLI entrypoint → MCP server wiring → tool handlers → shared `lib/` utilities.
 
-- `src/`: server implementation
-  - `src/index.ts`: CLI entrypoint (stdio server)
-  - `src/server.ts`: MCP server wiring + stdio transport
-  - `src/tools.ts`: tool implementations
-  - `src/schemas.ts`: Zod schemas for tool IO
-  - `src/config.ts`: configuration/constants
-  - `src/lib/`: LLM + retry + telemetry + prompt utilities
-- `tests/`: `node:test` suites
-- `dist/`: build output (generated)
-- `docs/`: static assets (e.g., `docs/logo.png`)
-- `scripts/`: repo utilities (e.g., `scripts/Quality-Gates.ps1`)
-- `metrics/`, `logs/`: local artifacts (ignored by git)
+## 2. Repository Map (High-Level Only)
 
-## Setup & Environment
+- `src/`: Production server code (CLI, MCP server, tools, schemas, config, shared utils).
+- `src/lib/`: Provider + prompt/telemetry/error utilities used by tools.
+- `tests/`: `node:test` suites (unit + MCP integration).
+- `.github/workflows/`: CI automation (publish pipeline).
+- `docs/`: Static assets (e.g., logo).
 
-- Node.js: `>=22.0.0` (see `package.json` `engines.node`).
-- Install dependencies:
-  - `npm ci` (matches CI)
-  - `npm install`
-- Runtime configuration (env vars): documented in `README.md` and `CONFIGURATION.md`.
-  - Required: `LLM_PROVIDER` plus one provider API key (`OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY`).
-  - Optional: `LLM_MODEL`, `DEBUG`.
+> _Note: Ignore `dist`, `node_modules`._
 
-## Development Workflow
+## 3. Operational Commands
 
-- Dev (watch from source): `npm run dev`
-- Build (emit `dist/`): `npm run build`
-- Run compiled server: `npm run start`
-- MCP Inspector (stdio): `npm run inspector`
+- **Environment:** Node.js `>=22.0.0`.
+- **Install:** `npm install` (CI uses `npm ci`)
+- **Dev Server:** `npm run dev` (runs `tsx watch src/index.ts`)
+- **Test:** `npm test` (Node’s built-in test runner via `node --test --import=tsx`)
+- **Build:** `npm run build` (TypeScript build via `tsc -p tsconfig.build.json`)
 
-Notes:
+Useful gates:
 
-- `dev:http` / `start:http` are compatibility aliases of `dev` / `start` (no HTTP transport).
+- `npm run lint`
+- `npm run type-check`
 
-## Testing
+## 4. Coding Standards (Style & Patterns)
 
-- Run tests once: `npm run test`
-- Watch mode: `npm run test:watch`
-- Coverage: `npm run test:coverage` (writes `coverage/lcov.info`)
-- Test location: `tests/` (executed by Node’s built-in test runner).
+- **Module system:** ESM (`"type": "module"`) with `moduleResolution: NodeNext`.
+- **Imports:** Local imports use `.js` extensions (even in TypeScript source).
+- **Naming:** `camelCase` for variables/functions; `PascalCase` for types.
+- **Typing:** Strict TypeScript (`strict: true`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`).
+- **Preferred patterns:**
+  - Zod schemas are strict (unknown input fields are rejected); parse early in tool handlers.
+  - Tool outputs include machine-friendly `structuredContent` and also a JSON string in `content` for backward compatibility.
+  - User-provided prompt text is wrapped as data using `wrapPromptData(...)` and the `INPUT_HANDLING_SECTION` guidance.
+  - Error responses are created via shared helpers (see `createErrorResponse` usage in tool handlers).
 
-## Code Style & Conventions
+## 5. Agent Behavioral Rules (The “Do Nots”)
 
-- Language: TypeScript (ESM, `"type": "module"`).
-- Type-check: `npm run type-check` (runs `tsc --noEmit` for both `tsconfig.json` and `tsconfig.test.json`).
-- Lint: `npm run lint` (ESLint flat config in `eslint.config.mjs`).
-- Format: `npm run format` (Prettier; import ordering via `@trivago/prettier-plugin-sort-imports`).
+- **Prohibited:** Do not use `any` (ESLint forbids it).
+- **Prohibited:** Do not add default exports; keep named exports.
+- **Prohibited:** Do not omit `.js` on local imports (NodeNext/ESM requires it).
+- **Prohibited:** Do not weaken Zod schemas (keep strict objects; reject unknown fields).
+- **Prohibited:** Do not write non-MCP output to stdout (stdio transport); log via the project logger / stderr only.
+- **Prohibited:** Do not hardcode secrets or echo API keys. Use env vars only (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`).
+- **Prohibited:** Do not edit lockfiles manually.
 
-Conventions reflected in repo config/docs:
+## 6. Testing Strategy
 
-- Local imports use `.js` extensions (NodeNext resolution).
-- Prefer type-only imports (`import { type X } from ...`).
-- Zod objects are typically strict (`z.strictObject(...)`) to reject unknown fields.
+- **Framework:** `node:test`.
+- **Approach:**
+  - Unit tests validate Zod strictness and prompt wrapping/normalization utilities.
+  - Integration tests spin up the server over stdio using the MCP SDK client and run from source (`node --import=tsx src/index.ts`).
+  - LLM-backed integration tests are gated on presence of any provider API key in env.
 
-Related repo guidance:
+## 7. Evolution & Maintenance
 
-- `.github/instructions/typescript-mcp-server.instructions.md`
-- `.github/instructions/zod-v4.instructions.md`
+- **Update Rule:** If a convention changes (scripts, tool surface, folder structure, provider behavior), update this file in the same PR.
+- **Feedback Loop:** If a build/test/lint/type-check command fails twice, add the root cause + fix to “Common Pitfalls” below.
 
-## Build / Release
+## 8. Common Pitfalls
 
-- Build output directory: `dist/`.
-- Package entrypoints:
-  - `bin.prompt-tuner-mcp-server` → `./dist/index.js`
-  - `main` / `exports` → `dist/index.js` (and `dist/index.d.ts`)
-- Pre-publish gate: `npm run prepublishOnly` (runs `lint`, `type-check`, `build`).
-- GitHub workflow: `.github/workflows/publish.yml` publishes to npm on GitHub Release publish.
-
-## Security & Safety
-
-- Secrets: provider API keys are supplied via environment variables (do not commit keys).
-- Transport: stdio server should not write non-protocol output to stdout.
-- Inputs: tool inputs are validated/trimmed and use strict schemas (unknown fields rejected).
-- Google safety: content filtering is enabled (documented in `README.md` / `CONFIGURATION.md`).
-
-## Pull Request / Commit Guidelines
-
-- No commit message convention is enforced by repo configuration.
-- Before opening a PR, run the same gates used by publish:
-  - `npm run lint`
-  - `npm run type-check`
-  - `npm run test`
-  - `npm run build`
-
-Optional helper:
-
-- `scripts/Quality-Gates.ps1` provides a PowerShell workflow for measuring/comparing metrics and doing “safe refactors” with validation gates.
-
-## Troubleshooting
-
-- Server exits immediately:
-  - Ensure `LLM_PROVIDER` is set and the matching provider API key env var is present.
-- MCP client reports malformed JSON-RPC / corrupted stdio:
-  - Avoid writing logs to stdout; use stderr logging patterns only.
-- Type-check failures that mention Node types:
-  - Confirm you’re on Node `>=22` and dependencies are installed.
-- Slow responses or timeouts:
-  - Try setting `LLM_MODEL` to a faster model (see defaults in `README.md`).
-
-## Open Questions / TODO
-
-- `.github/workflows/publish.yml` uses Node 20, but `package.json` requires Node `>=22.0.0`. Decide whether to align the workflow Node version or relax `engines.node`.
+- CI publish workflow uses Node `20` while `package.json` declares `engines.node >=22.0.0`; keep these aligned when changing runtime requirements.
+- `dev:http` / `start:http` scripts are aliases; the server currently runs over stdio (no HTTP transport).
