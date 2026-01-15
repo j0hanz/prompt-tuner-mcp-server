@@ -10,6 +10,7 @@ import {
   CraftingPromptInputSchema,
   FixPromptInputSchema,
 } from '../src/schemas.js';
+import { toolsTestHelpers } from '../src/tools.js';
 
 describe('input schemas', () => {
   it('rejects unknown fields for fix', () => {
@@ -142,5 +143,37 @@ describe('output validation', () => {
       'Sure, you are a helpful assistant. Follow the instructions carefully.';
     const result = normalizePromptText(input);
     assert.strictEqual(result, input);
+  });
+});
+
+describe('token sizing', () => {
+  it('keeps a minimum token budget for short prompts', () => {
+    const input = 'Hello';
+    const tokens = toolsTestHelpers.resolveMaxTokens(
+      input,
+      toolsTestHelpers.MIN_FIX_OUTPUT_TOKENS,
+      toolsTestHelpers.FIX_MAX_OUTPUT_TOKENS
+    );
+    assert.strictEqual(tokens, toolsTestHelpers.MIN_FIX_OUTPUT_TOKENS);
+  });
+
+  it('caps fix output tokens for long prompts', () => {
+    const input = 'x'.repeat(10_000);
+    const tokens = toolsTestHelpers.resolveMaxTokens(
+      input,
+      toolsTestHelpers.MIN_FIX_OUTPUT_TOKENS,
+      toolsTestHelpers.FIX_MAX_OUTPUT_TOKENS
+    );
+    assert.strictEqual(tokens, toolsTestHelpers.FIX_MAX_OUTPUT_TOKENS);
+  });
+
+  it('caps boost output tokens for long prompts', () => {
+    const input = 'x'.repeat(50_000);
+    const tokens = toolsTestHelpers.resolveMaxTokens(
+      input,
+      toolsTestHelpers.MIN_BOOST_OUTPUT_TOKENS,
+      toolsTestHelpers.BOOST_MAX_OUTPUT_TOKENS
+    );
+    assert.strictEqual(tokens, toolsTestHelpers.BOOST_MAX_OUTPUT_TOKENS);
   });
 });

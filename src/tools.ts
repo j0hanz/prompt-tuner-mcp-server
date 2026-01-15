@@ -33,18 +33,41 @@ const MIN_FIX_OUTPUT_TOKENS = 512;
 const MIN_BOOST_OUTPUT_TOKENS = 800;
 const MIN_CRAFT_OUTPUT_TOKENS = 1200;
 
-function resolveMaxTokens(input: string, minTokens: number): number {
-  const trimmed = input.trim();
+const FIX_MAX_OUTPUT_TOKENS = 2000;
+const BOOST_MAX_OUTPUT_TOKENS = 3500;
+const CRAFT_MAX_OUTPUT_TOKENS = 6000;
+
+const CHARS_PER_TOKEN_ESTIMATE = 4;
+
+function estimateTokensFromText(text: string): number {
+  const trimmed = text.trim();
   const { length } = trimmed;
-  const desired = Math.max(length, minTokens);
-  return Math.min(desired, MAX_OUTPUT_TOKENS);
+  if (length <= 0) return 0;
+  return Math.ceil(length / CHARS_PER_TOKEN_ESTIMATE);
+}
+
+function resolveMaxTokens(
+  input: string,
+  minTokens: number,
+  toolCap: number
+): number {
+  const estimatedOutputTokens = estimateTokensFromText(input);
+  const desired = Math.max(
+    minTokens,
+    Math.ceil(estimatedOutputTokens * 0.8) + 50
+  );
+  return Math.min(desired, toolCap, MAX_OUTPUT_TOKENS);
 }
 
 function resolveCraftingMaxTokens(input: CraftingPromptInput): number {
   const combined = [input.request, input.constraints]
     .filter((value): value is string => Boolean(value))
     .join('\n');
-  return resolveMaxTokens(combined, MIN_CRAFT_OUTPUT_TOKENS);
+  return resolveMaxTokens(
+    combined,
+    MIN_CRAFT_OUTPUT_TOKENS,
+    CRAFT_MAX_OUTPUT_TOKENS
+  );
 }
 
 const FIX_PROMPT_TOOL = {
@@ -295,7 +318,11 @@ async function handleFixPrompt(
     const client = await getLLMClient();
     const text = await client.generateText(
       buildFixInstruction(parsed.prompt),
-      resolveMaxTokens(parsed.prompt, MIN_FIX_OUTPUT_TOKENS),
+      resolveMaxTokens(
+        parsed.prompt,
+        MIN_FIX_OUTPUT_TOKENS,
+        FIX_MAX_OUTPUT_TOKENS
+      ),
       {
         signal: extra.signal,
       }
@@ -326,7 +353,11 @@ async function handleBoostPrompt(
     const client = await getLLMClient();
     const text = await client.generateText(
       buildBoostInstruction(parsed.prompt),
-      resolveMaxTokens(parsed.prompt, MIN_BOOST_OUTPUT_TOKENS),
+      resolveMaxTokens(
+        parsed.prompt,
+        MIN_BOOST_OUTPUT_TOKENS,
+        BOOST_MAX_OUTPUT_TOKENS
+      ),
       { signal: extra.signal }
     );
 
@@ -405,3 +436,14 @@ export function registerPromptTools(server: McpServer): void {
     handleCraftingPrompt
   );
 }
+
+export const toolsTestHelpers = {
+  estimateTokensFromText,
+  resolveMaxTokens,
+  MIN_FIX_OUTPUT_TOKENS,
+  MIN_BOOST_OUTPUT_TOKENS,
+  MIN_CRAFT_OUTPUT_TOKENS,
+  FIX_MAX_OUTPUT_TOKENS,
+  BOOST_MAX_OUTPUT_TOKENS,
+  CRAFT_MAX_OUTPUT_TOKENS,
+} as const;
