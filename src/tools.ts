@@ -241,6 +241,32 @@ function buildCraftingInstruction(input: CraftingPromptInput): string {
     `Tone: ${formatTone(input.tone)}`,
     `Verbosity: ${formatVerbosity(input.verbosity)}`,
   ];
+  const templateBlocks: string[] = [
+    '# Workflow Prompt',
+    '',
+    '## Context',
+    '- Workspace / environment context (paths, OS, runtime) if known.',
+    '- Relevant existing code constraints / conventions.',
+    '',
+    '## Task',
+    '- State the goal clearly and list concrete deliverables.',
+    '',
+    '## Operating rules',
+    '- Safety rules (ask-before-destruction, no secrets, minimal diffs, etc).',
+    '- If constraints were provided, include them here as non-negotiable bullets.',
+    '',
+    '## Execution loop',
+    '1) Recall prior context (if any).',
+    '2) Discover relevant files and code paths.',
+    '3) Draft a small plan with acceptance criteria.',
+    '4) Implement the smallest safe changes.',
+    '5) Verify with the tightest checks (tests/lint/type-check).',
+    '6) Report outcomes and next steps.',
+    '',
+    '## Response format',
+    '- Provide concise progress updates while working.',
+    '- Finish with a short recap + next actions.',
+  ];
   const blocks = [
     'You are a prompt engineering expert.',
     '',
@@ -251,6 +277,8 @@ function buildCraftingInstruction(input: CraftingPromptInput): string {
     '- Include sections: Context, Task, Operating rules, Execution loop, Response format.',
     '- Do NOT include analysis, preambles, quotes, or code fences around the final output.',
     '- If constraints are provided, integrate them as non-negotiable rules under the Operating rules section.',
+    '- Use the exact section headings shown in the template (do not rename headings).',
+    '- Before responding, self-check that all required headings are present.',
     '',
     'Use these settings:',
     ...settingsLines.map((line) => `- ${line}`),
@@ -269,7 +297,145 @@ function buildCraftingInstruction(input: CraftingPromptInput): string {
     );
   }
 
+  blocks.push(
+    '',
+    'Output template (MUST keep headings exactly; fill in the content):',
+    '',
+    ...templateBlocks
+  );
+
   return blocks.join('\n');
+}
+
+function buildCraftingRetryInstruction(input: CraftingPromptInput): string {
+  const settingsLines: string[] = [
+    `Mode: ${formatMode(input.mode)}`,
+    `Approach: ${formatApproach(input.approach)}`,
+    `Tone: ${formatTone(input.tone)}`,
+    `Verbosity: ${formatVerbosity(input.verbosity)}`,
+  ];
+
+  const blocks: string[] = [
+    'You are a prompt engineering expert.',
+    '',
+    'Task: Regenerate the workflow prompt, but this time you MUST follow the required Markdown structure exactly.',
+    '',
+    'Hard requirements (non-negotiable):',
+    '- Output must start with: # Workflow Prompt',
+    '- Include these headings EXACTLY (spelling + casing):',
+    '  - ## Context',
+    '  - ## Task',
+    '  - ## Operating rules',
+    '  - ## Execution loop',
+    '  - ## Response format',
+    '- Do NOT add any content before # Workflow Prompt.',
+    '- Do NOT wrap the output in code fences.',
+    '- Keep the output as a single Markdown document.',
+    '',
+    'Use these settings:',
+    ...settingsLines.map((line) => `- ${line}`),
+    '',
+    CRAFTING_INPUT_HANDLING_SECTION,
+    '',
+    'User request (JSON string inside markers):',
+    wrapPromptData(input.request),
+  ];
+
+  if (input.constraints) {
+    blocks.push(
+      '',
+      'Constraints (JSON string inside markers):',
+      wrapPromptData(input.constraints)
+    );
+  }
+
+  blocks.push(
+    '',
+    'Self-check before responding: confirm you included all 5 headings and that there is no preamble.',
+    '',
+    'Now output the workflow prompt.'
+  );
+
+  return blocks.join('\n');
+}
+
+function formatMultilineBullets(value: string): string[] {
+  const lines = value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) return ['- (none)'];
+  return lines.map((line) => `- ${line}`);
+}
+
+function buildCraftingFallbackPrompt(input: CraftingPromptInput): string {
+  const settingsLines: string[] = [
+    `- Mode: ${formatMode(input.mode)}`,
+    `- Approach: ${formatApproach(input.approach)}`,
+    `- Tone: ${formatTone(input.tone)}`,
+    `- Verbosity: ${formatVerbosity(input.verbosity)}`,
+  ];
+
+  const blocks: string[] = [
+    '# Workflow Prompt',
+    '',
+    '## Context',
+    'You are an autonomous software engineering agent working in VS Code.',
+    'Use the following settings:',
+    ...settingsLines,
+    '',
+    'User request:',
+    ...formatMultilineBullets(input.request),
+  ];
+
+  blocks.push(
+    '',
+    '## Task',
+    '- Complete the work described in the user request.',
+    '- If the request is ambiguous, ask focused clarifying questions before making risky changes.',
+    '- Prefer minimal, verifiable edits over large refactors.',
+    '',
+    '## Operating rules'
+  );
+
+  if (input.constraints) {
+    blocks.push(
+      'Non-negotiable constraints:',
+      ...formatMultilineBullets(input.constraints),
+      ''
+    );
+  }
+
+  blocks.push(
+    'General rules:',
+    '- Verify before acting; do not guess when files/tests can confirm.',
+    '- Ask before destructive or irreversible actions.',
+    '- Avoid unrelated refactors; keep changes atomic.',
+    '- Never include secrets in outputs; use env vars for credentials.',
+    '',
+    '## Execution loop',
+    '1) Recall: search for existing context, decisions, or similar work.',
+    '2) Discover: locate relevant files via ls/find/grep; read only what you need.',
+    '3) Plan: propose the smallest safe steps with acceptance criteria and risks.',
+    '4) Implement: make atomic changes; prefer one patch per file when feasible.',
+    '5) Verify: run the tightest check next (tests/lint/type-check).',
+    '6) Report: summarize what changed, how verified, and next steps.',
+    '',
+    '## Response format',
+    '- While working: short progress updates (1–2 sentences).',
+    '- Final: bullets summarizing changes, verification, and remaining follow-ups.'
+  );
+
+  return blocks.join('\n');
+}
+
+function isCraftingOutputValidationError(error: unknown): error is McpError {
+  return (
+    error instanceof McpError &&
+    error.code === ErrorCode.E_LLM_FAILED &&
+    error.message.startsWith('Crafted prompt missing required')
+  );
 }
 
 function buildFixInstruction(prompt: string): string {
@@ -463,19 +629,46 @@ async function handleCraftingPrompt(
     };
   }>
 > {
-  return runPromptTool({
-    input,
-    extra,
-    schema: CraftingPromptInputSchema,
-    progress: {
-      start: 'Preparing workflow prompt',
-      end: 'Workflow prompt ready',
-    },
-    buildInstruction: buildCraftingInstruction,
-    resolveMaxTokens: resolveCraftingMaxTokens,
-    normalizeOutput: normalizePromptText,
-    validateOutput: validateCraftingPromptOutput,
-    buildStructured: (parsed, output) => ({
+  try {
+    const parsed = CraftingPromptInputSchema.parse(input);
+    assertNotAborted(extra.signal);
+    await sendProgress(extra, 0, 1, 'Preparing workflow prompt');
+
+    const client = await getLLMClient();
+    const maxTokens = resolveCraftingMaxTokens(parsed);
+
+    const initialText = await client.generateText(
+      buildCraftingInstruction(parsed),
+      maxTokens,
+      { signal: extra.signal }
+    );
+
+    let output = normalizePromptText(initialText);
+    try {
+      validateCraftingPromptOutput(output);
+    } catch (error) {
+      if (!isCraftingOutputValidationError(error)) throw error;
+
+      await sendProgress(extra, 0.5, 1, 'Retrying workflow prompt formatting');
+      const retryText = await client.generateText(
+        buildCraftingRetryInstruction(parsed),
+        maxTokens,
+        { signal: extra.signal }
+      );
+      output = normalizePromptText(retryText);
+
+      try {
+        validateCraftingPromptOutput(output);
+      } catch (retryError) {
+        if (!isCraftingOutputValidationError(retryError)) throw retryError;
+        output = buildCraftingFallbackPrompt(parsed);
+      }
+    }
+
+    validateCraftingPromptOutput(output);
+    await sendProgress(extra, 1, 1, 'Workflow prompt ready');
+
+    return createSuccessResponse('Crafted workflow prompt.', {
       ok: true as const,
       prompt: output,
       settings: {
@@ -484,10 +677,14 @@ async function handleCraftingPrompt(
         tone: parsed.tone,
         verbosity: parsed.verbosity,
       },
-    }),
-    successMessage: 'Crafted workflow prompt.',
-    errorContext: extractRequestFromInput,
-  });
+    });
+  } catch (error) {
+    return createErrorResponse(
+      error,
+      ErrorCode.E_LLM_FAILED,
+      extractRequestFromInput(input)
+    );
+  }
 }
 
 export function registerPromptTools(server: McpServer): void {
@@ -507,6 +704,8 @@ export function registerPromptTools(server: McpServer): void {
 export const toolsTestHelpers = {
   estimateTokensFromText,
   resolveMaxTokens,
+  validateCraftingPromptOutput,
+  buildCraftingFallbackPrompt,
   MIN_FIX_OUTPUT_TOKENS,
   MIN_BOOST_OUTPUT_TOKENS,
   MIN_CRAFT_OUTPUT_TOKENS,

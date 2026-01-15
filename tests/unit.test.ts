@@ -177,3 +177,22 @@ describe('token sizing', () => {
     assert.strictEqual(tokens, toolsTestHelpers.BOOST_MAX_OUTPUT_TOKENS);
   });
 });
+
+describe('crafting_prompt fallback', () => {
+  it('produces a contract-compliant workflow prompt', () => {
+    const parsed = CraftingPromptInputSchema.parse({
+      request: 'Generate an AGENTS.md file for this repo.',
+      constraints: 'No breaking changes. Keep edits minimal.',
+      mode: 'general',
+      approach: 'balanced',
+      tone: 'direct',
+      verbosity: 'normal',
+    });
+
+    const prompt = toolsTestHelpers.buildCraftingFallbackPrompt(parsed);
+    assert.ok(prompt.startsWith('# Workflow Prompt'));
+
+    // Ensure the same validator used by the tool accepts the fallback.
+    toolsTestHelpers.validateCraftingPromptOutput(prompt);
+  });
+});
