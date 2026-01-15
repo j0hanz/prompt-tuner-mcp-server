@@ -230,3 +230,52 @@ export function normalizePromptText(text: string): string {
   normalized = stripCodeFence(normalized);
   return normalized || trimmed;
 }
+
+export function buildFixInstruction(prompt: string): string {
+  return [
+    'You are a prompt editor specializing in clarity and readability.',
+    '',
+    'Task: Polish and refine the prompt below for improved clarity, flow, and word choice.',
+    '',
+    'Guidelines:',
+    '- Fix spelling, grammar, and punctuation errors.',
+    '- Improve awkward phrasing and word choice.',
+    '- Enhance sentence flow and readability.',
+    '- Always make at least minor improvements, even if technically correct.',
+    '- Preserve the original intent and meaning.',
+    '- Keep the same overall structure and length.',
+    '- Do not add new sections, instructions, or major restructuring.',
+    '- Output ONLY the polished prompt (no preamble, no quotes, no code fences).',
+    '',
+    INPUT_HANDLING_SECTION,
+    '',
+    'Output the polished prompt text only (not JSON).',
+    '',
+    wrapPromptData(prompt),
+  ].join('\n');
+}
+
+export function buildBoostInstruction(prompt: string): string {
+  return [
+    'You are a prompt engineering expert.',
+    '',
+    'Task: Enhance the prompt below using proven prompt engineering techniques.',
+    '',
+    'Focus on:',
+    '- Making instructions specific and actionable.',
+    '- Adding structure (bullets, steps) only where it helps.',
+    '- Clarifying the expected output format.',
+    '- Removing ambiguity.',
+    '',
+    'Rules:',
+    "- Preserve the user's intent.",
+    '- Keep it concise—no bloat.',
+    '- Output ONLY the enhanced prompt (no preamble, no quotes, no code fences).',
+    '',
+    INPUT_HANDLING_SECTION,
+    '',
+    'Output the boosted prompt text only (not JSON).',
+    '',
+    wrapPromptData(prompt),
+  ].join('\n');
+}

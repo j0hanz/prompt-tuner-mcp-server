@@ -19,6 +19,7 @@ import {
 
 import { SERVER_INSTRUCTIONS, SERVER_NAME, SERVER_VERSION } from './config.js';
 import { logger } from './lib/errors.js';
+import { registerPrompts } from './prompts.js';
 import { registerPromptTools } from './tools.js';
 
 process.on('warning', (warning) => {
@@ -176,12 +177,14 @@ function createServer(): McpServer {
         logging: {},
         resources: {},
         tools: { listChanged: true },
+        prompts: { listChanged: true },
       },
     }
   );
 
   registerInstructionsResource(server);
   registerPromptTools(server);
+  registerPrompts(server);
   enforceStrictProtocolVersion(server);
   enforceInitializeFirst(server);
   disableSdkToolInputValidation(server);
