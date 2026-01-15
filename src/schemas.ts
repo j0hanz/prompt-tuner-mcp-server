@@ -2,103 +2,72 @@ import { z } from 'zod';
 
 import { MAX_PROMPT_LENGTH } from './config.js';
 
-function addEmptyPromptIssue(ctx: z.RefinementCtx): void {
-  ctx.addIssue({
-    code: 'too_small',
-    origin: 'string',
-    minimum: 1,
-    inclusive: true,
-    message:
-      'Prompt is empty or contains only whitespace. Please provide a valid prompt.',
-  });
+const RAW_INPUT_MAX = MAX_PROMPT_LENGTH * 2;
+
+interface TextFieldMessages {
+  empty: string;
+  tooLong: (trimmedLength: number) => string;
+  rawTooLong: string;
 }
 
-function addTooLongIssue(ctx: z.RefinementCtx, trimmed: string): void {
-  ctx.addIssue({
-    code: 'too_big',
-    origin: 'string',
-    maximum: MAX_PROMPT_LENGTH,
-    inclusive: true,
-    message: `Prompt exceeds maximum length after trimming: ${trimmed.length} characters (limit: ${MAX_PROMPT_LENGTH}). Please shorten your prompt.`,
-  });
+function buildTextFieldMessages(label: string): TextFieldMessages {
+  const lowerLabel = label.toLowerCase();
+  return {
+    empty: `${label} is empty or contains only whitespace. Please provide a valid ${lowerLabel}.`,
+    tooLong: (trimmedLength) =>
+      `${label} exceeds maximum length after trimming: ${trimmedLength} characters (limit: ${MAX_PROMPT_LENGTH}). Please shorten your ${lowerLabel}.`,
+    rawTooLong: `${label} rejected: raw input exceeds ${RAW_INPUT_MAX} characters (including whitespace). Trim or shorten your ${lowerLabel}.`,
+  };
 }
 
-function enforcePromptLength(value: string, ctx: z.RefinementCtx): void {
+function enforceTrimmedLength(
+  value: string,
+  ctx: z.RefinementCtx,
+  messages: TextFieldMessages
+): void {
   const trimmed = value.trim();
   if (trimmed.length < 1) {
-    addEmptyPromptIssue(ctx);
+    ctx.addIssue({
+      code: 'too_small',
+      origin: 'string',
+      minimum: 1,
+      inclusive: true,
+      message: messages.empty,
+    });
     return;
   }
 
   if (trimmed.length > MAX_PROMPT_LENGTH) {
-    addTooLongIssue(ctx, trimmed);
+    ctx.addIssue({
+      code: 'too_big',
+      origin: 'string',
+      maximum: MAX_PROMPT_LENGTH,
+      inclusive: true,
+      message: messages.tooLong(trimmed.length),
+    });
   }
 }
 
-function buildPromptSchema(
+function buildTrimmedTextSchema(
+  label: string,
   description: string
 ): z.ZodPipe<z.ZodString, z.ZodTransform<string, string>> {
+  const messages = buildTextFieldMessages(label);
   return z
     .string()
-    .max(
-      MAX_PROMPT_LENGTH * 2,
-      `Prompt rejected: raw input exceeds ${MAX_PROMPT_LENGTH * 2} characters (including whitespace). Trim or shorten your prompt.`
-    )
-    .superRefine(enforcePromptLength)
+    .max(RAW_INPUT_MAX, messages.rawTooLong)
+    .superRefine((value, ctx) => {
+      enforceTrimmedLength(value, ctx, messages);
+    })
     .transform((value) => value.trim())
     .describe(description);
 }
 
-const basePromptSchema = buildPromptSchema('Prompt text');
-
-function addEmptyRequestIssue(ctx: z.RefinementCtx): void {
-  ctx.addIssue({
-    code: 'too_small',
-    origin: 'string',
-    minimum: 1,
-    inclusive: true,
-    message:
-      'Request is empty or contains only whitespace. Please provide a valid request.',
-  });
-}
-
-function addTooLongRequestIssue(ctx: z.RefinementCtx, trimmed: string): void {
-  ctx.addIssue({
-    code: 'too_big',
-    origin: 'string',
-    maximum: MAX_PROMPT_LENGTH,
-    inclusive: true,
-    message: `Request exceeds maximum length after trimming: ${trimmed.length} characters (limit: ${MAX_PROMPT_LENGTH}). Please shorten your request.`,
-  });
-}
-
-function enforceRequestLength(value: string, ctx: z.RefinementCtx): void {
-  const trimmed = value.trim();
-  if (trimmed.length < 1) {
-    addEmptyRequestIssue(ctx);
-    return;
-  }
-
-  if (trimmed.length > MAX_PROMPT_LENGTH) {
-    addTooLongRequestIssue(ctx, trimmed);
-  }
-}
-
-function buildRequestSchema(
-  description: string
-): z.ZodPipe<z.ZodString, z.ZodTransform<string, string>> {
-  return z
-    .string()
-    .max(
-      MAX_PROMPT_LENGTH * 2,
-      `Request rejected: raw input exceeds ${MAX_PROMPT_LENGTH * 2} characters (including whitespace). Trim or shorten your request.`
-    )
-    .superRefine(enforceRequestLength)
-    .transform((value) => value.trim())
-    .describe(description);
-}
-
-const baseRequestSchema = buildRequestSchema('Task/request text');
+const basePromptSchema = buildTrimmedTextSchema('Prompt', 'Prompt text');
+const baseRequestSchema = buildTrimmedTextSchema(
+  'Request',
+  'Task/request text'
+);
 
 const CRAFTING_PROMPT_MODES = [
   'general',

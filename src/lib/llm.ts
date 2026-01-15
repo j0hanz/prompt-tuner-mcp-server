@@ -337,12 +337,7 @@ const NON_RETRYABLE_CODES = new Set<ErrorCodeType>([
   ErrorCode.E_INVALID_INPUT,
 ]);
 
-function resolveRetrySettings(): {
-  maxRetries: number;
-  baseDelayMs: number;
-  maxDelayMs: number;
-  totalTimeoutMs: number;
-} {
+function resolveRetrySettings(): RetrySettings {
   return {
     maxRetries: RETRY_MAX_ATTEMPTS,
     baseDelayMs: RETRY_BASE_DELAY_MS,
@@ -518,7 +513,7 @@ async function executeAttempts(
   requestFn: () => Promise<string>,
   signal: AbortSignal | undefined
 ): Promise<{ content: string; attemptsUsed: number }> {
-  const settings = resolveRetrySettings() as RetrySettings;
+  const settings = resolveRetrySettings();
   const startTime = Date.now();
   let attemptsUsed = 0;
   for (let attempt = 0; attempt <= settings.maxRetries; attempt++) {
@@ -637,18 +632,18 @@ async function runGeneration(
 
 const PROVIDER_CONFIG = {
   openai: {
-    envKey: 'OPENAI_API_KEY',
+    envKey: PROVIDER_ENV_KEYS.openai,
     defaultModel: DEFAULT_MODELS.openai,
     create: (apiKey: string, model: string) => new OpenAIClient(apiKey, model),
   },
   anthropic: {
-    envKey: 'ANTHROPIC_API_KEY',
+    envKey: PROVIDER_ENV_KEYS.anthropic,
     defaultModel: DEFAULT_MODELS.anthropic,
     create: (apiKey: string, model: string) =>
       new AnthropicClient(apiKey, model),
   },
   google: {
-    envKey: 'GOOGLE_API_KEY',
+    envKey: PROVIDER_ENV_KEYS.google,
     defaultModel: DEFAULT_MODELS.google,
     create: (apiKey: string, model: string) => new GoogleClient(apiKey, model),
   },
@@ -656,10 +651,14 @@ const PROVIDER_CONFIG = {
 
 let llmClientPromise: Promise<LLMClient> | null = null;
 
+const PROVIDER_API_KEYS: Record<LLMProvider, string | undefined> = {
+  openai: config.OPENAI_API_KEY,
+  anthropic: config.ANTHROPIC_API_KEY,
+  google: config.GOOGLE_API_KEY,
+};
+
 function resolveApiKey(provider: LLMProvider): string | undefined {
-  if (provider === 'openai') return config.OPENAI_API_KEY;
-  if (provider === 'anthropic') return config.ANTHROPIC_API_KEY;
-  return config.GOOGLE_API_KEY;
+  return PROVIDER_API_KEYS[provider];
 }
 
 function createLLMClient(): LLMClient {
