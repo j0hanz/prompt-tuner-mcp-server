@@ -165,12 +165,25 @@ type LogLevel =
 async function sendMcpLog(level: LogLevel, data: unknown): Promise<void> {
   const current = server;
   if (!current?.isConnected()) return;
+  if (!isLoggingNegotiated(current)) return;
   try {
     await current.sendLoggingMessage({ level, data });
   } catch (error) {
     const log = getLogger();
     log.debug({ err: error }, 'Failed to send MCP log message');
   }
+}
+
+function isLoggingNegotiated(current: McpServer): boolean {
+  const protocol = current.server as unknown as {
+    getClientCapabilities?: () => unknown;
+  };
+  if (!protocol.getClientCapabilities) return false;
+  const caps = protocol.getClientCapabilities();
+  if (!caps) return false;
+  const { logging } = caps as { logging?: unknown };
+  if (typeof logging === 'boolean') return logging;
+  return true;
 }
 
 function logSecondShutdown(reason: string): void {

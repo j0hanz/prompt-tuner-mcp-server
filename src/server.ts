@@ -14,7 +14,6 @@ import {
   InitializeRequestSchema,
   type InitializeResult,
   ErrorCode as RpcErrorCode,
-  McpError as RpcMcpError,
   SUPPORTED_PROTOCOL_VERSIONS,
 } from '@modelcontextprotocol/sdk/types.js';
 
@@ -76,21 +75,10 @@ function enforceStrictProtocolVersion(server: McpServer): void {
     async (request): Promise<InitializeResult> => {
       const { protocolVersion } = request.params;
       if (!SUPPORTED_PROTOCOL_VERSIONS.includes(protocolVersion)) {
-        const error = new RpcMcpError(
-          RpcErrorCode.InvalidParams,
-          `Unsupported protocol version: ${protocolVersion} (supported: ${SUPPORTED_PROTOCOL_VERSIONS.join(
-            ', '
-          )})`
+        logger.warn(
+          { protocolVersion, supported: SUPPORTED_PROTOCOL_VERSIONS },
+          'Unsupported protocol version requested; negotiating to latest supported version'
         );
-        setTimeout(() => {
-          server.close().catch((closeError: unknown) => {
-            logger.error(
-              { err: closeError, protocolVersion },
-              'Failed to close server after protocol mismatch'
-            );
-          });
-        }, 0);
-        throw error;
       }
       return await baseInitialize(request);
     }
@@ -181,6 +169,7 @@ function createServer(): McpServer {
       instructions: SERVER_INSTRUCTIONS,
       capabilities: {
         logging: {},
+        resources: {},
         tools: { listChanged: true },
       },
     }
@@ -195,6 +184,18 @@ function createServer(): McpServer {
   return server;
 }
 
+function isLoggingNegotiated(server: McpServer): boolean {
+  const protocol = server.server as unknown as {
+    getClientCapabilities?: () => unknown;
+  };
+  if (!protocol.getClientCapabilities) return false;
+  const caps = protocol.getClientCapabilities();
+  if (!caps) return false;
+  const { logging } = caps as { logging?: unknown };
+  if (typeof logging === 'boolean') return logging;
+  return true;
+}
+
 export async function startServer(): Promise<McpServer> {
   const server = createServer();
   await server.connect(new StdioServerTransport());
@@ -202,15 +203,21 @@ export async function startServer(): Promise<McpServer> {
   logger.info(
     `${styleText('green', SERVER_NAME)} v${styleText('blue', SERVER_VERSION)} started`
   );
-  try {
-    await server.sendLoggingMessage({
-      level: 'info',
-      logger: SERVER_NAME,
-      data: { event: 'start', version: SERVER_VERSION },
-    });
-  } catch (error) {
-    logger.debug({ err: error }, 'Failed to send MCP log message');
-  }
+  const protocol = server.server as unknown as { oninitialized?: () => void };
+  const baseOnInitialized = protocol.oninitialized?.bind(server.server);
+  protocol.oninitialized = (): void => {
+    baseOnInitialized?.();
+    if (!isLoggingNegotiated(server)) return;
+    server
+      .sendLoggingMessage({
+        level: 'info',
+        logger: SERVER_NAME,
+        data: { event: 'start', version: SERVER_VERSION },
+      })
+      .catch((error: unknown) => {
+        logger.debug({ err: error }, 'Failed to send MCP log message');
+      });
+  };
 
   return server;
 }
