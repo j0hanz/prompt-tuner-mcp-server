@@ -112,7 +112,12 @@ function enforceInitializeFirst(server: McpServer): void {
       typeof request === 'object' && request !== null && 'method' in request
         ? (request as { method?: unknown }).method
         : undefined;
-    if (!initialized && method !== 'initialize' && method !== 'ping') {
+    if (
+      !initialized &&
+      method !== 'initialize' &&
+      method !== 'ping' &&
+      method !== 'logging/setLevel'
+    ) {
       const hasId =
         typeof request === 'object' &&
         request !== null &&
