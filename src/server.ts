@@ -1,7 +1,13 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 import { styleText } from 'node:util';
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import {
+  McpServer,
+  ResourceTemplate,
+} from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   type InitializeRequest,
@@ -30,6 +36,29 @@ type InitializeHandler = (
 
 type OnRequestHandler = (request: unknown, extra?: unknown) => void;
 type OnInitializedHandler = () => void;
+
+const INSTRUCTIONS_RESOURCE_URI = 'internal://instructions';
+const INSTRUCTIONS_PATH = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  'instructions.md'
+);
+
+function registerInstructionsResource(server: McpServer): void {
+  server.registerResource(
+    'instructions',
+    new ResourceTemplate(INSTRUCTIONS_RESOURCE_URI, { list: undefined }),
+    { title: 'Agent Instructions', mimeType: 'text/markdown' },
+    (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          text: fs.readFileSync(INSTRUCTIONS_PATH, 'utf-8'),
+          mimeType: 'text/markdown',
+        },
+      ],
+    })
+  );
+}
 
 function enforceStrictProtocolVersion(server: McpServer): void {
   const baseInitialize = (
@@ -157,6 +186,7 @@ function createServer(): McpServer {
     }
   );
 
+  registerInstructionsResource(server);
   registerPromptTools(server);
   enforceStrictProtocolVersion(server);
   enforceInitializeFirst(server);
