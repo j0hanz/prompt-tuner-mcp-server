@@ -96,21 +96,30 @@ function enforceInitializeFirst(server: McpServer): void {
         ? (request as { method?: unknown }).method
         : undefined;
     if (!initialized && method !== 'initialize' && method !== 'ping') {
-      const id =
-        typeof request === 'object' && request !== null && 'id' in request
-          ? (request as { id?: unknown }).id
-          : undefined;
-      const errorResponse = {
-        jsonrpc: '2.0',
-        id,
-        error: {
-          code: RpcErrorCode.InvalidRequest,
-          message: 'Server not initialized',
-        },
-      };
-      protocol._transport?.send(errorResponse).catch((error: unknown) => {
-        logger.error({ err: error }, 'Failed to send initialize error');
-      });
+      const hasId =
+        typeof request === 'object' &&
+        request !== null &&
+        Object.prototype.hasOwnProperty.call(request, 'id');
+      if (hasId) {
+        const rawId = (request as { id?: unknown }).id;
+        const responseId =
+          typeof rawId === 'string' ||
+          typeof rawId === 'number' ||
+          rawId === null
+            ? rawId
+            : null;
+        const errorResponse = {
+          jsonrpc: '2.0',
+          id: responseId,
+          error: {
+            code: RpcErrorCode.InvalidRequest,
+            message: 'Server not initialized',
+          },
+        };
+        protocol._transport?.send(errorResponse).catch((error: unknown) => {
+          logger.error({ err: error }, 'Failed to send initialize error');
+        });
+      }
       return;
     }
     baseOnRequest(request, extra);
@@ -143,7 +152,7 @@ function createServer(): McpServer {
       instructions: SERVER_INSTRUCTIONS,
       capabilities: {
         logging: {},
-        tools: { listChanged: false },
+        tools: { listChanged: true },
       },
     }
   );

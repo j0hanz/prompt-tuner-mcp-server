@@ -10,6 +10,7 @@ import {
   createErrorResponse,
   createSuccessResponse,
   ErrorCode,
+  logger,
   McpError,
 } from './lib/errors.js';
 import { getLLMClient } from './lib/llm.js';
@@ -38,6 +39,35 @@ const BOOST_MAX_OUTPUT_TOKENS = 3500;
 const CRAFT_MAX_OUTPUT_TOKENS = 6000;
 
 const CHARS_PER_TOKEN_ESTIMATE = 4;
+
+function assertNotAborted(signal: AbortSignal): void {
+  if (signal.aborted) {
+    throw new McpError(ErrorCode.E_TIMEOUT, 'Request aborted');
+  }
+}
+
+async function sendProgress(
+  extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
+  progress: number,
+  total: number | undefined,
+  message?: string
+): Promise<void> {
+  const token = extra._meta?.progressToken;
+  if (token === undefined) return;
+  try {
+    await extra.sendNotification({
+      method: 'notifications/progress',
+      params: {
+        progressToken: token,
+        progress,
+        ...(total !== undefined ? { total } : {}),
+        ...(message ? { message } : {}),
+      },
+    });
+  } catch (error) {
+    logger.debug({ err: error }, 'Failed to send progress notification');
+  }
+}
 
 function estimateTokensFromText(text: string): number {
   const trimmed = text.trim();
@@ -314,6 +344,8 @@ async function handleFixPrompt(
 > {
   try {
     const parsed = FixPromptInputSchema.parse(input);
+    assertNotAborted(extra.signal);
+    await sendProgress(extra, 0, 1, 'Preparing prompt');
 
     const client = await getLLMClient();
     const text = await client.generateText(
@@ -329,6 +361,7 @@ async function handleFixPrompt(
     );
 
     const fixed = normalizePromptText(text);
+    await sendProgress(extra, 1, 1, 'Prompt ready');
     const structured = { ok: true as const, fixed };
     return createSuccessResponse('Fixed prompt.', structured);
   } catch (error) {
@@ -349,6 +382,8 @@ async function handleBoostPrompt(
 > {
   try {
     const parsed = BoostPromptInputSchema.parse(input);
+    assertNotAborted(extra.signal);
+    await sendProgress(extra, 0, 1, 'Preparing prompt');
 
     const client = await getLLMClient();
     const text = await client.generateText(
@@ -362,6 +397,7 @@ async function handleBoostPrompt(
     );
 
     const boosted = normalizePromptText(text);
+    await sendProgress(extra, 1, 1, 'Prompt ready');
     const structured = { ok: true as const, boosted };
     return createSuccessResponse('Boosted prompt.', structured);
   } catch (error) {
@@ -393,6 +429,8 @@ async function handleCraftingPrompt(
 > {
   try {
     const parsed = CraftingPromptInputSchema.parse(input);
+    assertNotAborted(extra.signal);
+    await sendProgress(extra, 0, 1, 'Preparing workflow prompt');
 
     const client = await getLLMClient();
     const text = await client.generateText(
@@ -403,6 +441,7 @@ async function handleCraftingPrompt(
 
     const prompt = normalizePromptText(text);
     validateCraftingPromptOutput(prompt);
+    await sendProgress(extra, 1, 1, 'Workflow prompt ready');
     const structured = {
       ok: true as const,
       prompt,
