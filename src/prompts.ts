@@ -14,7 +14,7 @@ export function registerPrompts(server: McpServer): void {
       argsSchema: FixPromptInputSchema.shape,
     },
     (args) => {
-      const { prompt } = args;
+      const { prompt } = FixPromptInputSchema.parse(args);
       return {
         messages: [
           {
@@ -36,7 +36,7 @@ export function registerPrompts(server: McpServer): void {
       argsSchema: BoostPromptInputSchema.shape,
     },
     (args) => {
-      const { prompt } = args;
+      const { prompt } = BoostPromptInputSchema.parse(args);
       return {
         messages: [
           {

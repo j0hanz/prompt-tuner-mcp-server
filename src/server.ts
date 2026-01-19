@@ -177,8 +177,8 @@ function createServer(): McpServer {
       capabilities: {
         logging: {},
         resources: {},
-        tools: { listChanged: true },
-        prompts: { listChanged: true },
+        tools: { listChanged: false },
+        prompts: { listChanged: false },
       },
     }
   );
@@ -188,6 +188,7 @@ function createServer(): McpServer {
   registerPrompts(server);
   enforceStrictProtocolVersion(server);
   enforceInitializeFirst(server);
+  // Keep validation in handlers so we can return structured MCP tool errors.
   disableSdkToolInputValidation(server);
 
   return server;
