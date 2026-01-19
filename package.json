@@ -24,7 +24,8 @@
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('dist', {recursive:true, force:true}); ['tsconfig.tsbuildinfo', 'tsconfig.build.tsbuildinfo', 'tsconfig.test.tsbuildinfo'].forEach(f => require('fs').rmSync(f, {force:true}))\"",
     "validate:instructions": "node -e \"require('fs').accessSync('src/instructions.md')\"",
-    "build": "npm run clean && tsc -p tsconfig.json && npm run validate:instructions && npm run copy:assets && node -e \"require('fs').chmodSync('dist/index.js', '755')\"",
+    "build": "tsc -p tsconfig.json && npm run validate:instructions && npm run copy:assets && node -e \"require('fs').chmodSync('dist/index.js', '755')\"",
+    "build:clean": "npm run clean && npm run build",
     "copy:assets": "node -e \"require('fs').copyFileSync('src/instructions.md', 'dist/instructions.md')\"",
     "prepare": "npm run build",
     "watch": "tsc --watch",
@@ -41,7 +42,7 @@
     "duplication": "jscpd -f typescript,tsx -p \"**/*.ts\" -k 50 -t 3 src",
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js",
     "inspector:http": "npx @modelcontextprotocol/inspector -- node dist/index.js",
-    "prepublishOnly": "npm run lint && npm run type-check && npm run build"
+    "prepublishOnly": "npm run lint && npm run type-check && npm run build:clean"
   },
   "keywords": [
     "mcp",

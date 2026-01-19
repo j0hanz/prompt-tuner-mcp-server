@@ -54,7 +54,7 @@ export interface LLMRequestOptions {
 export interface LLMClient {
   generateText(
     prompt: string,
-    maxTokens?: number,
+    maxTokens: number,
     options?: LLMRequestOptions
   ): Promise<string>;
   getProvider(): LLMProvider;

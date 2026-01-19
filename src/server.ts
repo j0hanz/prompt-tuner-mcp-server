@@ -42,6 +42,7 @@ const INSTRUCTIONS_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   'instructions.md'
 );
+const INSTRUCTIONS_TEXT = fs.readFileSync(INSTRUCTIONS_PATH, 'utf-8');
 
 function registerInstructionsResource(server: McpServer): void {
   server.registerResource(
@@ -52,7 +53,7 @@ function registerInstructionsResource(server: McpServer): void {
       contents: [
         {
           uri: uri.href,
-          text: fs.readFileSync(INSTRUCTIONS_PATH, 'utf-8'),
+          text: INSTRUCTIONS_TEXT,
           mimeType: 'text/markdown',
         },
       ],

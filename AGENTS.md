@@ -28,7 +28,8 @@
 - **Install:** `npm install` (CI uses `npm ci`)
 - **Dev Server:** `npm run dev` (runs `tsx watch src/index.ts`)
 - **Test:** `npm test` (Node’s built-in test runner via `node --test --import=tsx`)
-- **Build:** `npm run build` (TypeScript build via `tsc -p tsconfig.build.json`)
+- **Build:** `npm run build` (TypeScript build via `tsc -p tsconfig.json`)
+- **Clean Build:** `npm run build:clean` (removes build outputs + tsbuildinfo, then runs `npm run build`)
 
 Useful gates:
 

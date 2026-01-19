@@ -490,7 +490,7 @@ async function runPromptTool<
   try {
     const parsed = options.schema.parse(options.input);
     assertNotAborted(options.extra.signal);
-    await sendProgress(options.extra, 0, 1, options.progress.start);
+    void sendProgress(options.extra, 0, 1, options.progress.start);
 
     const client = await getLLMClient();
     const text = await client.generateText(
@@ -501,7 +501,7 @@ async function runPromptTool<
 
     const output = options.normalizeOutput(text);
     options.validateOutput?.(output);
-    await sendProgress(options.extra, 1, 1, options.progress.end);
+    void sendProgress(options.extra, 1, 1, options.progress.end);
 
     const structured = options.buildStructured(parsed, output);
     return createSuccessResponse(options.successMessage, structured);
@@ -584,7 +584,7 @@ async function handleCraftingPrompt(
   try {
     const parsed = CraftingPromptInputSchema.parse(input);
     assertNotAborted(extra.signal);
-    await sendProgress(extra, 0, 1, 'Preparing workflow prompt');
+    void sendProgress(extra, 0, 1, 'Preparing workflow prompt');
 
     const client = await getLLMClient();
     const maxTokens = resolveCraftingMaxTokens(parsed);
@@ -601,7 +601,7 @@ async function handleCraftingPrompt(
     } catch (error) {
       if (!isCraftingOutputValidationError(error)) throw error;
 
-      await sendProgress(extra, 0.5, 1, 'Retrying workflow prompt formatting');
+      void sendProgress(extra, 0.5, 1, 'Retrying workflow prompt formatting');
       const retryText = await client.generateText(
         buildCraftingRetryInstruction(parsed),
         maxTokens,
@@ -618,7 +618,7 @@ async function handleCraftingPrompt(
     }
 
     validateCraftingPromptOutput(output);
-    await sendProgress(extra, 1, 1, 'Workflow prompt ready');
+    void sendProgress(extra, 1, 1, 'Workflow prompt ready');
 
     return createSuccessResponse('Crafted workflow prompt.', {
       ok: true as const,
